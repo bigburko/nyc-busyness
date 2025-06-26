@@ -1,3 +1,5 @@
+'use client';
+
 import { Tooltip, Box } from '@chakra-ui/react';
 import { IoIosInformationCircle } from 'react-icons/io';
 import React from 'react';
@@ -12,8 +14,6 @@ export default function MyToolTip({ label }: Props) {
       hasArrow
       bg="gray.300"
       color="black"
-      fontSize="sm"
-      p={30}
       borderRadius="md"
       label={<Box color="black">{label}</Box>}
     >
