@@ -22,6 +22,7 @@ export default function MyToolTip({ label }: Props) {
         cursor="pointer"
         display="inline-flex"
         alignItems="center"
+        p={20}
       >
         <IoIosInformationCircle />
       </Box>
