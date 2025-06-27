@@ -8,6 +8,7 @@ import {
   SliderFilledTrack,
   SliderThumb,
 } from '@chakra-ui/react';
+import MyToolTip from './MyToolTip';
 // import MyToolTip from './MyToolTip';
 
 interface Props {
@@ -31,7 +32,7 @@ export default function MySlider({
         <Heading as="h4" size="md">
           {heading}
         </Heading>
-        {/* <MyToolTip label="Hello world!" /> */}
+        <MyToolTip label="Lorem ipsum dolor sit amet consectetur adipisicing elit.`" />
       </Box>
 
       <Slider aria-label="slider" defaultValue={defaultValue}>

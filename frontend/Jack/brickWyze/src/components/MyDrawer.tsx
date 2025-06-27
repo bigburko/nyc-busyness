@@ -10,11 +10,18 @@ import {
   DrawerContent,
   DrawerCloseButton,
   useDisclosure,
+  Flex,
+  Box,
 } from '@chakra-ui/react';
 import { useRef } from 'react';
 import MySlider from './MySlider';
 import MyToolTip from './MyToolTip';
 import { GiHamburgerMenu } from "react-icons/gi";
+import MyRangeSlider from './MyRangeSlider';
+import { SearchIcon } from '@chakra-ui/icons';
+
+
+
 
 export default function MyDrawer() {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -23,7 +30,7 @@ export default function MyDrawer() {
   return (
     <main style={{ padding: '2rem' }}>
       <Button ref={btnRef} onClick={onOpen} background={"transparent"}>
-        <GiHamburgerMenu></GiHamburgerMenu>
+        <GiHamburgerMenu />
       </Button>
 
       <Drawer
@@ -38,14 +45,28 @@ export default function MyDrawer() {
           <DrawerHeader>Priorities</DrawerHeader>
 
           <DrawerBody>
-            <MySlider />
-            <MyToolTip label={"hello World!"}></MyToolTip>
+            <Flex align="center" justify="space-between">
+              <MySlider />
+            </Flex>
+            <Flex align="center" justify="space-between">
+              <MyRangeSlider heading='Rent (PSF)' toolTipText='Target Average Rent cost per Square foot in $USD'></MyRangeSlider>
+            </Flex>
+            <Flex align="center" justify="space-between">
+              <MySlider />
+            </Flex>
+            <Flex align="center" justify="space-between">
+              <MySlider />
+            </Flex>
           </DrawerBody>
+          
 
           <DrawerFooter>
-            <Button variant="outline" mr={3} onClick={onClose}>
-              Close
-            </Button>
+            <Box w="100%" textAlign="center">
+              <Button borderRadius={20} bg="#FF492C" variant="outline" onClick={onClose}>
+                <SearchIcon mr={2} />
+                Search
+              </Button>
+            </Box>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
