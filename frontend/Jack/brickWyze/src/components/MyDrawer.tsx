@@ -40,35 +40,29 @@ export default function MyDrawer() {
         finalFocusRef={btnRef}
       >
         <DrawerOverlay />
-        <DrawerContent bg="#FFDED8">
+        <DrawerContent bg="#FFDED8" display="flex" flexDirection="column" h="100%">
           <DrawerCloseButton />
           <DrawerHeader>Priorities</DrawerHeader>
 
-          <DrawerBody>
-            <Flex align="center" justify="space-between">
+          <DrawerBody overflowY="auto">
+            <Flex direction="column" gap={4}>
               <MySlider />
-            </Flex>
-            <Flex align="center" justify="space-between">
-              <MyRangeSlider heading='Rent (PSF)' toolTipText='Target Average Rent cost per Square foot in $USD'></MyRangeSlider>
-            </Flex>
-            <Flex align="center" justify="space-between">
+              <MyRangeSlider heading='Rent (PSF)' toolTipText='Target Average Rent cost per Square foot in $USD' />
               <MySlider />
-            </Flex>
-            <Flex align="center" justify="space-between">
               <MySlider />
             </Flex>
           </DrawerBody>
-          
 
-          <DrawerFooter>
-            <Box w="100%" textAlign="center">
-              <Button borderRadius={20} bg="#FF492C" variant="outline" onClick={onClose}>
+          <Box p={4} position="sticky" bottom="0" bg="#FFDED8" zIndex="sticky">
+            <Flex justify="center">
+              <Button bg="#FF492C" variant="solid" onClick={onClose}>
                 <SearchIcon mr={2} />
                 Search
               </Button>
-            </Box>
-          </DrawerFooter>
+            </Flex>
+          </Box>
         </DrawerContent>
+
       </Drawer>
     </main>
   );
