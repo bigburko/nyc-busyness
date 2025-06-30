@@ -9,12 +9,13 @@ import {
   ActionMeta,
   MenuListProps,
   ValueContainerProps,
+  GroupBase,
 } from 'chakra-react-select';
 import { ethnicityData } from './ethnicityData';
 import { Pill } from './Pill';
 import { MenuOption } from './MenuOption';
 
-// Define all interfaces in the main file
+// Define all interfaces
 interface Option {
   label: string;
   value: string;
@@ -50,6 +51,8 @@ interface Props {
   data?: Option[];
   label?: string;
   onChange: (selected: string[]) => void;
+  autoFocus?: boolean;
+  onMenuOpenChange?: (isOpen: boolean) => void;
 }
 
 // Helper function
@@ -104,6 +107,8 @@ export default function HierarchicalMultiSelect({
   data = ethnicityData,
   label = 'Select Ethnicities',
   onChange,
+  autoFocus = false,
+  onMenuOpenChange,
 }: Props) {
   const [selectedValues, setSelectedValues] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -112,6 +117,21 @@ export default function HierarchicalMultiSelect({
   const selectRef = useRef<any>(null);
 
   const hierarchyTree = useMemo(() => buildHierarchyTree(data), [data]);
+
+  // Handle auto-focus
+  useEffect(() => {
+    if (autoFocus && selectRef.current) {
+      setTimeout(() => {
+        selectRef.current.focus();
+        setMenuIsOpen(true);
+      }, 400);
+    }
+  }, [autoFocus]);
+
+  // Notify parent when menu state changes
+  useEffect(() => {
+    onMenuOpenChange?.(menuIsOpen);
+  }, [menuIsOpen, onMenuOpenChange]);
 
   // Create flat options list
   const flatOptions = useMemo(() => {
@@ -399,7 +419,7 @@ export default function HierarchicalMultiSelect({
           </Box>
         ) : (
           optionsToRender.map((option) => (
-           <MenuOption
+            <MenuOption
               key={option.value}
               option={option}
               selectedValues={selectedValues}
@@ -412,7 +432,6 @@ export default function HierarchicalMultiSelect({
               inputValue={inputValue}
               hierarchyNodeMap={hierarchyTree.nodeMap}
             />
-
           ))
         )}
       </Box>
@@ -453,9 +472,9 @@ export default function HierarchicalMultiSelect({
   };
 
   return (
-    <Box w="100%">
+    <Box w="100%" position="relative">
       <FormLabel mb={1}>{label}</FormLabel>
-      <Select<EnhancedOption, true>
+      <Select<EnhancedOption, true, GroupBase<EnhancedOption>>
         ref={selectRef}
         isMulti
         value={selectedOptions}
@@ -475,21 +494,23 @@ export default function HierarchicalMultiSelect({
         menuIsOpen={menuIsOpen}
         onMenuOpen={() => setMenuIsOpen(true)}
         onMenuClose={() => setMenuIsOpen(false)}
+        menuPosition="absolute"
+        menuPlacement="bottom"
         chakraStyles={{
           container: (provided) => ({
             ...provided,
             backgroundColor: 'white',
             width: '100%',
           }),
-          control: (provided) => ({
+          control: (provided, state) => ({
             ...provided,
             backgroundColor: 'white',
-            borderColor: '#E2E8F0',
-            boxShadow: 'none',
+            borderColor: state.isFocused ? '#FF492C' : '#E2E8F0',
+            boxShadow: state.isFocused ? '0 0 0 1px #FF492C' : 'none',
             minHeight: 'auto',
             width: '100%',
             '&:hover': {
-              borderColor: '#CBD5E0',
+              borderColor: state.isFocused ? '#FF492C' : '#CBD5E0',
             },
           }),
           valueContainer: (provided) => ({
@@ -503,13 +524,17 @@ export default function HierarchicalMultiSelect({
             backgroundColor: 'white',
             border: '1px solid #E2E8F0',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            zIndex: 9999,
+            marginTop: '4px',
+            marginBottom: '4px',
+            width: '100%',
+            zIndex: 100,
           }),
+          // Removed menuPortal as it's not a valid property
           menuList: (provided) => ({
             ...provided,
             backgroundColor: '#FAFAFA',
             padding: '4px',
-            maxHeight: 'none',
+            maxHeight: '380px',
           }),
           dropdownIndicator: (provided) => ({ 
             ...provided, 

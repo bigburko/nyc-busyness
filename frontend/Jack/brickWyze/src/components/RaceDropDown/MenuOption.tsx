@@ -39,7 +39,7 @@ const getRaceEmoji = (label: string): string => {
   if (label.includes('Asian')) return '🌏';
   if (label.includes('American Indian')) return '🪶';
   if (label.includes('Pacific Islander')) return '🏝️';
-  if (label.includes('Some Other Race')) return '🌈';
+  if (label.includes('Some Other Race')) return '❓';
   if (label.includes('Black')) return '🌍';
   if (label.includes('White')) return '🌎';
   if (label.includes('Hispanic')) return '🌮';
@@ -120,7 +120,9 @@ export const MenuOption: React.FC<MenuOptionProps> = ({
             )}
             <Box fontSize="lg" flexShrink={0}>{getRaceEmoji(option.label)}</Box>
             <Box minW={0} flex={1}>
-              <Box fontSize="sm" fontWeight="bold" isTruncated>{option.label}</Box>
+              <Box fontSize="sm" fontWeight="bold" whiteSpace="normal" wordBreak="break-word">
+                {option.label}
+              </Box>
               <Box fontSize="xs" opacity={0.9}>
                 {leafChildren.length} items
                 {someSelected && !allSelected && ` • ${selectedCount} selected`}
@@ -166,7 +168,9 @@ export const MenuOption: React.FC<MenuOptionProps> = ({
         }}
       >
         <Box minW={0} flex={1}>
-          <Box fontSize="sm" isTruncated>{option.label}</Box>
+          <Box fontSize="sm" whiteSpace="normal" wordBreak="break-word">
+            {option.label}
+          </Box>
           <Box fontSize="xs" opacity={0.8}>
             {leafChildren.length} items
             {someSelected && !allSelected && ` • ${selectedCount} selected`}
@@ -212,8 +216,8 @@ export const MenuOption: React.FC<MenuOptionProps> = ({
           transform: 'translateX(2px)',
         }}
         fontSize="sm"
-        isTruncated
-        maxW="calc(100% - 60px)"
+        whiteSpace="normal"
+        wordBreak="break-word"
       >
         {option.label}
       </Box>
