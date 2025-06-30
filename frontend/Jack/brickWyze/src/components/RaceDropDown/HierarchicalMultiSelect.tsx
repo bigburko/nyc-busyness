@@ -458,10 +458,12 @@ export default function HierarchicalMultiSelect({
         >
           {displayPills.map((pill) => (
             <Pill
-              key={`${pill.value}-${pill.type}`}
-              pill={pill}
-              onRemove={removePill}
-            />
+                key={`${pill.value}-${pill.type}`}
+                pill={pill}
+                onRemove={removePill}
+              />
+
+
           ))}
           <Box display="flex" flex="1" minW="100px">
             {nonMultiValueChildren}
@@ -527,22 +529,26 @@ export default function HierarchicalMultiSelect({
             marginTop: '4px',
             marginBottom: '4px',
             width: '100%',
+            height: '380px',        // 👈 forces fixed total menu height
+            maxHeight: '380px',
+            minHeight: '240px',
+            overflowY: 'auto',
             zIndex: 100,
           }),
-          // Removed menuPortal as it's not a valid property
           menuList: (provided) => ({
             ...provided,
             backgroundColor: '#FAFAFA',
             padding: '4px',
-            maxHeight: '380px',
+            height: '100%',         // 👈 force it to take the parent height
+            overflowY: 'auto',
           }),
-          dropdownIndicator: (provided) => ({ 
-            ...provided, 
+          dropdownIndicator: (provided) => ({
+            ...provided,
             padding: '4px 8px',
             color: '#718096',
           }),
-          clearIndicator: (provided) => ({ 
-            ...provided, 
+          clearIndicator: (provided) => ({
+            ...provided,
             padding: '4px 8px',
             color: '#718096',
           }),
@@ -551,6 +557,7 @@ export default function HierarchicalMultiSelect({
             display: 'none',
           }),
         }}
+
         components={{
           MenuList: CustomMenuList,
           ValueContainer: CustomValueContainer,
@@ -559,6 +566,7 @@ export default function HierarchicalMultiSelect({
           GroupHeading: () => null,
         }}
       />
+
     </Box>
   );
 }

@@ -12,49 +12,48 @@ import {
   Flex,
   Box,
 } from '@chakra-ui/react';
-import { useRef, useEffect } from 'react';
-import MySlider from './MySlider';
+import { useRef, useState } from 'react';
 import { GiHamburgerMenu } from 'react-icons/gi';
-import MyRangeSlider from './MyRangeSlider';
 import { SearchIcon } from '@chakra-ui/icons';
+import type { FocusableElement } from '@chakra-ui/utils';
+
+import MySlider from './MySlider';
+import MyRangeSlider from './MyRangeSlider';
 import HierarchicalMultiSelect from './RaceDropDown/HierarchicalMultiSelect';
 import { ethnicityData } from './RaceDropDown/ethnicityData';
 
 export default function MyDrawer() {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const btnRef = useRef<HTMLButtonElement>(null!);
+  const btnRef = useRef<HTMLButtonElement>(null); // ✅ Correct HTMLButtonElement
   const ethnicityRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
 
+  const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
+
   const handleEthnicityChange = (selected: string[]) => {
+    setSelectedEthnicities(selected);
     console.log("Selected ethnicity codes:", selected);
+  };
+
+  const handleDropdownMenuChange = (menuIsOpen: boolean) => {
+    if (menuIsOpen) {
+      setTimeout(() => {
+        scrollToDropdown();
+      }, 100);
+    } else {
+      scrollToTop();
+    }
   };
 
   const scrollToDropdown = () => {
     if (ethnicityRef.current && drawerBodyRef.current) {
-      const dropdownElement = ethnicityRef.current;
-      const drawerBody = drawerBodyRef.current;
+      const dropdown = ethnicityRef.current;
+      const body = drawerBodyRef.current;
 
-      const dropdownRect = dropdownElement.getBoundingClientRect();
-      const drawerBodyRect = drawerBody.getBoundingClientRect();
+      const offsetTop = dropdown.offsetTop;
+      const scrollTarget = Math.max(0, offsetTop - 50);
 
-      const dropdownOffsetTop = dropdownElement.offsetTop;
-      const drawerBodyHeight = drawerBodyRect.height;
-      const dropdownHeight = Math.max(dropdownRect.height, 400);
-
-      let scrollPosition;
-      if (dropdownHeight + 100 < drawerBodyHeight) {
-        scrollPosition = dropdownOffsetTop - 50;
-      } else {
-        scrollPosition = dropdownOffsetTop - 20;
-      }
-
-      scrollPosition = Math.max(0, scrollPosition);
-
-      drawerBody.scrollTo({
-        top: scrollPosition,
-        behavior: 'smooth'
-      });
+      body.scrollTo({ top: scrollTarget, behavior: 'smooth' });
     }
   };
 
@@ -64,27 +63,17 @@ export default function MyDrawer() {
     }
   };
 
-  const handleDropdownMenuChange = (isOpen: boolean) => {
-    if (isOpen) {
-      setTimeout(() => {
-        scrollToDropdown();
-      }, 100);
-    } else {
-      scrollToTop(); // Snap back when closed
-    }
-  };
-
   return (
     <main style={{ padding: '2rem' }}>
-      <Button ref={btnRef} onClick={onOpen} background={'transparent'}>
+      <Button ref={btnRef} onClick={onOpen} background="transparent">
         <GiHamburgerMenu />
       </Button>
 
       <Drawer
         isOpen={isOpen}
-        placement="left"
         onClose={onClose}
-        finalFocusRef={btnRef}
+        finalFocusRef={btnRef as React.RefObject<FocusableElement>} // ✅ Cast for Chakra
+        placement="left"
         size="sm"
       >
         <DrawerOverlay />
@@ -128,19 +117,19 @@ export default function MyDrawer() {
 
               <Box mt={4} />
 
-              {/* Dropdown container with scroll target */}
+              {/* Ethnicity Dropdown Scroll Target */}
               <Box
                 ref={ethnicityRef}
                 borderRadius="md"
-                transition="all 0.3s"
-                position="relative"
                 minHeight="60px"
+                position="relative"
               >
                 <HierarchicalMultiSelect
                   data={ethnicityData}
                   label="Select Ethnicities"
                   onChange={handleEthnicityChange}
                   onMenuOpenChange={handleDropdownMenuChange}
+                  autoFocus={false}
                 />
               </Box>
             </Flex>
