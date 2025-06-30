@@ -53,7 +53,13 @@ interface Props {
   onChange: (selected: string[]) => void;
   autoFocus?: boolean;
   onMenuOpenChange?: (isOpen: boolean) => void;
+  controlledInput: string;
+  setControlledInput: (val: string) => void;
+  externalSelectedValues: string[];
+  externalExpandedGroups: Set<string>;
+  setExternalExpandedGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
+
 
 // Helper function
 const buildHierarchyTree = (data: Option[]) => {
@@ -109,10 +115,22 @@ export default function HierarchicalMultiSelect({
   onChange,
   autoFocus = false,
   onMenuOpenChange,
+  controlledInput,
+  setControlledInput,
+  externalSelectedValues,
+  externalExpandedGroups,
+  setExternalExpandedGroups,
 }: Props) {
-  const [selectedValues, setSelectedValues] = useState<string[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [inputValue, setInputValue] = useState('');
+
+  const selectedValues = externalSelectedValues;
+  const setSelectedValues = onChange;
+
+  const expandedGroups = externalExpandedGroups;
+  const setExpandedGroups = setExternalExpandedGroups;
+
+  const inputValue = controlledInput;
+  const setInputValue = setControlledInput;
+
   const [menuIsOpen, setMenuIsOpen] = useState(false);
   const selectRef = useRef<any>(null);
 
@@ -208,7 +226,12 @@ export default function HierarchicalMultiSelect({
         }
       });
       
-      setExpandedGroups(prev => new Set([...prev, ...groupsToExpand]));
+      setExpandedGroups((prev: Set<string>) => {
+  const next = new Set(prev);
+  // ...
+  return next;
+});
+
     }
   }, [inputValue, flatOptions, hierarchyTree.nodeMap]);
 

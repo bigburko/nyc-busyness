@@ -17,6 +17,7 @@ import { GiHamburgerMenu } from 'react-icons/gi';
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
+
 import MySlider from './MySlider';
 import MyRangeSlider from './MyRangeSlider';
 import HierarchicalMultiSelect from './RaceDropDown/HierarchicalMultiSelect';
@@ -24,15 +25,18 @@ import { ethnicityData } from './RaceDropDown/ethnicityData';
 
 export default function MyDrawer() {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const btnRef = useRef<HTMLButtonElement>(null); // ✅ Correct HTMLButtonElement
+  const btnRef = useRef<HTMLButtonElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
 
+  // ✅ Persistent ethnicity select state
   const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
+  const [dropdownInput, setDropdownInput] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
+
 
   const handleEthnicityChange = (selected: string[]) => {
     setSelectedEthnicities(selected);
-    console.log("Selected ethnicity codes:", selected);
   };
 
   const handleDropdownMenuChange = (menuIsOpen: boolean) => {
@@ -49,10 +53,8 @@ export default function MyDrawer() {
     if (ethnicityRef.current && drawerBodyRef.current) {
       const dropdown = ethnicityRef.current;
       const body = drawerBodyRef.current;
-
       const offsetTop = dropdown.offsetTop;
       const scrollTarget = Math.max(0, offsetTop - 50);
-
       body.scrollTo({ top: scrollTarget, behavior: 'smooth' });
     }
   };
@@ -72,7 +74,7 @@ export default function MyDrawer() {
       <Drawer
         isOpen={isOpen}
         onClose={onClose}
-        finalFocusRef={btnRef as React.RefObject<FocusableElement>} // ✅ Cast for Chakra
+        finalFocusRef={btnRef as React.RefObject<FocusableElement>}
         placement="left"
         size="sm"
       >
@@ -114,22 +116,19 @@ export default function MyDrawer() {
               />
               <MySlider />
               <MySlider />
-
               <Box mt={4} />
-
-              {/* Ethnicity Dropdown Scroll Target */}
-              <Box
-                ref={ethnicityRef}
-                borderRadius="md"
-                minHeight="60px"
-                position="relative"
-              >
+              <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
                 <HierarchicalMultiSelect
                   data={ethnicityData}
                   label="Select Ethnicities"
                   onChange={handleEthnicityChange}
-                  onMenuOpenChange={handleDropdownMenuChange}
                   autoFocus={false}
+                  onMenuOpenChange={handleDropdownMenuChange}
+                  controlledInput={dropdownInput}
+                  setControlledInput={setDropdownInput}
+                  externalSelectedValues={selectedEthnicities}
+                  externalExpandedGroups={expandedGroups}
+                  setExternalExpandedGroups={setExpandedGroups}
                 />
               </Box>
             </Flex>
