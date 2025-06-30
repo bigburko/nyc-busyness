@@ -20,7 +20,7 @@ import { GiHamburgerMenu } from 'react-icons/gi';
 import MyRangeSlider from './MyRangeSlider';
 import { SearchIcon } from '@chakra-ui/icons';
 import HierarchicalMultiSelect from './HierarchicalMultiSelect'; // 👈 Import component
-import { ethnicityOptions } from '../app/Data/sampleData'; // 👈 Replace with your actual data source
+import { ethnicityData } from '../app/Data/ethncityData'; // 👈 Replace with your actual data source
 
 export default function MyDrawer() {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -66,7 +66,7 @@ export default function MyDrawer() {
               {/* 👇 Hierarchical Dropdown */}
               <Box>
                 <HierarchicalMultiSelect
-                  data={ethnicityOptions}
+                  data={ethnicityData}
                   label="Select Ethnicities"
                   onChange={handleEthnicityChange}
                 />
