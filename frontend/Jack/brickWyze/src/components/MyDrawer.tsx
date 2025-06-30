@@ -19,8 +19,8 @@ import MyToolTip from './MyToolTip';
 import { GiHamburgerMenu } from 'react-icons/gi';
 import MyRangeSlider from './MyRangeSlider';
 import { SearchIcon } from '@chakra-ui/icons';
-import HierarchicalMultiSelect from './HierarchicalMultiSelect'; // 👈 Import component
-import { ethnicityData } from '../app/Data/ethncityData'; // 👈 Replace with your actual data source
+import HierarchicalMultiSelect from './RaceDropDown/HierarchicalMultiSelect'; // 👈 Import component
+import { ethnicityData } from './RaceDropDown/ethnicityData'; // 👈 Replace with your actual data source
 
 export default function MyDrawer() {
   const { isOpen, onOpen, onClose } = useDisclosure();
