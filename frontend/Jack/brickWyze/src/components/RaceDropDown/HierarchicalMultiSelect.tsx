@@ -58,6 +58,8 @@ interface Props {
   externalSelectedValues: string[];
   externalExpandedGroups: Set<string>;
   setExternalExpandedGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
+  setMenuIsOpenExternal?: (open: boolean) => void;
+  selectWrapperRef?: React.RefObject<HTMLDivElement | null>; // ✅ FIXED TYPE HERE
 }
 
 
@@ -107,6 +109,7 @@ const buildHierarchyTree = (data: Option[]) => {
   });
 
   return { nodeMap, rootNodes };
+
 };
 
 export default function HierarchicalMultiSelect({
@@ -120,8 +123,11 @@ export default function HierarchicalMultiSelect({
   externalSelectedValues,
   externalExpandedGroups,
   setExternalExpandedGroups,
+  setMenuIsOpenExternal,
+  selectWrapperRef,
+  
 }: Props) {
-
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const selectedValues = externalSelectedValues;
   const setSelectedValues = onChange;
 
@@ -146,10 +152,20 @@ export default function HierarchicalMultiSelect({
     }
   }, [autoFocus]);
 
+  // Expose wrapperRef to parent if provided
+  useEffect(() => {
+    if (selectWrapperRef && wrapperRef.current) {
+      (selectWrapperRef as React.MutableRefObject<HTMLDivElement | null>).current = wrapperRef.current;
+    }
+  }, [selectWrapperRef]);
+
+
   // Notify parent when menu state changes
   useEffect(() => {
-    onMenuOpenChange?.(menuIsOpen);
-  }, [menuIsOpen, onMenuOpenChange]);
+  onMenuOpenChange?.(menuIsOpen);
+  setMenuIsOpenExternal?.(menuIsOpen); // 👈 add this line
+}, [menuIsOpen, onMenuOpenChange, setMenuIsOpenExternal]);
+
 
   // Create flat options list
   const flatOptions = useMemo(() => {
@@ -497,7 +513,7 @@ export default function HierarchicalMultiSelect({
   };
 
   return (
-    <Box w="100%" position="relative">
+    <Box w="100%" position="relative" ref={wrapperRef}>
       <FormLabel mb={1}>{label}</FormLabel>
       <Select<EnhancedOption, true, GroupBase<EnhancedOption>>
         ref={selectRef}
@@ -517,8 +533,17 @@ export default function HierarchicalMultiSelect({
         options={selectableFilteredOptions}
         isClearable
         menuIsOpen={menuIsOpen}
-        onMenuOpen={() => setMenuIsOpen(true)}
-        onMenuClose={() => setMenuIsOpen(false)}
+        onMenuOpen={() => {
+          if (!menuIsOpen) {
+            setMenuIsOpen(true);
+          }
+        }}
+
+        onMenuClose={() => {
+          setMenuIsOpen(false);
+          setMenuIsOpenExternal?.(false);
+        }}
+
         menuPosition="absolute"
         menuPlacement="bottom"
         chakraStyles={{
@@ -550,34 +575,19 @@ export default function HierarchicalMultiSelect({
             border: '1px solid #E2E8F0',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
             marginTop: '4px',
-            marginBottom: '4px',
             width: '100%',
-            height: '380px',        // 👈 forces fixed total menu height
-            maxHeight: '380px',
-            minHeight: '240px',
-            overflowY: 'auto',
             zIndex: 100,
+            // ✅ REMOVE fixed height here
+            maxHeight: undefined,
+            height: 'auto',
+            overflow: 'visible', // 👈 important
           }),
           menuList: (provided) => ({
             ...provided,
             backgroundColor: '#FAFAFA',
             padding: '4px',
-            height: '100%',         // 👈 force it to take the parent height
+            maxHeight: '380px', // ✅ scroll limit applied here only
             overflowY: 'auto',
-          }),
-          dropdownIndicator: (provided) => ({
-            ...provided,
-            padding: '4px 8px',
-            color: '#718096',
-          }),
-          clearIndicator: (provided) => ({
-            ...provided,
-            padding: '4px 8px',
-            color: '#718096',
-          }),
-          noOptionsMessage: (provided) => ({
-            ...provided,
-            display: 'none',
           }),
         }}
 

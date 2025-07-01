@@ -7,16 +7,18 @@ import {
   SliderTrack,
   SliderFilledTrack,
   SliderThumb,
+  Flex,
 } from '@chakra-ui/react';
 import MyToolTip from './MyToolTip';
-// import MyToolTip from './MyToolTip';
 
 interface Props {
   heading?: string;
   unFilledTrack?: string;
   filledTrack?: string;
-  boxSize?: string;
+  boxSize?: string | number;
   defaultValue?: number;
+  onChange?: (val: number) => void;
+  toolTipText?: string; // ✅ Added this to match your usage
 }
 
 export default function MySlider({
@@ -25,17 +27,23 @@ export default function MySlider({
   filledTrack = '#FE4A2C',
   boxSize = '7',
   defaultValue = 50,
+  onChange,
+  toolTipText,
 }: Props) {
   return (
     <Box bg="#FFDED8" p={4} borderRadius="md" mb={6} w="100%">
-      <Box display="flex" alignItems="center" gap={2} mb={3}>
+      <Flex alignItems="center" gap={2} mb={3}>
         <Heading as="h4" size="md">
           {heading}
         </Heading>
-        <MyToolTip label="Lorem ipsum dolor sit amet consectetur adipisicing elit.`" />
-      </Box>
+        {toolTipText && <MyToolTip>{toolTipText}</MyToolTip>}
+      </Flex>
 
-      <Slider aria-label="slider" defaultValue={defaultValue}>
+      <Slider
+        aria-label="slider"
+        defaultValue={defaultValue}
+        onChange={onChange}
+      >
         <SliderTrack bg={unFilledTrack}>
           <SliderFilledTrack bg={filledTrack} />
         </SliderTrack>

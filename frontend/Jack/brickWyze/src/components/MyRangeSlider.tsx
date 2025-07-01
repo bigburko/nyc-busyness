@@ -11,7 +11,7 @@ import {
   Input,
   Text,
 } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MyToolTip from './MyToolTip';
 
 interface Props {
@@ -24,6 +24,7 @@ interface Props {
   min?: number;
   max?: number;
   step?: number;
+  onChange?: (range: [number, number]) => void; // ✅ Add onChange handler
 }
 
 export default function MyRangeSlider({
@@ -36,9 +37,14 @@ export default function MyRangeSlider({
   max = 160,
   step = 1,
   toolTipText,
+  onChange,
 }: Props) {
   const MIN_GAP = 5;
   const [range, setRange] = useState<[number, number]>(defaultRange);
+
+  useEffect(() => {
+    onChange?.(range);
+  }, [range, onChange]);
 
   const clamp = (val: [number, number]): [number, number] => {
     let [minVal, maxVal] = val;

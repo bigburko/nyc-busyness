@@ -1,18 +1,19 @@
 'use client';
 
-import MyDrawer from '@/components/MyDrawer';
-import MyToolTip from '@/components/MyToolTip';
-import { Box, Button, Heading, Tooltip } from '@chakra-ui/react';
-import MySlider from '@/components/MySlider';
-import ClientOnly from '@/components/ClientOnly';
-
+import { Box } from '@chakra-ui/react';
+import Map from '@/components/MapGroup/Map';  // or wherever your Map.tsx is located
+import MyDrawer from '@/components/MyDrawer'; // optional: your overlay UI
 
 export default function Page() {
-
   return (
-      <ClientOnly>
-      <MyDrawer></MyDrawer>
-      </ClientOnly>
-      
+    <Box
+      position="relative"
+      height="100vh"
+      width="100vw"
+      overflow="hidden"
+    >
+      <Map />
+      <MyDrawer />
+    </Box>
   );
 }

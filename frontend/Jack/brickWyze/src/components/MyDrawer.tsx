@@ -12,11 +12,10 @@ import {
   Flex,
   Box,
 } from '@chakra-ui/react';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { GiHamburgerMenu } from 'react-icons/gi';
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
-
 
 import MySlider from './MySlider';
 import MyRangeSlider from './MyRangeSlider';
@@ -28,42 +27,52 @@ export default function MyDrawer() {
   const btnRef = useRef<HTMLButtonElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
+  const selectWrapperRef = useRef<HTMLDivElement>(null); // ✅ NEW REF
 
-  // ✅ Persistent ethnicity select state
   const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
   const [dropdownInput, setDropdownInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
+  const [menuIsOpen, setMenuIsOpen] = useState(false);
 
+  const [slider1Value, setSlider1Value] = useState(50);
+  const [slider2Value, setSlider2Value] = useState(50);
+  const [slider3Value, setSlider3Value] = useState(50);
+  const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
 
-  const handleEthnicityChange = (selected: string[]) => {
-    setSelectedEthnicities(selected);
-  };
-
-  const handleDropdownMenuChange = (menuIsOpen: boolean) => {
-    if (menuIsOpen) {
+  const handleDropdownMenuChange = (isOpen: boolean) => {
+    setMenuIsOpen(isOpen);
+    if (isOpen) {
       setTimeout(() => {
-        scrollToDropdown();
+        if (ethnicityRef.current && drawerBodyRef.current) {
+          const offsetTop = ethnicityRef.current.offsetTop;
+          const scrollTarget = Math.max(0, offsetTop - 50);
+          drawerBodyRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+        }
       }, 100);
-    } else {
-      scrollToTop();
     }
   };
 
-  const scrollToDropdown = () => {
-    if (ethnicityRef.current && drawerBodyRef.current) {
-      const dropdown = ethnicityRef.current;
-      const body = drawerBodyRef.current;
-      const offsetTop = dropdown.offsetTop;
-      const scrollTarget = Math.max(0, offsetTop - 50);
-      body.scrollTo({ top: scrollTarget, behavior: 'smooth' });
-    }
-  };
+  // ✅ CLOSE menu when clicking outside Select — but not when clicking sliders
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
 
-  const scrollToTop = () => {
-    if (drawerBodyRef.current) {
-      drawerBodyRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      const dropdown = document.querySelector('.chakra-select__menu');
+      const wrapper = selectWrapperRef.current;
+
+      if (menuIsOpen && dropdown && !dropdown.contains(target) && wrapper && !wrapper.contains(target)) {
+        setMenuIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
     }
-  };
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [menuIsOpen, isOpen]);
 
   return (
     <main style={{ padding: '2rem' }}>
@@ -92,9 +101,7 @@ export default function MyDrawer() {
             ref={drawerBodyRef}
             overflowY="auto"
             css={{
-              '&::-webkit-scrollbar': {
-                width: '8px',
-              },
+              '&::-webkit-scrollbar': { width: '8px' },
               '&::-webkit-scrollbar-track': {
                 background: '#f1f1f1',
                 borderRadius: '4px',
@@ -102,26 +109,27 @@ export default function MyDrawer() {
               '&::-webkit-scrollbar-thumb': {
                 background: '#888',
                 borderRadius: '4px',
-                '&:hover': {
-                  background: '#555',
-                },
+                '&:hover': { background: '#555' },
               },
             }}
           >
             <Flex direction="column" gap={4} pb={8}>
-              <MySlider />
+              <MySlider heading="Slider 1" defaultValue={slider1Value} onChange={setSlider1Value} />
               <MyRangeSlider
                 heading="Rent (PSF)"
                 toolTipText="Target Average Rent cost per Square foot in $USD"
+                defaultRange={rangeValue}
+                onChange={setRangeValue}
               />
-              <MySlider />
-              <MySlider />
+              <MySlider heading="Slider 2" defaultValue={slider2Value} onChange={setSlider2Value} />
+              <MySlider heading="Slider 3" defaultValue={slider3Value} onChange={setSlider3Value} />
+
               <Box mt={4} />
               <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
                 <HierarchicalMultiSelect
                   data={ethnicityData}
                   label="Select Ethnicities"
-                  onChange={handleEthnicityChange}
+                  onChange={setSelectedEthnicities}
                   autoFocus={false}
                   onMenuOpenChange={handleDropdownMenuChange}
                   controlledInput={dropdownInput}
@@ -129,6 +137,8 @@ export default function MyDrawer() {
                   externalSelectedValues={selectedEthnicities}
                   externalExpandedGroups={expandedGroups}
                   setExternalExpandedGroups={setExpandedGroups}
+                  setMenuIsOpenExternal={setMenuIsOpen}
+                  selectWrapperRef={selectWrapperRef} // ✅ Pass down
                 />
               </Box>
             </Flex>
