@@ -4,10 +4,13 @@ import { useRef, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-const INITIAL_CENTER: [number, number] = [-74.0242, 40.6941];
-const INITIAL_ZOOM = 10.12;
+import rawGeojson from './manhattan_census_tracts.json';
+import { CleanGeojson } from './CleanGeojson';
+import { ProcessGeojson } from './ProcessGeojson';
 
-// ✅ Use token from env file
+const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831]; // Over Manhattan
+const INITIAL_ZOOM = 12.5;
+
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
 export default function Map() {
@@ -16,30 +19,53 @@ export default function Map() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const height = containerRef.current?.offsetHeight;
-    console.log('[Map.tsx] container height:', height);
     console.log('[Map.tsx] Initializing map...');
 
-    try {
-      const map = new mapboxgl.Map({
-        container: containerRef.current,
-        center: INITIAL_CENTER,
-        zoom: INITIAL_ZOOM,
-        style: 'mapbox://styles/mapbox/streets-v12',
+    const map = new mapboxgl.Map({
+      container: containerRef.current,
+      center: INITIAL_CENTER,
+      zoom: INITIAL_ZOOM,
+      style: 'mapbox://styles/mapbox/streets-v12',
+    });
+
+    map.on('load', () => {
+      console.log('[Mapbox] Map loaded successfully');
+
+      // ✅ Clean and process the raw GeoJSON
+      const cleaned = CleanGeojson(rawGeojson);
+      const processed = ProcessGeojson(cleaned, { precision: 6 });
+
+      map.addSource('tracts', {
+        type: 'geojson',
+        data: processed,
       });
 
-      map.on('load', () => {
-        console.log('[Mapbox] Map loaded successfully');
+      map.addLayer({
+        id: 'tracts-fill',
+        type: 'fill',
+        source: 'tracts',
+        paint: {
+          'fill-color': '#FF492C',
+          'fill-opacity': 0.4,
+        },
       });
 
-      map.on('error', (e) => {
-        console.error('[Mapbox ERROR]', e.error);
+      map.addLayer({
+        id: 'tracts-outline',
+        type: 'line',
+        source: 'tracts',
+        paint: {
+          'line-color': '#000000',
+          'line-width': 1,
+        },
       });
+    });
 
-      return () => map.remove();
-    } catch (err) {
-      console.error('[Map.tsx] Error creating map:', err);
-    }
+    map.on('error', (e) => {
+      console.error('[Mapbox ERROR]', e.error);
+    });
+
+    return () => map.remove();
   }, []);
 
   return (
@@ -54,7 +80,7 @@ export default function Map() {
         height: '100%',
         width: '100%',
         zIndex: 0,
-        backgroundColor: '#e2e8f0', // just for visibility while loading
+        backgroundColor: '#e2e8f0',
       }}
     />
   );

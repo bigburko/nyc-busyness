@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Button,
   Drawer,
   DrawerBody,
   DrawerHeader,
@@ -11,6 +10,7 @@ import {
   useDisclosure,
   Flex,
   Box,
+  Button,
 } from '@chakra-ui/react';
 import { useRef, useState, useEffect } from 'react';
 import { GiHamburgerMenu } from 'react-icons/gi';
@@ -24,10 +24,10 @@ import { ethnicityData } from './RaceDropDown/ethnicityData';
 
 export default function MyDrawer() {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const btnRef = useRef<HTMLDivElement>(null); // Changed from HTMLButtonElement
   const ethnicityRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
-  const selectWrapperRef = useRef<HTMLDivElement>(null); // ✅ NEW REF
+  const selectWrapperRef = useRef<HTMLDivElement>(null);
 
   const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
   const [dropdownInput, setDropdownInput] = useState('');
@@ -52,7 +52,6 @@ export default function MyDrawer() {
     }
   };
 
-  // ✅ CLOSE menu when clicking outside Select — but not when clicking sliders
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -75,10 +74,18 @@ export default function MyDrawer() {
   }, [menuIsOpen, isOpen]);
 
   return (
-    <main style={{ padding: '2rem' }}>
-      <Button ref={btnRef} onClick={onOpen} background="transparent">
-        <GiHamburgerMenu />
-      </Button>
+    <main>
+      <Box
+        ref={btnRef}
+        onClick={onOpen}
+        position="absolute"
+        top="16px"
+        left="16px"
+        zIndex={10}
+        cursor="pointer"
+      >
+        <GiHamburgerMenu size={28} color="#2D3748" />
+      </Box>
 
       <Drawer
         isOpen={isOpen}
@@ -138,7 +145,7 @@ export default function MyDrawer() {
                   externalExpandedGroups={expandedGroups}
                   setExternalExpandedGroups={setExpandedGroups}
                   setMenuIsOpenExternal={setMenuIsOpen}
-                  selectWrapperRef={selectWrapperRef} // ✅ Pass down
+                  selectWrapperRef={selectWrapperRef}
                 />
               </Box>
             </Flex>
