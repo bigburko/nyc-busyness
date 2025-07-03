@@ -4,12 +4,13 @@ import { useRef, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import rawGeojson from './manhattan_census_tracts.json';
-import { CleanGeojson } from './CleanGeojson';
-import { ProcessGeojson } from './ProcessGeojson';
+import rawGeojson from '@/components/MapGroup/manhattan_census_tracts.json';
+import { CleanGeojson } from '@/components/MapGroup/CleanGeojson';
+import { ProcessGeojson } from '@/components/MapGroup/ProcessGeojson';
+import { fetchResilienceScores } from './fetchResilienceScores';
 
-const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831]; // Over Manhattan
-const INITIAL_ZOOM = 12.5;
+const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831];
+const INITIAL_ZOOM = 12;
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
@@ -19,21 +20,75 @@ export default function Map() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log('[Map.tsx] Initializing map...');
-
     const map = new mapboxgl.Map({
       container: containerRef.current,
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      pitch: 20,
+      bearing: 29,
+      antialias: true,
+      style: 'mapbox://styles/mapbox/light-v11',
     });
 
-    map.on('load', () => {
+    const popup = new mapboxgl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+    });
+
+    map.on('load', async () => {
       console.log('[Mapbox] Map loaded successfully');
 
-      // ✅ Clean and process the raw GeoJSON
+      // 🏙️ Add 3D buildings
+      map.addLayer(
+        {
+          id: '3d-buildings',
+          source: 'composite',
+          'source-layer': 'building',
+          filter: ['==', 'extrude', 'true'],
+          type: 'fill-extrusion',
+          minzoom: 12,
+          paint: {
+            'fill-extrusion-color': '#aaa',
+            'fill-extrusion-height': ['get', 'height'],
+            'fill-extrusion-base': ['get', 'min_height'],
+            'fill-extrusion-opacity': 0.6,
+          },
+        },
+        'waterway-label'
+      );
+
       const cleaned = CleanGeojson(rawGeojson);
       const processed = ProcessGeojson(cleaned, { precision: 6 });
+
+      const scores = await fetchResilienceScores();
+      console.debug('[DEBUG] Fetched scores:', scores);
+
+      const scoreMap: { [key: string]: number } = {};
+      scores.forEach((s) => {
+        scoreMap[s.geoid.toString()] = s.custom_score;
+      });
+
+      const values = Object.values(scoreMap);
+      const minScore = Math.min(...values);
+      const maxScore = Math.max(...values);
+
+      processed.features = processed.features.map((feat) => {
+        const geoid = feat.properties?.GEOID?.toString();
+        const rawScore = geoid ? scoreMap[geoid] : null;
+
+        let normScore = null;
+        if (rawScore !== null && rawScore !== undefined && maxScore > minScore) {
+          normScore = (rawScore - minScore) / (maxScore - minScore);
+        }
+
+        return {
+          ...feat,
+          properties: {
+            ...feat.properties,
+            custom_score: normScore,
+          },
+        };
+      });
 
       map.addSource('tracts', {
         type: 'geojson',
@@ -45,8 +100,20 @@ export default function Map() {
         type: 'fill',
         source: 'tracts',
         paint: {
-          'fill-color': '#FF492C',
-          'fill-opacity': 0.4,
+          'fill-color': [
+            'case',
+            ['!=', ['get', 'custom_score'], null],
+            [
+              'interpolate',
+              ['linear'],
+              ['get', 'custom_score'],
+              0, '#d73027',   // red
+              0.5, '#fee08b', // yellow
+              1, '#1a9850',   // green
+            ],
+            '#f0f0f0',
+          ],
+          'fill-opacity': 0.6,
         },
       });
 
@@ -55,9 +122,29 @@ export default function Map() {
         type: 'line',
         source: 'tracts',
         paint: {
-          'line-color': '#000000',
+          'line-color': '#000',
           'line-width': 1,
         },
+      });
+
+      // 🧠 Hover Tooltip
+      map.on('mousemove', 'tracts-fill', (e) => {
+        if (!e.features || !e.features.length) return;
+
+        const feature = e.features[0];
+        const props = feature.properties || {};
+        const geoid = props.GEOID;
+        const score = props.custom_score;
+
+        const content = `<strong>GEOID:</strong> ${geoid}<br/><strong>Score:</strong> ${
+          score !== null ? score.toFixed(2) : 'N/A'
+        }`;
+
+        popup.setLngLat((e.lngLat as any)).setHTML(content).addTo(map);
+      });
+
+      map.on('mouseleave', 'tracts-fill', () => {
+        popup.remove();
       });
     });
 
