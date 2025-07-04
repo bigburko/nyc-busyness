@@ -17,14 +17,14 @@ import { GiHamburgerMenu } from 'react-icons/gi';
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
-import MySlider from './MySlider';
+import WeightingPanel from './ScoreWeightingGroup/WeightingPanel';
 import MyRangeSlider from './MyRangeSlider';
-import HierarchicalMultiSelect from './RaceDropDown/HierarchicalMultiSelect';
-import { ethnicityData } from './RaceDropDown/ethnicityData';
+import HierarchicalMultiSelect from './RaceDropDownGroup/HierarchicalMultiSelect';
+import { ethnicityData } from './RaceDropDownGroup/ethnicityData';
 
 export default function MyDrawer() {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const btnRef = useRef<HTMLDivElement>(null); // Changed from HTMLButtonElement
+  const btnRef = useRef<HTMLDivElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
   const selectWrapperRef = useRef<HTMLDivElement>(null);
@@ -34,9 +34,6 @@ export default function MyDrawer() {
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
   const [menuIsOpen, setMenuIsOpen] = useState(false);
 
-  const [slider1Value, setSlider1Value] = useState(50);
-  const [slider2Value, setSlider2Value] = useState(50);
-  const [slider3Value, setSlider3Value] = useState(50);
   const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
 
   const handleDropdownMenuChange = (isOpen: boolean) => {
@@ -55,7 +52,6 @@ export default function MyDrawer() {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-
       const dropdown = document.querySelector('.chakra-select__menu');
       const wrapper = selectWrapperRef.current;
 
@@ -121,17 +117,14 @@ export default function MyDrawer() {
             }}
           >
             <Flex direction="column" gap={4} pb={8}>
-              <MySlider heading="Foot Traffic Weighting" defaultValue={slider1Value} onChange={setSlider1Value} />
-              <MySlider heading="Safety Weighting" defaultValue={slider2Value} onChange={setSlider2Value} />
-              <MySlider heading="Rent Score Weighting" defaultValue={slider3Value} onChange={setSlider3Value} />
-              <MySlider heading="Rent Score Weighting" defaultValue={slider3Value} onChange={setSlider3Value} />
+              <WeightingPanel />
+
               <MyRangeSlider
                 heading="Rent (PSF)"
                 toolTipText="Target Average Rent cost per Square foot in $USD"
                 defaultRange={rangeValue}
                 onChange={setRangeValue}
               />
-              
 
               <Box mt={4} />
               <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
