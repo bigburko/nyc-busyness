@@ -31,61 +31,30 @@ export default function Map() {
     });
 
     const popup = new mapboxgl.Popup({
-      closeButton: false,
-      closeOnClick: false,
+      closeButton: true,
+      closeOnClick: true,
+      className: 'resilience-popup',
     });
 
     map.on('load', async () => {
-      console.log('[Mapbox] Map loaded successfully');
-
-      // 🏙️ Add 3D buildings
-      map.addLayer(
-        {
-          id: '3d-buildings',
-          source: 'composite',
-          'source-layer': 'building',
-          filter: ['==', 'extrude', 'true'],
-          type: 'fill-extrusion',
-          minzoom: 12,
-          paint: {
-            'fill-extrusion-color': '#aaa',
-            'fill-extrusion-height': ['get', 'height'],
-            'fill-extrusion-base': ['get', 'min_height'],
-            'fill-extrusion-opacity': 0.6,
-          },
-        },
-        'waterway-label'
-      );
-
       const cleaned = CleanGeojson(rawGeojson);
       const processed = ProcessGeojson(cleaned, { precision: 6 });
 
       const scores = await fetchResilienceScores();
-      console.debug('[DEBUG] Fetched scores:', scores);
-
-      const scoreMap: { [key: string]: number } = {};
+      const scoreMap: { [key: string]: any } = {};
       scores.forEach((s) => {
-        scoreMap[s.geoid.toString()] = s.custom_score;
+        scoreMap[s.geoid.toString()] = s;
       });
-
-      const values = Object.values(scoreMap);
-      const minScore = Math.min(...values);
-      const maxScore = Math.max(...values);
 
       processed.features = processed.features.map((feat) => {
         const geoid = feat.properties?.GEOID?.toString();
-        const rawScore = geoid ? scoreMap[geoid] : null;
-
-        let normScore = null;
-        if (rawScore !== null && rawScore !== undefined && maxScore > minScore) {
-          normScore = (rawScore - minScore) / (maxScore - minScore);
-        }
+        const scoreData = geoid ? scoreMap[geoid] : null;
 
         return {
           ...feat,
           properties: {
             ...feat.properties,
-            custom_score: normScore,
+            ...scoreData,
           },
         };
       });
@@ -103,14 +72,7 @@ export default function Map() {
           'fill-color': [
             'case',
             ['!=', ['get', 'custom_score'], null],
-            [
-              'interpolate',
-              ['linear'],
-              ['get', 'custom_score'],
-              0, '#d73027',   // red
-              0.5, '#fee08b', // yellow
-              1, '#1a9850',   // green
-            ],
+            ['interpolate', ['linear'], ['get', 'custom_score'], 0, '#d73027', 5, '#fee08b', 10, '#1a9850'],
             '#f0f0f0',
           ],
           'fill-opacity': 0.6,
@@ -127,24 +89,40 @@ export default function Map() {
         },
       });
 
-      // 🧠 Hover Tooltip
-      map.on('mousemove', 'tracts-fill', (e) => {
+      map.on('click', 'tracts-fill', (e) => {
         if (!e.features || !e.features.length) return;
 
         const feature = e.features[0];
         const props = feature.properties || {};
-        const geoid = props.GEOID;
-        const score = props.custom_score;
+        const toScore = (val: any) => val !== null && val !== undefined ? Math.round(val * 10) : 'N/A';
 
-        const content = `<strong>GEOID:</strong> ${geoid}<br/><strong>Score:</strong> ${
-          score !== null ? score.toFixed(2) : 'N/A'
-        }`;
+        const content = `
+          <div style="font-family: sans-serif; max-width: 240px;">
+            <h3 style="margin: 0 0 8px; font-size: 16px;">📍 ${props.NTAName || 'Unknown Area'}</h3>
+            <div style="font-size: 14px; margin-bottom: 12px;">
+              <strong style="font-size: 24px; color: #1a9850;">${toScore(props.custom_score)}</strong><span style="font-size: 16px;"> /100</span>
+              <div style="margin-top: 10px;">
+                <div><strong>Low Crime:</strong> <span style="color:#1a9850">${toScore(props.crime_score)}/100</span></div>
+                <div><strong>Foot Traffic:</strong> <span style="color:#fdae61">${toScore(props.foot_traffic_score)}/100</span></div>
+                <div><strong>Flood Safety:</strong> <span style="color:#1a9850">${toScore(props.flood_safety_score)}/100</span></div>
+                <div><strong>Rent Score:</strong> <span style="color:#fdae61">${toScore(props.rent_score)}/100</span></div>
+                <div><strong>POI Score:</strong> <span style="color:#fdae61">${toScore(props.poi_score)}/100</span></div>
+                <div><strong>Demographics:</strong> <span style="color:#1a9850">${toScore(props.demographic_score)}/100</span></div>
+              </div>
+            </div>
+            <button style="background:#eee;border-radius:6px;border:none;padding:6px 12px;font-size:13px;cursor:pointer;">Save to Shortlist</button>
+          </div>
+        `;
 
-        popup.setLngLat((e.lngLat as any)).setHTML(content).addTo(map);
+        popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
       });
 
       map.on('mouseleave', 'tracts-fill', () => {
-        popup.remove();
+        map.getCanvas().style.cursor = '';
+      });
+
+      map.on('mouseenter', 'tracts-fill', () => {
+        map.getCanvas().style.cursor = 'pointer';
       });
     });
 

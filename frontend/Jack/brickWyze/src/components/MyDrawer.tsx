@@ -121,15 +121,17 @@ export default function MyDrawer() {
             }}
           >
             <Flex direction="column" gap={4} pb={8}>
-              <MySlider heading="Slider 1" defaultValue={slider1Value} onChange={setSlider1Value} />
+              <MySlider heading="Foot Traffic Weighting" defaultValue={slider1Value} onChange={setSlider1Value} />
+              <MySlider heading="Safety Weighting" defaultValue={slider2Value} onChange={setSlider2Value} />
+              <MySlider heading="Rent Score Weighting" defaultValue={slider3Value} onChange={setSlider3Value} />
+              <MySlider heading="Rent Score Weighting" defaultValue={slider3Value} onChange={setSlider3Value} />
               <MyRangeSlider
                 heading="Rent (PSF)"
                 toolTipText="Target Average Rent cost per Square foot in $USD"
                 defaultRange={rangeValue}
                 onChange={setRangeValue}
               />
-              <MySlider heading="Slider 2" defaultValue={slider2Value} onChange={setSlider2Value} />
-              <MySlider heading="Slider 3" defaultValue={slider3Value} onChange={setSlider3Value} />
+              
 
               <Box mt={4} />
               <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
