@@ -21,7 +21,12 @@ export default function Page() {
 
   return (
     <Box position="relative" height="100vh" width="100vw" overflow="hidden">
-      {searchFilters && <Map {...searchFilters} />}
+      {/* Always show the map */}
+      <Map 
+        weights={searchFilters?.weights}
+        rentRange={searchFilters?.rentRange}
+        selectedEthnicities={searchFilters?.selectedEthnicities}
+      />
       <MyDrawer onSearchSubmit={handleSearchSubmit} />
     </Box>
   );

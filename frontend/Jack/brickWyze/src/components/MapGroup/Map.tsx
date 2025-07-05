@@ -30,27 +30,31 @@ export default function Map({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Load initial census tract boundaries
+  const loadInitialTracts = () => {
+    const cleaned = CleanGeojson(rawGeojson);
+    const processed = ProcessGeojson(cleaned, { precision: 6 });
+    
+    if (mapRef.current && mapRef.current.getSource('tracts')) {
+      const source = mapRef.current.getSource('tracts');
+      if (source && 'setData' in source) {
+        (source as mapboxgl.GeoJSONSource).setData(processed);
+        console.log('[Initial load] Census tracts loaded:', processed.features.length);
+      }
+    }
+  };
 
   const fetchAndProcessGeojson = async () => {
     const cleaned = CleanGeojson(rawGeojson);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
 
     if (!weights || !rentRange || !selectedEthnicities) {
-      console.warn('[Skipping Fetch] Missing filters:', {
-        weights,
-        rentRange,
-        selectedEthnicities,
-      });
-      
-      // Set default data without scores
-      if (mapRef.current && mapRef.current.getSource('tracts')) {
-        const source = mapRef.current.getSource('tracts');
-        if (source && 'setData' in source) {
-          (source as mapboxgl.GeoJSONSource).setData(processed);
-        }
-      }
       return;
     }
+
+    setHasSearched(true);
 
     console.log('[Sending to Edge Function]', {
       weights,
@@ -114,6 +118,7 @@ export default function Map({
               properties: {
                 ...feat.properties,
                 ...matched,
+                hasScore: true, // Flag to indicate this tract has scores
               },
             };
           }
@@ -123,6 +128,7 @@ export default function Map({
             properties: {
               ...feat.properties,
               custom_score: 0,
+              hasScore: false,
             },
           };
         }),
@@ -137,7 +143,8 @@ export default function Map({
           (source as mapboxgl.GeoJSONSource).setData(updatedGeojson);
           console.log('[GeoJSON set on map]', updatedGeojson.features.length, 'features');
           
-          // Force map to repaint
+          // Update paint properties to show colors
+          mapRef.current.setPaintProperty('tracts-fill', 'fill-opacity', 0.7);
           mapRef.current.triggerRepaint();
         }
       }
@@ -170,43 +177,54 @@ export default function Map({
         },
       });
 
+      // Add fill layer - initially transparent
       map.addLayer({
         id: 'tracts-fill',
         type: 'fill',
         source: 'tracts',
         paint: {
-          'fill-color': [
-            'case',
-            ['has', 'custom_score'],
-            [
-              'interpolate',
-              ['linear'],
-              ['get', 'custom_score'],
-              0, '#d73027',      // Dark red for 0
-              0.2, '#fc8d59',    // Orange-red for 0.2
-              0.4, '#fee08b',    // Yellow for 0.4
-              0.6, '#d9ef8b',    // Light green for 0.6
-              0.8, '#91bfdb',    // Light blue for 0.8
-              1, '#1a9850'       // Dark green for 1.0
-            ],
-            '#cccccc' // Gray for no data
-          ],
-          'fill-opacity': 0.7,
-        },
+  'fill-color': [
+    'case',
+    ['==', ['typeof', ['get', 'hasScore']], 'boolean'],
+    [
+      'case',
+      ['get', 'hasScore'],
+      [
+        'interpolate',
+        ['linear'],
+        ['get', 'custom_score'],
+        0, '#d73027',      // Dark red for 0
+        0.2, '#fc8d59',    // Orange-red for 0.2
+        0.4, '#fee08b',    // Yellow for 0.4
+        0.6, '#d9ef8b',    // Light green for 0.6
+        0.8, '#91bfdb',    // Light blue for 0.8
+        1, '#1a9850'       // Dark green for 1.0
+      ],
+      'transparent'
+    ],
+    'transparent' // No color if hasScore is not a boolean
+  ],
+  'fill-opacity': 0, // Start with transparent fills
+},
+
       });
 
+      // Add outline layer - always visible
       map.addLayer({
         id: 'tracts-outline',
         type: 'line',
         source: 'tracts',
         paint: {
-          'line-color': '#333',
-          'line-width': 0.5,
+          'line-color': '#666',
+          'line-width': 1,
+          'line-opacity': 0.8,
         },
       });
 
-      // Add a legend
+      // Add legend (hidden initially)
       const legend = document.createElement('div');
+      legend.id = 'map-legend';
+      legend.style.display = 'none';
       legend.innerHTML = `
         <div style="position: absolute; bottom: 30px; right: 10px; background: white; padding: 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
           <div style="font-weight: bold; margin-bottom: 5px;">Resilience Score</div>
@@ -238,6 +256,22 @@ export default function Map({
         if (!e.features?.length) return;
         const feature = e.features[0];
         const props = feature.properties || {};
+
+        // Only show detailed popup if we have scores
+        if (!props.hasScore) {
+          const simpleContent = `
+            <div style="font-family: sans-serif; max-width: 200px;">
+              <h3 style="margin: 0 0 8px; font-size: 16px;">📍 ${props.NTAName || props.GEOID || 'Census Tract'}</h3>
+              <p style="font-size: 14px; color: #666;">Click "Search" to see resilience scores</p>
+            </div>
+          `;
+          
+          new mapboxgl.Popup({ closeButton: true })
+            .setLngLat(e.lngLat)
+            .setHTML(simpleContent)
+            .addTo(map);
+          return;
+        }
 
         const toScore = (val: any) => {
           if (val === null || val === undefined) return 'N/A';
@@ -273,12 +307,28 @@ export default function Map({
                 <div style="margin: 4px 0;"><strong>Rent Value:</strong> ${toScore(props.rent_score)}/100</div>
                 <div style="margin: 4px 0;"><strong>Points of Interest:</strong> ${toScore(props.poi_score)}/100</div>
                 <div style="margin: 4px 0;"><strong>Demographics:</strong> ${toScore(props.demographic_score)}/100</div>
-                ${props.rent_psf ? `<div style="margin: 4px 0;"><strong>Rent PSF:</strong> $${props.rent_psf}</div>` : ''}
+                ${props.demographic_match_pct !== null && props.demographic_match_pct !== undefined ? 
+                  `<div style="margin: 4px 0; font-size: 11px; color: #666;">
+                    (${props.demographic_match_pct.toFixed(1)}% match)
+                  </div>` : ''}
+                ${props.avg_rent ? `<div style="margin: 4px 0;"><strong>Avg Rent:</strong> $${props.avg_rent}</div>` : ''}
               </div>
-              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
-                <strong>Weights Applied:</strong>
-                ${weights ? weights.map(w => `<div style="font-size: 11px; margin: 2px 0;">${w.label}: ${w.value}%</div>`).join('') : 'Default'}
-              </div>
+              ${weights && weights.length > 0 ? `
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+                  <strong style="font-size: 12px;">Weights Applied:</strong>
+                  <div style="font-size: 11px; margin-top: 4px;">
+                    ${weights.map(w => `<div style="margin: 2px 0;">${w.label}: ${w.value}%</div>`).join('')}
+                  </div>
+                </div>
+              ` : ''}
+              ${selectedEthnicities && selectedEthnicities.length > 0 ? `
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+                  <strong style="font-size: 12px;">Selected Demographics:</strong>
+                  <div style="font-size: 11px; margin-top: 4px; max-height: 60px; overflow-y: auto;">
+                    ${selectedEthnicities.join(', ')}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           </div>
         `;
@@ -298,6 +348,9 @@ export default function Map({
       });
 
       setIsMapLoaded(true);
+      
+      // Load initial census tract boundaries
+      loadInitialTracts();
     });
 
     return () => {
@@ -306,9 +359,16 @@ export default function Map({
     };
   }, []);
 
+  // Effect to handle search results
   useEffect(() => {
     if (isMapLoaded && weights && rentRange && selectedEthnicities) {
       fetchAndProcessGeojson();
+      
+      // Show legend when search is performed
+      const legend = document.getElementById('map-legend');
+      if (legend) {
+        legend.style.display = 'block';
+      }
     }
   }, [isMapLoaded, weights, rentRange, selectedEthnicities]);
 
