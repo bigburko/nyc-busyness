@@ -1,8 +1,14 @@
-// src/components/ScoreWeightingGroup/MySlider.tsx
 'use client';
 
 import {
-  Box, Flex, Slider, SliderFilledTrack, SliderThumb, SliderTrack, Text, CloseButton
+  Box,
+  Flex,
+  Slider,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderTrack,
+  Text,
+  CloseButton,
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 
@@ -18,7 +24,14 @@ export interface Props {
 }
 
 export default function MySlider({
-  label, icon, filledTrack, value, onChangeEnd, onRemove, canBeRemoved, boxSize = 6,
+  label,
+  icon,
+  filledTrack,
+  value,
+  onChangeEnd,
+  onRemove,
+  canBeRemoved,
+  boxSize = 6,
 }: Props) {
   // Internal state provides a smooth dragging experience without re-rendering the whole page
   const [internalValue, setInternalValue] = useState(value);
@@ -29,19 +42,17 @@ export default function MySlider({
   }, [value]);
 
   return (
-    <Box
-      bg="white" borderRadius="md" p={3} boxShadow="sm" w="100%"
-    >
+    <Box bg="white" borderRadius="md" p={3} boxShadow="sm" w="100%">
       <Flex align="center" justify="space-between" mb={2}>
         <Flex align="center" gap={2}>
-          <Box 
-            bg={filledTrack} 
-            borderRadius="full" 
-            boxSize={boxSize} 
+          <Box
+            bg={filledTrack}
+            borderRadius="full"
+            boxSize={boxSize}
             display="flex"
-            alignItems="center" 
-            justifyContent="center" 
-            fontSize="sm" 
+            alignItems="center"
+            justifyContent="center"
+            fontSize="sm"
             color="white"
           >
             {icon}
@@ -49,7 +60,6 @@ export default function MySlider({
           <Text fontWeight="medium">{label}</Text>
         </Flex>
         <Flex align="center" gap={3}>
-          {/* Display internal value for immediate visual feedback */}
           <Text fontSize="sm" fontWeight="bold" minW="40px" textAlign="right">
             {Math.round(internalValue)}%
           </Text>
@@ -57,11 +67,8 @@ export default function MySlider({
         </Flex>
       </Flex>
       <Slider
-        // The slider's thumb is driven by the fast internal state
         value={internalValue}
-        // `onChange` only updates the internal state
         onChange={setInternalValue}
-        // `onChangeEnd` informs the parent to run expensive logic
         onChangeEnd={onChangeEnd}
         min={0}
         max={100}
@@ -70,7 +77,7 @@ export default function MySlider({
         <SliderTrack bg="gray.200">
           <SliderFilledTrack bg={filledTrack} />
         </SliderTrack>
-        <SliderThumb />
+        <SliderThumb tabIndex={-1} /> {/* Prevents focus jumps */}
       </Slider>
     </Box>
   );

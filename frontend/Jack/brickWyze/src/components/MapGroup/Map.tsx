@@ -7,12 +7,14 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import rawGeojson from '@/components/MapGroup/manhattan_census_tracts.json';
 import { CleanGeojson } from '@/components/MapGroup/CleanGeojson';
 import { ProcessGeojson } from '@/components/MapGroup/ProcessGeojson';
-import { fetchResilienceScores } from './fetchResilienceScores';
 
 const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831];
 const INITIAL_ZOOM = 12;
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+
+const EDGE_FUNCTION_URL =
+  'https://kwuwuutcvpdomfivdemt.supabase.co/functions/v1/calculate-resilience';
 
 export default function Map() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -40,15 +42,58 @@ export default function Map() {
       const cleaned = CleanGeojson(rawGeojson);
       const processed = ProcessGeojson(cleaned, { precision: 6 });
 
-      const scores = await fetchResilienceScores();
+      console.log('[GeoJSON GEOIDs]', processed.features.map(f => f.properties?.GEOID));
+
+      let scores: any[] = [];
+
+      try {
+        const response = await fetch(EDGE_FUNCTION_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
+          },
+          body: JSON.stringify({
+            weights: {
+              footfall: 0.35,
+              demographics: 0.25,
+              safety: 0.15,
+              flooding: 0.10,
+              rent: 0.10,
+              poi: 0.05,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Edge Function error ${response.status}: ${errorText}`);
+        }
+
+        scores = await response.json();
+
+        console.log('[Edge Function GEOIDs]', scores.map(s => s.geoid));
+      } catch (err) {
+        console.error('[Edge Function Fetch Failed]', err);
+        return;
+      }
+
       const scoreMap: { [key: string]: any } = {};
-      scores.forEach((s) => {
-        scoreMap[s.geoid.toString()] = s;
+      scores.forEach((s: any) => {
+        const geoidStr = s?.geoid?.toString?.();
+        if (geoidStr) {
+          scoreMap[geoidStr] = s;
+        }
       });
 
       processed.features = processed.features.map((feat) => {
-        const geoid = feat.properties?.GEOID?.toString();
+        const geoid = feat.properties?.GEOID?.toString().padStart(11, '0');
         const scoreData = geoid ? scoreMap[geoid] : null;
+
+        if (!scoreData) {
+          console.warn(`[MISSING DATA] GEOID: ${geoid} not found in scoreMap`);
+        }
 
         return {
           ...feat,
@@ -72,7 +117,17 @@ export default function Map() {
           'fill-color': [
             'case',
             ['!=', ['get', 'custom_score'], null],
-            ['interpolate', ['linear'], ['get', 'custom_score'], 0, '#d73027', 5, '#fee08b', 10, '#1a9850'],
+            [
+              'interpolate',
+              ['linear'],
+              ['get', 'custom_score'],
+              0,
+              '#d73027',
+              5,
+              '#fee08b',
+              10,
+              '#1a9850',
+            ],
             '#f0f0f0',
           ],
           'fill-opacity': 0.6,
@@ -94,20 +149,37 @@ export default function Map() {
 
         const feature = e.features[0];
         const props = feature.properties || {};
-        const toScore = (val: any) => val !== null && val !== undefined ? Math.round(val * 10) : 'N/A';
+        const toScore = (val: any) =>
+          val !== null && val !== undefined ? Math.round(val * 10) : 'N/A';
+
+        console.log('[Popup Feature]', props);
 
         const content = `
           <div style="font-family: sans-serif; max-width: 240px;">
             <h3 style="margin: 0 0 8px; font-size: 16px;">📍 ${props.NTAName || 'Unknown Area'}</h3>
             <div style="font-size: 14px; margin-bottom: 12px;">
-              <strong style="font-size: 24px; color: #1a9850;">${toScore(props.custom_score)}</strong><span style="font-size: 16px;"> /100</span>
+              <strong style="font-size: 24px; color: #1a9850;">${toScore(
+                props.custom_score
+              )}</strong><span style="font-size: 16px;"> /100</span>
               <div style="margin-top: 10px;">
-                <div><strong>Low Crime:</strong> <span style="color:#1a9850">${toScore(props.crime_score)}/100</span></div>
-                <div><strong>Foot Traffic:</strong> <span style="color:#fdae61">${toScore(props.foot_traffic_score)}/100</span></div>
-                <div><strong>Flood Safety:</strong> <span style="color:#1a9850">${toScore(props.flood_safety_score)}/100</span></div>
-                <div><strong>Rent Score:</strong> <span style="color:#fdae61">${toScore(props.rent_score)}/100</span></div>
-                <div><strong>POI Score:</strong> <span style="color:#fdae61">${toScore(props.poi_score)}/100</span></div>
-                <div><strong>Demographics:</strong> <span style="color:#1a9850">${toScore(props.demographic_score)}/100</span></div>
+                <div><strong>Low Crime:</strong> <span style="color:#1a9850">${toScore(
+                  props.crime_score
+                )}/100</span></div>
+                <div><strong>Foot Traffic:</strong> <span style="color:#fdae61">${toScore(
+                  props.foot_traffic_score
+                )}/100</span></div>
+                <div><strong>Flood Safety:</strong> <span style="color:#1a9850">${toScore(
+                  props.flood_risk_score
+                )}/100</span></div>
+                <div><strong>Rent Score:</strong> <span style="color:#fdae61">${toScore(
+                  props.rent_score
+                )}/100</span></div>
+                <div><strong>POI Score:</strong> <span style="color:#fdae61">${toScore(
+                  props.poi_score
+                )}/100</span></div>
+                <div><strong>Demographics:</strong> <span style="color:#1a9850">${toScore(
+                  props.demographic_score
+                )}/100</span></div>
               </div>
             </div>
             <button style="background:#eee;border-radius:6px;border:none;padding:6px 12px;font-size:13px;cursor:pointer;">Save to Shortlist</button>
