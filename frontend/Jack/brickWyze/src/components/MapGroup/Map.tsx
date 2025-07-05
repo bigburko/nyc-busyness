@@ -16,22 +16,46 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 const EDGE_FUNCTION_URL =
   'https://kwuwuutcvpdomfivdemt.supabase.co/functions/v1/calculate-resilience';
 
-export default function Map({ weights, rentRange, selectedEthnicities }: any) {
+interface MapProps {
+  weights?: any[];
+  rentRange?: [number, number];
+  selectedEthnicities?: string[];
+}
+
+export default function Map({
+  weights,
+  rentRange,
+  selectedEthnicities,
+}: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-
-  const [geojson, setGeojson] = useState<any>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
   const fetchAndProcessGeojson = async () => {
     const cleaned = CleanGeojson(rawGeojson);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
-    const geoids = processed.features.map((f) => f.properties?.GEOID);
+
+    if (!weights || !rentRange || !selectedEthnicities) {
+      console.warn('[Skipping Fetch] Missing filters:', {
+        weights,
+        rentRange,
+        selectedEthnicities,
+      });
+      
+      // Set default data without scores
+      if (mapRef.current && mapRef.current.getSource('tracts')) {
+        const source = mapRef.current.getSource('tracts');
+        if (source && 'setData' in source) {
+          (source as mapboxgl.GeoJSONSource).setData(processed);
+        }
+      }
+      return;
+    }
 
     console.log('[Sending to Edge Function]', {
       weights,
       rentRange,
-      selectedEthnicities,
-      geoids,
+      ethnicities: selectedEthnicities,
     });
 
     try {
@@ -45,8 +69,7 @@ export default function Map({ weights, rentRange, selectedEthnicities }: any) {
         body: JSON.stringify({
           weights,
           rentRange,
-          selectedEthnicities,
-          geoids,
+          ethnicities: selectedEthnicities,
         }),
       });
 
@@ -56,31 +79,67 @@ export default function Map({ weights, rentRange, selectedEthnicities }: any) {
       }
 
       const scores = await response.json();
+      console.log('[Received scores]', scores.length, 'zones');
+      
+      // Check score distribution
+      const scoreDistribution = scores.map((s: any) => s.custom_score).sort((a: number, b: number) => a - b);
+      console.log('[Score distribution]', {
+        min: Math.min(...scoreDistribution),
+        max: Math.max(...scoreDistribution),
+        median: scoreDistribution[Math.floor(scoreDistribution.length / 2)],
+        sample: scoreDistribution.slice(0, 10)
+      });
+      
       const scoreMap: Record<string, any> = {};
       scores.forEach((s: any) => {
-        const geoid = s?.geoid?.toString?.();
-        if (geoid) scoreMap[geoid] = s;
+        if (s?.geoid) {
+          const paddedGeoid = s.geoid.toString().padStart(11, '0');
+          scoreMap[paddedGeoid] = s;
+        }
       });
 
       const updatedGeojson = {
         ...processed,
         features: processed.features.map((feat) => {
-          const geoid = feat.properties?.GEOID?.toString().padStart(11, '0');
+          if (!feat.properties || !feat.properties.GEOID) {
+            return feat;
+          }
+
+          const geoid = feat.properties.GEOID.toString().padStart(11, '0');
+          const matched = scoreMap[geoid];
+
+          if (matched) {
+            return {
+              ...feat,
+              properties: {
+                ...feat.properties,
+                ...matched,
+              },
+            };
+          }
+          
           return {
             ...feat,
             properties: {
               ...feat.properties,
-              ...scoreMap[geoid],
+              custom_score: 0,
             },
           };
         }),
       };
 
-      setGeojson(updatedGeojson);
+      console.log('[Updated GeoJSON]', updatedGeojson);
+      console.log('[Sample feature with scores]', updatedGeojson.features[0]?.properties);
 
       if (mapRef.current && mapRef.current.getSource('tracts')) {
-        const source = mapRef.current.getSource('tracts') as mapboxgl.GeoJSONSource;
-        source.setData(updatedGeojson);
+        const source = mapRef.current.getSource('tracts');
+        if (source && 'setData' in source) {
+          (source as mapboxgl.GeoJSONSource).setData(updatedGeojson);
+          console.log('[GeoJSON set on map]', updatedGeojson.features.length, 'features');
+          
+          // Force map to repaint
+          mapRef.current.triggerRepaint();
+        }
       }
     } catch (err) {
       console.error('[Edge Function Fetch Failed]', err);
@@ -103,8 +162,6 @@ export default function Map({ weights, rentRange, selectedEthnicities }: any) {
     mapRef.current = map;
 
     map.on('load', () => {
-      fetchAndProcessGeojson();
-
       map.addSource('tracts', {
         type: 'geojson',
         data: {
@@ -120,11 +177,21 @@ export default function Map({ weights, rentRange, selectedEthnicities }: any) {
         paint: {
           'fill-color': [
             'case',
-            ['!=', ['get', 'custom_score'], null],
-            ['interpolate', ['linear'], ['get', 'custom_score'], 0, '#d73027', 5, '#fee08b', 10, '#1a9850'],
-            '#f0f0f0',
+            ['has', 'custom_score'],
+            [
+              'interpolate',
+              ['linear'],
+              ['get', 'custom_score'],
+              0, '#d73027',      // Dark red for 0
+              0.2, '#fc8d59',    // Orange-red for 0.2
+              0.4, '#fee08b',    // Yellow for 0.4
+              0.6, '#d9ef8b',    // Light green for 0.6
+              0.8, '#91bfdb',    // Light blue for 0.8
+              1, '#1a9850'       // Dark green for 1.0
+            ],
+            '#cccccc' // Gray for no data
           ],
-          'fill-opacity': 0.6,
+          'fill-opacity': 0.7,
         },
       });
 
@@ -133,33 +200,84 @@ export default function Map({ weights, rentRange, selectedEthnicities }: any) {
         type: 'line',
         source: 'tracts',
         paint: {
-          'line-color': '#000',
-          'line-width': 1,
+          'line-color': '#333',
+          'line-width': 0.5,
         },
       });
+
+      // Add a legend
+      const legend = document.createElement('div');
+      legend.innerHTML = `
+        <div style="position: absolute; bottom: 30px; right: 10px; background: white; padding: 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+          <div style="font-weight: bold; margin-bottom: 5px;">Resilience Score</div>
+          <div style="display: flex; align-items: center; margin: 2px 0;">
+            <div style="width: 20px; height: 10px; background: #1a9850; margin-right: 5px;"></div>
+            <span style="font-size: 12px;">High (80-100)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 2px 0;">
+            <div style="width: 20px; height: 10px; background: #91bfdb; margin-right: 5px;"></div>
+            <span style="font-size: 12px;">Good (60-80)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 2px 0;">
+            <div style="width: 20px; height: 10px; background: #fee08b; margin-right: 5px;"></div>
+            <span style="font-size: 12px;">Fair (40-60)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 2px 0;">
+            <div style="width: 20px; height: 10px; background: #fc8d59; margin-right: 5px;"></div>
+            <span style="font-size: 12px;">Low (20-40)</span>
+          </div>
+          <div style="display: flex; align-items: center; margin: 2px 0;">
+            <div style="width: 20px; height: 10px; background: #d73027; margin-right: 5px;"></div>
+            <span style="font-size: 12px;">Very Low (0-20)</span>
+          </div>
+        </div>
+      `;
+      map.getContainer().appendChild(legend);
 
       map.on('click', 'tracts-fill', (e) => {
         if (!e.features?.length) return;
         const feature = e.features[0];
         const props = feature.properties || {};
 
-        const toScore = (val: any) =>
-          val !== null && val !== undefined ? Math.round(val * 10) : 'N/A';
+        const toScore = (val: any) => {
+          if (val === null || val === undefined) return 'N/A';
+          const score = parseFloat(val);
+          return isNaN(score) ? 'N/A' : Math.round(score * 100);
+        };
+
+        const getScoreColor = (score: number) => {
+          if (score >= 80) return '#1a9850';
+          if (score >= 60) return '#91bfdb';
+          if (score >= 40) return '#fee08b';
+          if (score >= 20) return '#fc8d59';
+          return '#d73027';
+        };
+
+        const overallScore = toScore(props.custom_score);
+        const scoreColor = getScoreColor(overallScore === 'N/A' ? 0 : overallScore);
 
         const content = `
-          <div style="font-family: sans-serif; max-width: 240px;">
-            <h3 style="margin: 0 0 8px; font-size: 16px;">📍 ${props.NTAName || 'Unknown Area'}</h3>
+          <div style="font-family: sans-serif; max-width: 280px;">
+            <h3 style="margin: 0 0 8px; font-size: 16px;">📍 ${props.NTAName || props.GEOID || 'Unknown Area'}</h3>
             <div style="font-size: 14px; margin-bottom: 12px;">
-              <strong style="font-size: 24px; color: #1a9850;">${toScore(
-                props.custom_score
-              )}</strong><span style="font-size: 16px;"> /100</span>
-              <div style="margin-top: 10px;">
-                <div><strong>Low Crime:</strong> ${toScore(props.crime_score)}/100</div>
-                <div><strong>Foot Traffic:</strong> ${toScore(props.foot_traffic_score)}/100</div>
-                <div><strong>Flood Safety:</strong> ${toScore(props.flood_risk_score)}/100</div>
-                <div><strong>Rent Score:</strong> ${toScore(props.rent_score)}/100</div>
-                <div><strong>POI Score:</strong> ${toScore(props.poi_score)}/100</div>
-                <div><strong>Demographics:</strong> ${toScore(props.demographic_score)}/100</div>
+              <div style="background: #f0f0f0; padding: 8px; border-radius: 4px; margin-bottom: 8px;">
+                <strong style="font-size: 24px; color: ${scoreColor};">
+                  ${overallScore}
+                </strong>
+                <span style="font-size: 14px;"> /100 Overall Score</span>
+              </div>
+              <div style="margin-top: 10px; font-size: 13px;">
+                <div style="margin: 4px 0;"><strong>Crime Safety:</strong> ${toScore(props.crime_score)}/100</div>
+                <div style="margin: 4px 0;"><strong>Foot Traffic:</strong> ${toScore(props.foot_traffic_score)}/100</div>
+                <div style="margin: 4px 0;"><strong>Flood Safety:</strong> ${toScore(props.flood_risk_score)}/100</div>
+                <div style="margin: 4px 0;"><strong>Rent Value:</strong> ${toScore(props.rent_score)}/100</div>
+                <div style="margin: 4px 0;"><strong>Points of Interest:</strong> ${toScore(props.poi_score)}/100</div>
+                <div style="margin: 4px 0;"><strong>Demographics:</strong> ${toScore(props.demographic_score)}/100</div>
+                ${props.rent_psf ? `<div style="margin: 4px 0;"><strong>Rent PSF:</strong> $${props.rent_psf}</div>` : ''}
+              </div>
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+                <strong>Weights Applied:</strong>
+                ${weights ? weights.map(w => `<div style="font-size: 11px; margin: 2px 0;">${w.label}: ${w.value}%</div>`).join('') : 'Default'}
               </div>
             </div>
           </div>
@@ -170,16 +288,29 @@ export default function Map({ weights, rentRange, selectedEthnicities }: any) {
           .setHTML(content)
           .addTo(map);
       });
+
+      map.on('mouseenter', 'tracts-fill', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'tracts-fill', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      setIsMapLoaded(true);
     });
 
-    return () => map.remove();
+    return () => {
+      map.remove();
+      setIsMapLoaded(false);
+    };
   }, []);
 
   useEffect(() => {
-    if (weights && rentRange && selectedEthnicities) {
+    if (isMapLoaded && weights && rentRange && selectedEthnicities) {
       fetchAndProcessGeojson();
     }
-  }, [weights, rentRange, selectedEthnicities]);
+  }, [isMapLoaded, weights, rentRange, selectedEthnicities]);
 
   return (
     <div
