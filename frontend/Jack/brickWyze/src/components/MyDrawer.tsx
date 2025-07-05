@@ -22,6 +22,14 @@ import MyRangeSlider from './MyRangeSlider';
 import HierarchicalMultiSelect from './RaceDropDownGroup/HierarchicalMultiSelect';
 import { ethnicityData } from './RaceDropDownGroup/ethnicityData';
 
+interface MyDrawerProps {
+  onSearchSubmit: (filters: {
+    weights: Weighting[];
+    rentRange: [number, number];
+    selectedEthnicities: string[];
+  }) => void;
+}
+
 const ALL_AVAILABLE_LAYERS: Layer[] = [
   { id: 'foot_traffic', label: 'Foot Traffic', icon: '🚶', color: '#4299E1' },
   { id: 'demographic', label: 'Demographics', icon: '👥', color: '#48BB78' },
@@ -40,7 +48,7 @@ const INITIAL_WEIGHTS: Weighting[] = [
   { id: 'poi', label: 'Points of Interest', icon: '📍', color: '#9F7AEA', value: 5 },
 ];
 
-export default function MyDrawer() {
+export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const btnRef = useRef<HTMLDivElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
@@ -48,35 +56,33 @@ export default function MyDrawer() {
   const selectWrapperRef = useRef<HTMLDivElement>(null);
 
   const [activeWeights, setActiveWeights] = useState<Weighting[]>(INITIAL_WEIGHTS);
+  const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
+  const [dropdownInput, setDropdownInput] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
+  const [menuIsOpen, setMenuIsOpen] = useState(false);
+  const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
 
   const normalizeWeights = (weights: Weighting[]): Weighting[] => {
     if (weights.length === 0) return [];
-
     const total = weights.reduce((sum, w) => sum + w.value, 0);
     if (total === 0) {
       const equalValue = 100 / weights.length;
       return weights.map(w => ({ ...w, value: equalValue }));
     }
-
     const normalized = weights.map(w => ({ ...w, value: (w.value / total) * 100 }));
     let roundedTotal = normalized.reduce((sum, w) => sum + Math.round(w.value), 0);
     const roundingError = 100 - roundedTotal;
-
     if (normalized.length > 0) {
       normalized[0].value = Math.round(normalized[0].value) + roundingError;
     }
-
     return normalized.map(w => ({ ...w, value: Math.round(w.value) }));
   };
 
   const handleSliderChangeEnd = (updatedId: string, newValue: number) => {
     const updatedSlider = activeWeights.find(w => w.id === updatedId);
     if (!updatedSlider) return;
-
     const otherSliders = activeWeights.filter(w => w.id !== updatedId);
-
     let updatedWeights: Weighting[];
-
     if (newValue >= 100) {
       updatedWeights = [
         { ...updatedSlider, value: 100 },
@@ -85,7 +91,6 @@ export default function MyDrawer() {
     } else {
       const totalRemaining = 100 - newValue;
       const totalOtherOriginal = otherSliders.reduce((sum, w) => sum + w.value, 0);
-
       updatedWeights = [
         { ...updatedSlider, value: newValue },
         ...otherSliders.map(w => {
@@ -96,7 +101,6 @@ export default function MyDrawer() {
         }),
       ];
     }
-
     setActiveWeights(normalizeWeights(updatedWeights));
   };
 
@@ -115,12 +119,6 @@ export default function MyDrawer() {
   const inactiveLayers = ALL_AVAILABLE_LAYERS.filter(
     layer => !activeWeights.some(active => active.id === layer.id)
   );
-
-  const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
-  const [dropdownInput, setDropdownInput] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
-  const [menuIsOpen, setMenuIsOpen] = useState(false);
-  const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
 
   const handleDropdownMenuChange = (isOpen: boolean) => {
     setMenuIsOpen(isOpen);
@@ -152,6 +150,19 @@ export default function MyDrawer() {
     };
   }, [menuIsOpen, isOpen]);
 
+  const handleSubmit = () => {
+    if (typeof onSearchSubmit === 'function') {
+      onSearchSubmit({
+        weights: normalizeWeights(activeWeights),
+        rentRange: rangeValue,
+        selectedEthnicities,
+      });
+    } else {
+      console.warn('onSearchSubmit is not a function');
+    }
+    onClose();
+  };
+
   return (
     <main>
       <Box ref={btnRef} onClick={onOpen} position="absolute" top="16px" left="16px" zIndex={10} cursor="pointer">
@@ -179,14 +190,12 @@ export default function MyDrawer() {
                 onRemove={handleRemove}
                 onAdd={handleAdd}
               />
-
               <MyRangeSlider
                 heading="Rent (PSF)"
                 toolTipText="Target Average Rent cost per Square foot in $USD"
                 defaultRange={rangeValue}
                 onChange={setRangeValue}
               />
-
               <Box mt={4} />
               <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
                 <HierarchicalMultiSelect
@@ -209,7 +218,7 @@ export default function MyDrawer() {
 
           <Box p={4} position="sticky" bottom="0" bg="#FFDED8" zIndex="sticky" borderTop="1px solid" borderColor="rgba(0,0,0,0.1)">
             <Flex justify="center">
-              <Button bg="#FF492C" variant="solid" onClick={onClose}>
+              <Button bg="#FF492C" variant="solid" onClick={handleSubmit}>
                 <SearchIcon mr={2} />
                 Search
               </Button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -16,8 +16,76 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 const EDGE_FUNCTION_URL =
   'https://kwuwuutcvpdomfivdemt.supabase.co/functions/v1/calculate-resilience';
 
-export default function Map() {
+export default function Map({ weights, rentRange, selectedEthnicities }: any) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+
+  const [geojson, setGeojson] = useState<any>(null);
+
+  const fetchAndProcessGeojson = async () => {
+    const cleaned = CleanGeojson(rawGeojson);
+    const processed = ProcessGeojson(cleaned, { precision: 6 });
+    const geoids = processed.features.map((f) => f.properties?.GEOID);
+
+    console.log('[Sending to Edge Function]', {
+      weights,
+      rentRange,
+      selectedEthnicities,
+      geoids,
+    });
+
+    try {
+      const response = await fetch(EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
+        },
+        body: JSON.stringify({
+          weights,
+          rentRange,
+          selectedEthnicities,
+          geoids,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Edge Function error ${response.status}: ${errorText}`);
+      }
+
+      const scores = await response.json();
+      const scoreMap: Record<string, any> = {};
+      scores.forEach((s: any) => {
+        const geoid = s?.geoid?.toString?.();
+        if (geoid) scoreMap[geoid] = s;
+      });
+
+      const updatedGeojson = {
+        ...processed,
+        features: processed.features.map((feat) => {
+          const geoid = feat.properties?.GEOID?.toString().padStart(11, '0');
+          return {
+            ...feat,
+            properties: {
+              ...feat.properties,
+              ...scoreMap[geoid],
+            },
+          };
+        }),
+      };
+
+      setGeojson(updatedGeojson);
+
+      if (mapRef.current && mapRef.current.getSource('tracts')) {
+        const source = mapRef.current.getSource('tracts') as mapboxgl.GeoJSONSource;
+        source.setData(updatedGeojson);
+      }
+    } catch (err) {
+      console.error('[Edge Function Fetch Failed]', err);
+    }
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -32,81 +100,17 @@ export default function Map() {
       style: 'mapbox://styles/mapbox/light-v11',
     });
 
-    const popup = new mapboxgl.Popup({
-      closeButton: true,
-      closeOnClick: true,
-      className: 'resilience-popup',
-    });
+    mapRef.current = map;
 
-    map.on('load', async () => {
-      const cleaned = CleanGeojson(rawGeojson);
-      const processed = ProcessGeojson(cleaned, { precision: 6 });
-
-      console.log('[GeoJSON GEOIDs]', processed.features.map(f => f.properties?.GEOID));
-
-      let scores: any[] = [];
-
-      try {
-        const response = await fetch(EDGE_FUNCTION_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
-          },
-          body: JSON.stringify({
-            weights: {
-              footfall: 0.35,
-              demographics: 0.25,
-              safety: 0.15,
-              flooding: 0.10,
-              rent: 0.10,
-              poi: 0.05,
-            },
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Edge Function error ${response.status}: ${errorText}`);
-        }
-
-        scores = await response.json();
-
-        console.log('[Edge Function GEOIDs]', scores.map(s => s.geoid));
-      } catch (err) {
-        console.error('[Edge Function Fetch Failed]', err);
-        return;
-      }
-
-      const scoreMap: { [key: string]: any } = {};
-      scores.forEach((s: any) => {
-        const geoidStr = s?.geoid?.toString?.();
-        if (geoidStr) {
-          scoreMap[geoidStr] = s;
-        }
-      });
-
-      processed.features = processed.features.map((feat) => {
-        const geoid = feat.properties?.GEOID?.toString().padStart(11, '0');
-        const scoreData = geoid ? scoreMap[geoid] : null;
-
-        if (!scoreData) {
-          console.warn(`[MISSING DATA] GEOID: ${geoid} not found in scoreMap`);
-        }
-
-        return {
-          ...feat,
-          properties: {
-            ...feat.properties,
-            ...scoreData,
-          },
-        };
-      });
+    map.on('load', () => {
+      fetchAndProcessGeojson();
 
       map.addSource('tracts', {
         type: 'geojson',
-        data: processed,
+        data: {
+          type: 'FeatureCollection',
+          features: [],
+        },
       });
 
       map.addLayer({
@@ -117,17 +121,7 @@ export default function Map() {
           'fill-color': [
             'case',
             ['!=', ['get', 'custom_score'], null],
-            [
-              'interpolate',
-              ['linear'],
-              ['get', 'custom_score'],
-              0,
-              '#d73027',
-              5,
-              '#fee08b',
-              10,
-              '#1a9850',
-            ],
+            ['interpolate', ['linear'], ['get', 'custom_score'], 0, '#d73027', 5, '#fee08b', 10, '#1a9850'],
             '#f0f0f0',
           ],
           'fill-opacity': 0.6,
@@ -145,14 +139,12 @@ export default function Map() {
       });
 
       map.on('click', 'tracts-fill', (e) => {
-        if (!e.features || !e.features.length) return;
-
+        if (!e.features?.length) return;
         const feature = e.features[0];
         const props = feature.properties || {};
+
         const toScore = (val: any) =>
           val !== null && val !== undefined ? Math.round(val * 10) : 'N/A';
-
-        console.log('[Popup Feature]', props);
 
         const content = `
           <div style="font-family: sans-serif; max-width: 240px;">
@@ -162,48 +154,32 @@ export default function Map() {
                 props.custom_score
               )}</strong><span style="font-size: 16px;"> /100</span>
               <div style="margin-top: 10px;">
-                <div><strong>Low Crime:</strong> <span style="color:#1a9850">${toScore(
-                  props.crime_score
-                )}/100</span></div>
-                <div><strong>Foot Traffic:</strong> <span style="color:#fdae61">${toScore(
-                  props.foot_traffic_score
-                )}/100</span></div>
-                <div><strong>Flood Safety:</strong> <span style="color:#1a9850">${toScore(
-                  props.flood_risk_score
-                )}/100</span></div>
-                <div><strong>Rent Score:</strong> <span style="color:#fdae61">${toScore(
-                  props.rent_score
-                )}/100</span></div>
-                <div><strong>POI Score:</strong> <span style="color:#fdae61">${toScore(
-                  props.poi_score
-                )}/100</span></div>
-                <div><strong>Demographics:</strong> <span style="color:#1a9850">${toScore(
-                  props.demographic_score
-                )}/100</span></div>
+                <div><strong>Low Crime:</strong> ${toScore(props.crime_score)}/100</div>
+                <div><strong>Foot Traffic:</strong> ${toScore(props.foot_traffic_score)}/100</div>
+                <div><strong>Flood Safety:</strong> ${toScore(props.flood_risk_score)}/100</div>
+                <div><strong>Rent Score:</strong> ${toScore(props.rent_score)}/100</div>
+                <div><strong>POI Score:</strong> ${toScore(props.poi_score)}/100</div>
+                <div><strong>Demographics:</strong> ${toScore(props.demographic_score)}/100</div>
               </div>
             </div>
-            <button style="background:#eee;border-radius:6px;border:none;padding:6px 12px;font-size:13px;cursor:pointer;">Save to Shortlist</button>
           </div>
         `;
 
-        popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
+        new mapboxgl.Popup({ closeButton: true })
+          .setLngLat(e.lngLat)
+          .setHTML(content)
+          .addTo(map);
       });
-
-      map.on('mouseleave', 'tracts-fill', () => {
-        map.getCanvas().style.cursor = '';
-      });
-
-      map.on('mouseenter', 'tracts-fill', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-    });
-
-    map.on('error', (e) => {
-      console.error('[Mapbox ERROR]', e.error);
     });
 
     return () => map.remove();
   }, []);
+
+  useEffect(() => {
+    if (weights && rentRange && selectedEthnicities) {
+      fetchAndProcessGeojson();
+    }
+  }, [weights, rentRange, selectedEthnicities]);
 
   return (
     <div
