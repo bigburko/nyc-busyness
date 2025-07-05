@@ -1,66 +1,47 @@
-// src/components/MySlider.tsx
+// src/components/ScoreWeightingGroup/MySlider.tsx
 'use client';
 
 import {
-  Box,
-  Flex,
-  Slider,
-  SliderFilledTrack,
-  SliderThumb,
-  SliderTrack,
-  Text,
-  CloseButton,
+  Box, Flex, Slider, SliderFilledTrack, SliderThumb, SliderTrack, Text, CloseButton
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 
-interface Props {
+export interface Props {
   label: string;
   icon: string;
   filledTrack: string;
-  value: number;
-  onChangeEnd: (val: number) => void; // Changed from onChange
+  value: number; // The "canonical" value from the parent
+  onChangeEnd: (val: number) => void; // Notifies parent when dragging stops
   onRemove: () => void;
-  canBeRemoved: boolean; // New prop
+  canBeRemoved: boolean;
   boxSize?: number;
 }
 
 export default function MySlider({
-  label,
-  icon,
-  filledTrack,
-  value,
-  onChangeEnd,
-  onRemove,
-  canBeRemoved,
-  boxSize = 6,
+  label, icon, filledTrack, value, onChangeEnd, onRemove, canBeRemoved, boxSize = 6,
 }: Props) {
-  // Internal state for smooth dragging without re-rendering the whole list
-  const [sliderValue, setSliderValue] = useState(value);
+  // Internal state provides a smooth dragging experience without re-rendering the whole page
+  const [internalValue, setInternalValue] = useState(value);
 
-  // Syncs the internal value if the parent's value changes
+  // Syncs the slider if its value is changed externally (e.g., by another slider)
   useEffect(() => {
-    setSliderValue(value);
+    setInternalValue(value);
   }, [value]);
 
   return (
     <Box
-      bg="white"
-      borderRadius="md"
-      p={3}
-      boxShadow="sm"
-      position="relative"
-      w="100%"
+      bg="white" borderRadius="md" p={3} boxShadow="sm" w="100%"
     >
       <Flex align="center" justify="space-between" mb={2}>
         <Flex align="center" gap={2}>
-          <Box
-            bg={filledTrack}
-            borderRadius="full"
-            boxSize={boxSize}
+          <Box 
+            bg={filledTrack} 
+            borderRadius="full" 
+            boxSize={boxSize} 
             display="flex"
-            alignItems="center"
-            justifyContent="center"
-            fontSize="sm"
+            alignItems="center" 
+            justifyContent="center" 
+            fontSize="sm" 
             color="white"
           >
             {icon}
@@ -68,17 +49,20 @@ export default function MySlider({
           <Text fontWeight="medium">{label}</Text>
         </Flex>
         <Flex align="center" gap={3}>
+          {/* Display internal value for immediate visual feedback */}
           <Text fontSize="sm" fontWeight="bold" minW="40px" textAlign="right">
-            {Math.round(sliderValue)}%
+            {Math.round(internalValue)}%
           </Text>
-          {/* Close button is only shown if it can be removed */}
           {canBeRemoved && <CloseButton size="sm" onClick={onRemove} />}
         </Flex>
       </Flex>
       <Slider
-        value={sliderValue}
-        onChange={setSliderValue} // Updates local state while dragging
-        onChangeEnd={onChangeEnd} // Updates parent state on release
+        // The slider's thumb is driven by the fast internal state
+        value={internalValue}
+        // `onChange` only updates the internal state
+        onChange={setInternalValue}
+        // `onChangeEnd` informs the parent to run expensive logic
+        onChangeEnd={onChangeEnd}
         min={0}
         max={100}
         step={1}

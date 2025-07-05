@@ -17,10 +17,31 @@ import { GiHamburgerMenu } from 'react-icons/gi';
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
-import WeightingPanel from './ScoreWeightingGroup/WeightingPanel';
+// --- IMPORTS (UNCHANGED) ---
+import WeightingPanel, { Weighting, Layer } from './ScoreWeightingGroup/WeightingPanel';
 import MyRangeSlider from './MyRangeSlider';
 import HierarchicalMultiSelect from './RaceDropDownGroup/HierarchicalMultiSelect';
 import { ethnicityData } from './RaceDropDownGroup/ethnicityData';
+
+// --- (1) YOUR UPDATED DATA DEFINITIONS ---
+const ALL_AVAILABLE_LAYERS: Layer[] = [
+  { id: 'foot_traffic', label: 'Foot Traffic', icon: '🚶', color: '#4299E1' },
+  { id: 'demographic', label: 'Demographics', icon: '👥', color: '#48BB78' },
+  { id: 'crime', label: 'Crime Score', icon: '🚨', color: '#E53E3E' },
+  { id: 'flood_risk', label: 'Flood Risk', icon: '🌊', color: '#38B2AC' },
+  { id: 'rent_score', label: 'Rent Score', icon: '💰', color: '#ED8936' },
+  { id: 'poi', label: 'Points of Interest', icon: '📍', color: '#9F7AEA' },
+];
+
+const INITIAL_WEIGHTS: Weighting[] = [
+  { id: 'foot_traffic', label: 'Foot Traffic', icon: '🚶', color: '#4299E1', value: 35 },
+  { id: 'demographic', label: 'Demographics', icon: '👥', color: '#48BB78', value: 25 },
+  { id: 'crime', label: 'Crime Score', icon: '🚨', color: '#E53E3E', value: 15 },
+  { id: 'flood_risk', label: 'Flood Risk', icon: '🌊', color: '#38B2AC', value: 10 },
+  { id: 'rent_score', label: 'Rent Score', icon: '💰', color: '#ED8936', value: 10 },
+  { id: 'poi', label: 'Points of Interest', icon: '📍', color: '#9F7AEA', value: 5 },
+];
+// ---
 
 export default function MyDrawer() {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -29,11 +50,57 @@ export default function MyDrawer() {
   const drawerBodyRef = useRef<HTMLDivElement>(null);
   const selectWrapperRef = useRef<HTMLDivElement>(null);
 
+  // --- (2) STATE AND HANDLERS (UNCHANGED LOGIC, IT WORKS WITH YOUR NEW DATA) ---
+  const [activeWeights, setActiveWeights] = useState<Weighting[]>(INITIAL_WEIGHTS);
+
+  const normalizeWeights = (weights: Weighting[]): Weighting[] => {
+    if (weights.length === 0) return [];
+    
+    const total = weights.reduce((sum, w) => sum + w.value, 0);
+    if (total === 0) {
+      const equalValue = 100 / weights.length;
+      return weights.map(w => ({ ...w, value: equalValue }));
+    }
+    
+    const normalized = weights.map(w => ({ ...w, value: (w.value / total) * 100 }));
+    let roundedTotal = normalized.reduce((sum, w) => sum + Math.round(w.value), 0);
+    const roundingError = 100 - roundedTotal;
+
+    if (normalized.length > 0) {
+        normalized[0].value = Math.round(normalized[0].value) + roundingError;
+    }
+    
+    return normalized.map(w => ({ ...w, value: Math.round(w.value) }));
+  };
+
+  const handleSliderChangeEnd = (updatedId: string, newValue: number) => {
+    const weightsAfterUpdate = activeWeights.map(w =>
+      w.id === updatedId ? { ...w, value: newValue } : w
+    );
+    setActiveWeights(normalizeWeights(weightsAfterUpdate));
+  };
+
+  const handleRemove = (idToRemove: string) => {
+    const remainingWeights = activeWeights.filter(w => w.id !== idToRemove);
+    setActiveWeights(normalizeWeights(remainingWeights));
+  };
+
+  const handleAdd = (layerToAdd: Layer) => {
+    const valueForNewItem = 15;
+    const scaledDownWeights = activeWeights.map(w => ({ ...w, value: w.value * (1 - valueForNewItem / 100) }));
+    const newWeightsList = [...scaledDownWeights, { ...layerToAdd, value: valueForNewItem }];
+    setActiveWeights(normalizeWeights(newWeightsList));
+  };
+
+  const inactiveLayers = ALL_AVAILABLE_LAYERS.filter(
+    layer => !activeWeights.some(active => active.id === layer.id)
+  );
+
+  // --- YOUR EXISTING STATE AND LOGIC (UNCHANGED) ---
   const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
   const [dropdownInput, setDropdownInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
   const [menuIsOpen, setMenuIsOpen] = useState(false);
-
   const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
 
   const handleDropdownMenuChange = (isOpen: boolean) => {
@@ -51,73 +118,45 @@ export default function MyDrawer() {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const dropdown = document.querySelector('.chakra-select__menu');
-      const wrapper = selectWrapperRef.current;
-
-      if (menuIsOpen && dropdown && !dropdown.contains(target) && wrapper && !wrapper.contains(target)) {
-        setMenuIsOpen(false);
-      }
+        const target = e.target as Node;
+        const dropdown = document.querySelector('.chakra-select__menu');
+        const wrapper = selectWrapperRef.current;
+        if (menuIsOpen && dropdown && !dropdown.contains(target) && wrapper && !wrapper.contains(target)) {
+            setMenuIsOpen(false);
+        }
     };
-
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('mousedown', handleClickOutside);
     }
-
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [menuIsOpen, isOpen]);
 
+
   return (
     <main>
-      <Box
-        ref={btnRef}
-        onClick={onOpen}
-        position="absolute"
-        top="16px"
-        left="16px"
-        zIndex={10}
-        cursor="pointer"
-      >
+      <Box ref={btnRef} onClick={onOpen} position="absolute" top="16px" left="16px" zIndex={10} cursor="pointer">
         <GiHamburgerMenu size={28} color="#2D3748" />
       </Box>
 
-      <Drawer
-        isOpen={isOpen}
-        onClose={onClose}
-        finalFocusRef={btnRef as React.RefObject<FocusableElement>}
-        placement="left"
-        size="sm"
-      >
+      <Drawer isOpen={isOpen} onClose={onClose} finalFocusRef={btnRef as React.RefObject<FocusableElement>} placement="left" size="sm">
         <DrawerOverlay />
-        <DrawerContent
-          bg="#FFDED8"
-          display="flex"
-          flexDirection="column"
-          h="100%"
-        >
+        <DrawerContent bg="#FFDED8" display="flex" flexDirection="column" h="100%">
           <DrawerCloseButton />
           <DrawerHeader>Priorities</DrawerHeader>
 
-          <DrawerBody
-            ref={drawerBodyRef}
-            overflowY="auto"
-            css={{
-              '&::-webkit-scrollbar': { width: '8px' },
-              '&::-webkit-scrollbar-track': {
-                background: '#f1f1f1',
-                borderRadius: '4px',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                background: '#888',
-                borderRadius: '4px',
-                '&:hover': { background: '#555' },
-              },
-            }}
-          >
+          <DrawerBody ref={drawerBodyRef} overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '8px' }, '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#888', borderRadius: '4px', '&:hover': { background: '#555' } } }}>
             <Flex direction="column" gap={4} pb={8}>
-              <WeightingPanel />
+              
+              {/* --- (3) PASSING PROPS TO WeightingPanel (UNCHANGED) --- */}
+              <WeightingPanel
+                activeWeights={activeWeights}
+                inactiveLayers={inactiveLayers}
+                onSliderChangeEnd={handleSliderChangeEnd}
+                onRemove={handleRemove}
+                onAdd={handleAdd}
+              />
 
               <MyRangeSlider
                 heading="Rent (PSF)"
@@ -146,15 +185,7 @@ export default function MyDrawer() {
             </Flex>
           </DrawerBody>
 
-          <Box
-            p={4}
-            position="sticky"
-            bottom="0"
-            bg="#FFDED8"
-            zIndex="sticky"
-            borderTop="1px solid"
-            borderColor="rgba(0,0,0,0.1)"
-          >
+          <Box p={4} position="sticky" bottom="0" bg="#FFDED8" zIndex="sticky" borderTop="1px solid" borderColor="rgba(0,0,0,0.1)">
             <Flex justify="center">
               <Button bg="#FF492C" variant="solid" onClick={onClose}>
                 <SearchIcon mr={2} />

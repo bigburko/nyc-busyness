@@ -1,119 +1,99 @@
-// src/components/WeightingPanel.tsx
-'use client';
+// src/components/WeightingPanel.tsx  (OR WHATEVER PATH YOURS HAS)
 
-import { Box, Flex } from '@chakra-ui/react';
-import MySlider from './MySlider';
-import AddWeightSelector, { Layer } from './AddWeightSelector';
-import { useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import { Box, Text, VStack, IconButton, HStack } from '@chakra-ui/react';
+// This import path may need to be adjusted if your files are in different folders.
+// Example: './MySlider' or '../MySlider'
+import MySlider from './MySlider'; 
+import { AddIcon } from '@chakra-ui/icons';
 
-interface Weighting extends Layer {
+export interface Layer {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+}
+
+export interface Weighting extends Layer {
   value: number;
 }
 
-const initialWeights: Weighting[] = [
-  { id: uuidv4(), label: 'Safety', icon: '🛡️', value: 30, color: '#F87171' },
-  { id: uuidv4(), label: 'Foot Traffic', icon: '🚶', value: 25, color: '#60A5FA' },
-  { id: uuidv4(), label: 'Rent Score', icon: '💰', value: 20, color: '#34D399' },
-  { id: uuidv4(), label: 'Demographics', icon: '👥', value: 15, color: '#FBBF24' },
-  { id: uuidv4(), label: 'POI', icon: '📍', value: 5, color: '#A78BFA' },
-  { id: uuidv4(), label: 'Flooding', icon: '🌊', value: 5, color: '#FB923C' },
-];
+export interface Props {
+  activeWeights: Weighting[];
+  inactiveLayers: Layer[];
+  // ** THIS IS THE KEY CHANGE **
+  // The prop from your drawer should be named 'onSliderChangeEnd'
+  onSliderChangeEnd: (id: string, newValue: number) => void; 
+  onRemove: (id: string) => void;
+  onAdd: (layer: Layer) => void;
+}
 
-export default function WeightingPanel() {
-  const [activeWeights, setActiveWeights] = useState<Weighting[]>(initialWeights);
-  const [inactiveLayers, setInactiveLayers] = useState<Layer[]>([]);
-
-  const handleSliderChange = (id: string, newValue: number) => {
-    setActiveWeights((prev) => {
-      // Edge Case: If only one slider, its value must always be 100.
-      if (prev.length === 1) {
-        return [{ ...prev[0], value: 100 }];
-      }
-
-      const clampedNewValue = Math.round(Math.max(0, Math.min(100, newValue)));
-
-      const others = prev.filter((w) => w.id !== id);
-      const totalOfOthers = others.reduce((sum, w) => sum + w.value, 0);
-      const newTotalForOthers = 100 - clampedNewValue;
-
-      // Guard against division by zero if all other sliders were at 0.
-      const scalingFactor = totalOfOthers > 0 ? newTotalForOthers / totalOfOthers : 0;
-
-      const updatedOthers = others.map((w) => ({
-        ...w,
-        value: w.value * scalingFactor,
-      }));
-
-      const targetSlider = prev.find((w) => w.id === id);
-      if (!targetSlider) return prev; // Should not happen
-
-      let newWeights = [...updatedOthers, { ...targetSlider, value: clampedNewValue }];
-
-      // Final normalization pass to ensure sum is exactly 100 due to rounding
-      let sum = 0;
-      const finalWeights = newWeights.map((w, index) => {
-        if (index < newWeights.length - 1) {
-          const roundedValue = Math.round(w.value);
-          sum += roundedValue;
-          return { ...w, value: roundedValue };
-        }
-        // The last item gets the remainder
-        return { ...w, value: 100 - sum };
-      });
-      
-      // Restore original order to prevent the list from visually re-sorting itself
-      return prev.map(p => finalWeights.find(f => f.id === p.id) || p);
-    });
-  };
-
-  const handleRemove = (id: string) => {
-    const layerToRemove = activeWeights.find((w) => w.id === id);
-    if (!layerToRemove) return;
-
-    setInactiveLayers((prev) => [
-      ...prev,
-      { ...layerToRemove, value: undefined },
-    ]);
-
-    setActiveWeights((prev) => {
-      const remaining = prev.filter((w) => w.id !== id);
-      const total = remaining.reduce((sum, w) => sum + w.value, 0);
-      return remaining.map((w) => ({
-        ...w,
-        value: Math.round((w.value / total) * 100),
-      }));
-    });
-  };
-
-  const handleAdd = (layer: Layer) => {
-    setInactiveLayers((prev) => prev.filter((l) => l.id !== layer.id));
-
-    setActiveWeights((prev) => {
-      const newWeighting = { ...layer, value: 10 };
-      const newTotal = prev.reduce((sum, w) => sum + w.value, 0) + newWeighting.value;
-      return [...prev, newWeighting].map((w) => ({
-        ...w,
-        value: Math.round((w.value / newTotal) * 100),
-      }));
-    });
-  };
-
+export default function WeightingPanel({
+  activeWeights = [],
+  inactiveLayers = [],
+  onSliderChangeEnd, // Use the new prop name
+  onRemove,
+  onAdd,
+}: Props) {
   return (
-    <Flex direction="column" gap={3} w="100%">
-      {activeWeights.map((weight) => (
-        <MySlider
-          key={weight.id}
-          label={weight.label}
-          icon={weight.icon}
-          value={weight.value}
-          filledTrack={weight.color}
-          onChangeEnd={(val) => handleSliderChange(weight.id, val)}
-          onRemove={() => handleRemove(weight.id)}
-          canBeRemoved={activeWeights.length > 1}
-        />
-      ))}
-      <AddWeightSelector layers={inactiveLayers} onAdd={handleAdd} />
-    </Flex>
+    <Box>
+      <Text fontWeight="bold" mb={2}>Adjust Priorities</Text>
+      <VStack spacing={4}>
+        {activeWeights.map((weight) => (
+          <MySlider
+            key={weight.id}
+            label={weight.label}
+            icon={weight.icon}
+            filledTrack={weight.color}
+            // ----- FIXES ARE HERE ------
+            value={weight.value} // 1. Use `value` instead of `defaultValue`
+            onChangeEnd={(val: number) => onSliderChangeEnd(weight.id, val)} // 2. Use `onChangeEnd` instead of `onChange`
+            canBeRemoved={activeWeights.length > 1} // 3. Add this required prop for MySlider
+            // ---------------------------
+            onRemove={() => onRemove(weight.id)}
+          />
+        ))}
+        {inactiveLayers.length > 0 && (
+          <Box w="100%" mt={4}>
+            <Text fontSize="sm" mb={2}>Add More</Text>
+            <VStack spacing={2} align="stretch">
+              {inactiveLayers.map((layer) => (
+                <HStack
+                  key={layer.id}
+                  spacing={3}
+                  justify="space-between"
+                  p={2}
+                  borderRadius="md"
+                  bg="white"
+                  boxShadow="sm"
+                >
+                  <HStack spacing={2}>
+                    <Box
+                      bg={layer.color}
+                      borderRadius="full"
+                      boxSize="6"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      fontSize="sm"
+                      color="white" // Added for better icon visibility
+                    >
+                      {layer.icon}
+                    </Box>
+                    <Text fontWeight="medium">{layer.label}</Text>
+                  </HStack>
+                  <IconButton
+                    icon={<AddIcon />}
+                    size="sm"
+                    aria-label="Add layer"
+                    onClick={() => onAdd(layer)}
+                    variant="ghost"
+                  />
+                </HStack>
+              ))}
+            </VStack>
+          </Box>
+        )}
+      </VStack>
+    </Box>
   );
 }
