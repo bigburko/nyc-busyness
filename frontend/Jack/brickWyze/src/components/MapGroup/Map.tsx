@@ -25,9 +25,10 @@ interface MapProps {
   weights?: any[];
   rentRange?: [number, number];
   selectedEthnicities?: string[];
+  selectedGenders?: string[]; // ✅ ONLY ADDITION
 }
 
-export default function Map({ weights, rentRange, selectedEthnicities }: MapProps) {
+export default function Map({ weights, rentRange, selectedEthnicities, selectedGenders }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -47,13 +48,14 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
     const cleaned = CleanGeojson(rawGeojson);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
 
-    if (!weights || !rentRange || !selectedEthnicities) return;
+    if (!weights || !rentRange || !selectedEthnicities) return; // ✅ KEEP ORIGINAL LOGIC
 
     if (DEBUG_MODE) {
       console.log('📤 Sending to edge function:', {
         weights,
         rentRange,
         ethnicities: selectedEthnicities,
+        genders: selectedGenders, // ✅ ONLY ADDITION
       });
     }
 
@@ -65,7 +67,12 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
           apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
           Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
         },
-        body: JSON.stringify({ weights, rentRange, ethnicities: selectedEthnicities }),
+        body: JSON.stringify({ 
+          weights, 
+          rentRange, 
+          ethnicities: selectedEthnicities,
+          genders: selectedGenders || [] // ✅ ONLY ADDITION
+        }),
       });
 
       if (!response.ok) {
@@ -79,6 +86,7 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
       if (DEBUG_MODE) {
         console.log('📥 Edge function returned zones:', zones.length);
         console.log('[✅ DEBUG] Ethnicities sent:', debug?.received_ethnicities);
+        console.log('[✅ DEBUG] Genders sent:', debug?.received_genders); // ✅ ONLY ADDITION
         console.log('[✅ DEBUG] Sample demo scores:', debug?.sample_demo_scores);
         console.log('[✅ DEBUG] Watched tracts filtered by rent:', debug?.filtered_out_watched);
         console.log('[✅ DEBUG] Watched rent values:', debug?.watched_rents);
@@ -112,7 +120,7 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
               ...feat.properties,
               ...(match || { custom_score: 0 }),
               ...match,
-              hasScore: watchedGEOIDs.includes(geoid) || !!match, // ✅ apply last
+              hasScore: watchedGEOIDs.includes(geoid) || !!match, // ✅ KEEP EXACT ORIGINAL
             },
           };
         }),
@@ -164,7 +172,7 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
     });
 
     map.on('click', 'tracts-fill', (e) => {
-      renderPopup(e, weights, selectedEthnicities);
+      renderPopup(e, weights, selectedEthnicities, selectedGenders); // ✅ ONLY ADDITION
     });
 
     map.on('mouseenter', 'tracts-fill', () => {
@@ -182,10 +190,10 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
   }, []);
 
   useEffect(() => {
-    if (isMapLoaded && weights && rentRange && selectedEthnicities) {
+    if (isMapLoaded && weights && rentRange && selectedEthnicities) { // ✅ KEEP ORIGINAL CONDITION
       fetchAndApplyScores();
     }
-  }, [isMapLoaded, weights, rentRange, selectedEthnicities]);
+  }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders]); // ✅ ONLY ADD TO DEPS
 
   return (
     <div

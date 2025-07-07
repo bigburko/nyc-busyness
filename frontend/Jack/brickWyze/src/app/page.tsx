@@ -9,6 +9,7 @@ interface SearchFilters {
   weights: any[];
   rentRange: [number, number];
   selectedEthnicities: string[];
+  selectedGenders: string[]; // ✅ ADDED
 }
 
 export default function Page() {
@@ -16,16 +17,16 @@ export default function Page() {
 
   const handleSearchSubmit = (filters: SearchFilters) => {
     console.log('[Search Submitted]', filters);
-    setSearchFilters(filters);
+    setSearchFilters(filters); // ✅ This now includes selectedGenders too
   };
 
   return (
     <Box position="relative" height="100vh" width="100vw" overflow="hidden">
-      {/* Always show the map */}
       <Map 
         weights={searchFilters?.weights}
         rentRange={searchFilters?.rentRange}
         selectedEthnicities={searchFilters?.selectedEthnicities}
+        selectedGenders={searchFilters?.selectedGenders} // ✅ PASSED TO MAP
       />
       <MyDrawer onSearchSubmit={handleSearchSubmit} />
     </Box>

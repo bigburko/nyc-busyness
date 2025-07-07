@@ -5,7 +5,8 @@ import mapboxgl from 'mapbox-gl';
 export const renderPopup = (
   e: mapboxgl.MapLayerMouseEvent,
   weights?: any[],
-  selectedEthnicities?: string[]
+  selectedEthnicities?: string[],
+  selectedGenders?: string[] // ✅ NEW
 ) => {
   if (!e.features?.length) return;
   const feature = e.features[0];
@@ -34,6 +35,12 @@ export const renderPopup = (
     return isNaN(score) ? 'N/A' : Math.round(score * 100);
   };
 
+  const formatPct = (val: any) => {
+    if (val === null || val === undefined) return 'N/A';
+    const pct = parseFloat(val);
+    return isNaN(pct) ? 'N/A' : `${(pct * 100).toFixed(1)}%`;
+  };
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return '#1a9850';
     if (score >= 60) return '#91bfdb';
@@ -58,6 +65,7 @@ export const renderPopup = (
           </strong>
           <span style="font-size: 14px;"> /100 Overall Score</span>
         </div>
+
         <div style="margin-top: 10px; font-size: 13px;">
           <div style="margin: 4px 0;"><strong>Crime Safety:</strong> ${toScore(props.crime_score)}/100</div>
           <div style="margin: 4px 0;"><strong>Foot Traffic:</strong> ${toScore(props.foot_traffic_score)}/100</div>
@@ -65,50 +73,47 @@ export const renderPopup = (
           <div style="margin: 4px 0;"><strong>Rent Value:</strong> ${toScore(props.rent_score)}/100</div>
           <div style="margin: 4px 0;"><strong>Points of Interest:</strong> ${toScore(props.poi_score)}/100</div>
           <div style="margin: 4px 0;"><strong>Demographics:</strong> ${toScore(props.demographic_score)}/100</div>
-          ${
-            props.demographic_score !== undefined &&
-            props.demographic_score === 0 &&
-            props.demographic_match_pct === 0
-              ? `<div style="margin: 4px 0; font-size: 11px; color: #c00;">
-                   ⚠️ No demographic match found for selected groups
-                 </div>`
-              : ''
-          }
-          ${
-            props.demographic_match_pct !== null &&
-            props.demographic_match_pct !== undefined
-              ? `<div style="margin: 4px 0; font-size: 11px; color: #666;">
-                   (${(props.demographic_match_pct * 100).toFixed(1)}% match)
-                 </div>`
-              : ''
-          }
-          ${
-            props.avg_rent
-              ? `<div style="margin: 4px 0;"><strong>Avg Rent:</strong> $${props.avg_rent}</div>`
-              : ''
+          
+          <div style="margin-top: 10px; font-size: 12px; color: #666;">
+            <div><strong>Race/Ethnicity Match:</strong> ${formatPct(props.demographic_match_pct)}</div>
+            <div><strong>Gender Match:</strong> ${formatPct(props.gender_match_pct)}</div>
+            <div><strong>Combined Match:</strong> ${formatPct(props.combined_match_pct)}</div>
+          </div>
+
+          ${props.avg_rent
+            ? `<div style="margin: 8px 0;"><strong>Avg Rent:</strong> $${props.avg_rent}</div>`
+            : ''
           }
         </div>
-        ${
-          weights && weights.length > 0
-            ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
-                <strong style="font-size: 12px;">Weights Applied:</strong>
-                <div style="font-size: 11px; margin-top: 4px;">
-                  ${weights
-                    .map((w) => `<div style="margin: 2px 0;">${w.label}: ${w.value}%</div>`)
-                    .join('')}
-                </div>
-              </div>`
-            : ''
+
+        ${weights?.length
+          ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+              <strong style="font-size: 12px;">Weights Applied:</strong>
+              <div style="font-size: 11px; margin-top: 4px;">
+                ${weights.map((w) => `<div style="margin: 2px 0;">${w.label}: ${w.value}%</div>`).join('')}
+              </div>
+            </div>`
+          : ''
         }
-        ${
-          selectedEthnicities && selectedEthnicities.length > 0
-            ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
-                <strong style="font-size: 12px;">Selected Demographics:</strong>
-                <div style="font-size: 11px; margin-top: 4px; max-height: 60px; overflow-y: auto;">
-                  ${selectedEthnicities.join(', ')}
-                </div>
-              </div>`
-            : ''
+
+        ${selectedEthnicities?.length
+          ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+              <strong style="font-size: 12px;">Selected Demographics:</strong>
+              <div style="font-size: 11px; margin-top: 4px; max-height: 60px; overflow-y: auto;">
+                ${selectedEthnicities.join(', ')}
+              </div>
+            </div>`
+          : ''
+        }
+
+        ${selectedGenders?.length
+          ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+              <strong style="font-size: 12px;">Selected Genders:</strong>
+              <div style="font-size: 11px; margin-top: 4px;">
+                ${selectedGenders.join(', ')}
+              </div>
+            </div>`
+          : ''
         }
       </div>
     </div>

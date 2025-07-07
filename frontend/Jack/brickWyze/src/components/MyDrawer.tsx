@@ -25,15 +25,17 @@ import type { FocusableElement } from '@chakra-ui/utils';
 
 import WeightingPanel, { Weighting, Layer } from './ScoreWeightingGroup/WeightingPanel';
 import MyRangeSlider from './MyRangeSlider';
-import HierarchicalMultiSelect from './RaceDropDownGroup/HierarchicalMultiSelect';
-import { ethnicityData } from './RaceDropDownGroup/ethnicityData';
-import CancelResetButton from './ScoreWeightingGroup/CancelResetButton'; // ✅ import your new reusable component
+import HierarchicalMultiSelect from './DemographicGroup/RaceDropDownGroup/HierarchicalMultiSelect';
+import { ethnicityData } from './DemographicGroup/RaceDropDownGroup/ethnicityData';
+import CancelResetButton from './ScoreWeightingGroup/CancelResetButton';
+import GenderSelect from './DemographicGroup/GenderGroup/GenderSelect'; // ✅ updated
 
 interface MyDrawerProps {
   onSearchSubmit: (filters: {
     weights: Weighting[];
     rentRange: [number, number];
     selectedEthnicities: string[];
+    selectedGenders: string[];
   }) => void;
 }
 
@@ -64,6 +66,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
 
   const [activeWeights, setActiveWeights] = useState<Weighting[]>(INITIAL_WEIGHTS);
   const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
+  const [selectedGenders, setSelectedGenders] = useState<string[]>(['male', 'female']); // ✅ both selected by default
   const [dropdownInput, setDropdownInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
   const [menuIsOpen, setMenuIsOpen] = useState(false);
@@ -88,94 +91,23 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
     return normalized.map(w => ({ ...w, value: Math.round(w.value) }));
   };
 
-  const handleSliderChangeEnd = (updatedId: string, newValue: number) => {
-    const updatedSlider = activeWeights.find(w => w.id === updatedId);
-    if (!updatedSlider) return;
-    const otherSliders = activeWeights.filter(w => w.id !== updatedId);
-    let updatedWeights: Weighting[];
-    if (newValue >= 100) {
-      updatedWeights = [
-        { ...updatedSlider, value: 100 },
-        ...otherSliders.map(w => ({ ...w, value: 0 })),
-      ];
-    } else {
-      const totalRemaining = 100 - newValue;
-      const totalOtherOriginal = otherSliders.reduce((sum, w) => sum + w.value, 0);
-      updatedWeights = [
-        { ...updatedSlider, value: newValue },
-        ...otherSliders.map(w => {
-          const proportionalShare = totalOtherOriginal === 0
-            ? totalRemaining / otherSliders.length
-            : (w.value / totalOtherOriginal) * totalRemaining;
-          return { ...w, value: proportionalShare };
-        }),
-      ];
-    }
-    setActiveWeights(normalizeWeights(updatedWeights));
-  };
-
-  const handleRemove = (idToRemove: string) => {
-    const remainingWeights = activeWeights.filter(w => w.id !== idToRemove);
-    setActiveWeights(normalizeWeights(remainingWeights));
-  };
-
-  const handleAdd = (layerToAdd: Layer) => {
-    const valueForNewItem = 15;
-    const scaledDownWeights = activeWeights.map(w => ({ ...w, value: w.value * (1 - valueForNewItem / 100) }));
-    const newWeightsList = [...scaledDownWeights, { ...layerToAdd, value: valueForNewItem }];
-    setActiveWeights(normalizeWeights(newWeightsList));
-  };
-
-  const inactiveLayers = ALL_AVAILABLE_LAYERS.filter(
-    layer => !activeWeights.some(active => active.id === layer.id)
-  );
-
-  const handleDropdownMenuChange = (isOpen: boolean) => {
-    setMenuIsOpen(isOpen);
-    if (isOpen) {
-      setTimeout(() => {
-        if (ethnicityRef.current && drawerBodyRef.current) {
-          const offsetTop = ethnicityRef.current.offsetTop;
-          const scrollTarget = Math.max(0, offsetTop - 50);
-          drawerBodyRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
-        }
-      }, 100);
-    }
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const dropdown = document.querySelector('.chakra-select__menu');
-      const wrapper = selectWrapperRef.current;
-      if (menuIsOpen && dropdown && !dropdown.contains(target) && wrapper && !wrapper.contains(target)) {
-        setMenuIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [menuIsOpen, isOpen]);
-
   const handleSubmit = () => {
     if (typeof onSearchSubmit === 'function') {
+      if (selectedGenders.length === 0) {
+        alert('Please select at least one gender.');
+        return;
+      }
+
       onSearchSubmit({
         weights: normalizeWeights(activeWeights),
         rentRange: rangeValue,
         selectedEthnicities,
+        selectedGenders,
       });
     } else {
       console.warn('onSearchSubmit is not a function');
     }
     onClose();
-  };
-
-  const handleConfirmReset = () => {
-    setActiveWeights(INITIAL_WEIGHTS);
-    setIsResetDialogOpen(false);
   };
 
   return (
@@ -196,20 +128,46 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
           <DrawerCloseButton />
           <DrawerHeader>Priorities</DrawerHeader>
 
-          <DrawerBody ref={drawerBodyRef} overflowY="auto" css={{
-            '&::-webkit-scrollbar': { width: '8px' },
-            '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
-            '&::-webkit-scrollbar-thumb': {
-              background: '#888', borderRadius: '4px', '&:hover': { background: '#555' },
-            },
-          }}>
+          <DrawerBody
+            ref={drawerBodyRef}
+            overflowY="auto"
+            css={{
+              '&::-webkit-scrollbar': { width: '8px' },
+              '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
+              '&::-webkit-scrollbar-thumb': {
+                background: '#888', borderRadius: '4px', '&:hover': { background: '#555' },
+              },
+            }}
+          >
             <Flex direction="column" gap={4} pb={8}>
               <WeightingPanel
                 activeWeights={activeWeights}
-                inactiveLayers={inactiveLayers}
-                onSliderChangeEnd={handleSliderChangeEnd}
-                onRemove={handleRemove}
-                onAdd={handleAdd}
+                inactiveLayers={ALL_AVAILABLE_LAYERS.filter(
+                  layer => !activeWeights.some(active => active.id === layer.id)
+                )}
+                onSliderChangeEnd={(id, value) => {
+                  const updatedSlider = activeWeights.find(w => w.id === id);
+                  if (!updatedSlider) return;
+                  const others = activeWeights.filter(w => w.id !== id);
+                  let updated = value >= 100
+                    ? [{ ...updatedSlider, value: 100 }, ...others.map(w => ({ ...w, value: 0 }))]
+                    : [
+                        { ...updatedSlider, value },
+                        ...others.map(w => {
+                          const total = others.reduce((s, w) => s + w.value, 0);
+                          const share = total === 0 ? (100 - value) / others.length : (w.value / total) * (100 - value);
+                          return { ...w, value: share };
+                        }),
+                      ];
+                  setActiveWeights(normalizeWeights(updated));
+                }}
+                onRemove={id => setActiveWeights(normalizeWeights(activeWeights.filter(w => w.id !== id)))}
+                onAdd={layer => {
+                  const newValue = 15;
+                  const scaled = activeWeights.map(w => ({ ...w, value: w.value * (1 - newValue / 100) }));
+                  const updated = [...scaled, { ...layer, value: newValue }];
+                  setActiveWeights(normalizeWeights(updated));
+                }}
               />
 
               <Flex justify="center" w="100%">
@@ -235,6 +193,8 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                 onChange={setRangeValue}
               />
 
+              <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
+
               <Box mt={4} />
               <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
                 <HierarchicalMultiSelect
@@ -242,7 +202,17 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                   label="Select Ethnicities"
                   onChange={setSelectedEthnicities}
                   autoFocus={false}
-                  onMenuOpenChange={handleDropdownMenuChange}
+                  onMenuOpenChange={(isOpen) => {
+                    setMenuIsOpen(isOpen);
+                    if (isOpen) {
+                      setTimeout(() => {
+                        if (ethnicityRef.current && drawerBodyRef.current) {
+                          const offsetTop = ethnicityRef.current.offsetTop;
+                          drawerBodyRef.current.scrollTo({ top: offsetTop - 50, behavior: 'smooth' });
+                        }
+                      }, 100);
+                    }
+                  }}
                   controlledInput={dropdownInput}
                   setControlledInput={setDropdownInput}
                   externalSelectedValues={selectedEthnicities}
@@ -255,7 +225,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
             </Flex>
           </DrawerBody>
 
-          <Box p={4} position="sticky" bottom="0" bg="#FFDED8" zIndex="sticky" borderTop="1px solid" borderColor="rgba(0,0,0,0.1)">
+          <Box p={4} position="sticky" bottom="0" bg="#FFDED8" zIndex="sticky" borderTop="1px solid rgba(0,0,0,0.1)">
             <Flex justify="center">
               <Button bg="#FF492C" variant="solid" onClick={handleSubmit}>
                 <SearchIcon mr={2} />
@@ -283,7 +253,10 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
 
             <AlertDialogFooter>
               <CancelResetButton ref={cancelRef} onClick={() => setIsResetDialogOpen(false)} />
-              <Button colorScheme="red" onClick={handleConfirmReset} ml={3}>
+              <Button colorScheme="red" onClick={() => {
+                setActiveWeights(INITIAL_WEIGHTS);
+                setIsResetDialogOpen(false);
+              }} ml={3}>
                 Reset
               </Button>
             </AlertDialogFooter>
