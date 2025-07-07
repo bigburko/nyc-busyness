@@ -11,6 +11,12 @@ import {
   Flex,
   Box,
   Button,
+  AlertDialog,
+  AlertDialogOverlay,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogBody,
+  AlertDialogFooter,
 } from '@chakra-ui/react';
 import { useRef, useState, useEffect } from 'react';
 import { GiHamburgerMenu } from 'react-icons/gi';
@@ -21,6 +27,7 @@ import WeightingPanel, { Weighting, Layer } from './ScoreWeightingGroup/Weightin
 import MyRangeSlider from './MyRangeSlider';
 import HierarchicalMultiSelect from './RaceDropDownGroup/HierarchicalMultiSelect';
 import { ethnicityData } from './RaceDropDownGroup/ethnicityData';
+import CancelResetButton from './ScoreWeightingGroup/CancelResetButton'; // ✅ import your new reusable component
 
 interface MyDrawerProps {
   onSearchSubmit: (filters: {
@@ -61,6 +68,9 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
   const [menuIsOpen, setMenuIsOpen] = useState(false);
   const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
+
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   const normalizeWeights = (weights: Weighting[]): Weighting[] => {
     if (weights.length === 0) return [];
@@ -163,13 +173,24 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
     onClose();
   };
 
+  const handleConfirmReset = () => {
+    setActiveWeights(INITIAL_WEIGHTS);
+    setIsResetDialogOpen(false);
+  };
+
   return (
     <main>
       <Box ref={btnRef} onClick={onOpen} position="absolute" top="16px" left="16px" zIndex={10} cursor="pointer">
         <GiHamburgerMenu size={28} color="#2D3748" />
       </Box>
 
-      <Drawer isOpen={isOpen} onClose={onClose} finalFocusRef={btnRef as React.RefObject<FocusableElement>} placement="left" size="sm">
+      <Drawer
+        isOpen={isOpen}
+        onClose={onClose}
+        finalFocusRef={btnRef as unknown as React.RefObject<FocusableElement>}
+        placement="left"
+        size="sm"
+      >
         <DrawerOverlay />
         <DrawerContent bg="#FFDED8" display="flex" flexDirection="column" h="100%">
           <DrawerCloseButton />
@@ -190,12 +211,30 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                 onRemove={handleRemove}
                 onAdd={handleAdd}
               />
+
+              <Flex justify="center" w="100%">
+                <Button
+                  size="sm"
+                  bg="gray.700"
+                  color="white"
+                  _hover={{ bg: 'gray.600' }}
+                  _active={{ bg: 'gray.800' }}
+                  borderRadius="md"
+                  px={4}
+                  py={2}
+                  onClick={() => setIsResetDialogOpen(true)}
+                >
+                  Reset Weights to Default
+                </Button>
+              </Flex>
+
               <MyRangeSlider
                 heading="Rent (PSF)"
                 toolTipText="Target Average Rent cost per Square foot in $USD"
                 defaultRange={rangeValue}
                 onChange={setRangeValue}
               />
+
               <Box mt={4} />
               <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
                 <HierarchicalMultiSelect
@@ -226,6 +265,31 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
           </Box>
         </DrawerContent>
       </Drawer>
+
+      <AlertDialog
+        isOpen={isResetDialogOpen}
+        leastDestructiveRef={cancelRef as unknown as React.RefObject<FocusableElement>}
+        onClose={() => setIsResetDialogOpen(false)}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Reset Weightings
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              Are you sure you want to reset all weightings to their default values? This cannot be undone.
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <CancelResetButton ref={cancelRef} onClick={() => setIsResetDialogOpen(false)} />
+              <Button colorScheme="red" onClick={handleConfirmReset} ml={3}>
+                Reset
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </main>
   );
 }
