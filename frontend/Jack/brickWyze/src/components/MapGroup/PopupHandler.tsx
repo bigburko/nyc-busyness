@@ -1,4 +1,4 @@
-// components/MapGroup/PopupHandler.tsx
+'use client';
 
 import mapboxgl from 'mapbox-gl';
 
@@ -60,10 +60,20 @@ export const renderPopup = (
           <div style="margin: 4px 0;"><strong>Points of Interest:</strong> ${toScore(props.poi_score)}/100</div>
           <div style="margin: 4px 0;"><strong>Demographics:</strong> ${toScore(props.demographic_score)}/100</div>
           ${
-            props.demographic_match_pct !== null && props.demographic_match_pct !== undefined
+            props.demographic_score !== undefined &&
+            props.demographic_score === 0 &&
+            props.demographic_match_pct === 0
+              ? `<div style="margin: 4px 0; font-size: 11px; color: #c00;">
+                   ⚠️ No demographic match found for selected groups
+                 </div>`
+              : ''
+          }
+          ${
+            props.demographic_match_pct !== null &&
+            props.demographic_match_pct !== undefined
               ? `<div style="margin: 4px 0; font-size: 11px; color: #666;">
-                  (${props.demographic_match_pct.toFixed(1)}% match)
-                </div>`
+                   (${props.demographic_match_pct.toFixed(1)}% match)
+                 </div>`
               : ''
           }
           ${

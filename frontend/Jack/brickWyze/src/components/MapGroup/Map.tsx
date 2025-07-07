@@ -42,6 +42,12 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
 
     if (!weights || !rentRange || !selectedEthnicities) return;
 
+    console.log('📤 Sending to edge function:', {
+      weights,
+      rentRange,
+      ethnicities: selectedEthnicities,
+    });
+
     try {
       const response = await fetch(EDGE_FUNCTION_URL, {
         method: 'POST',
@@ -53,11 +59,20 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
         body: JSON.stringify({ weights, rentRange, ethnicities: selectedEthnicities }),
       });
 
-      if (!response.ok) throw new Error(`Edge error ${response.status}: ${await response.text()}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Edge error ${response.status}:`, errorText);
+        throw new Error(errorText);
+      }
 
-      const scores = await response.json();
+      const { zones, debug } = await response.json();
+
+      console.log('📥 Edge function returned zones:', zones.length);
+      console.log('[✅ DEBUG] Ethnicities sent:', debug?.received_ethnicities);
+      console.log('[✅ DEBUG] Sample demo scores:', debug?.sample_demo_scores);
+
       const scoreMap: Record<string, any> = {};
-      scores.forEach((s: any) => {
+      zones.forEach((s: any) => {
         if (s?.geoid) scoreMap[s.geoid.toString().padStart(11, '0')] = s;
       });
 
@@ -78,9 +93,9 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
         }),
       };
 
+      console.log('🧠 Updated GeoJSON with scores:', updated);
       updateTractData(mapRef.current, updated);
       showLegend();
-
     } catch (err) {
       console.error('[Error fetching scores]', err);
     }
