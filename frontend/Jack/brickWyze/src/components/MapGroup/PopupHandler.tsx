@@ -13,8 +13,11 @@ export const renderPopup = (
 
   if (!props.hasScore) {
     const simpleContent = `
-      <div style="font-family: sans-serif; max-width: 200px;">
-        <h3 style="margin: 0 0 8px; font-size: 16px;">📍 ${props.NTAName || props.GEOID || 'Census Tract'}</h3>
+      <div style="font-family: sans-serif; max-width: 240px;">
+        <h3 style="margin: 0 0 4px; font-size: 16px;">📍 ${props.NTAName || 'Unknown Area'}</h3>
+        <div style="font-size: 12px; margin-bottom: 8px; color: #888;">
+          Tract ID: ${props.GEOID || 'Unknown'}
+        </div>
         <p style="font-size: 14px; color: #666;">Click "Search" to see resilience scores</p>
       </div>
     `;
@@ -44,7 +47,10 @@ export const renderPopup = (
 
   const content = `
     <div style="font-family: sans-serif; max-width: 280px;">
-      <h3 style="margin: 0 0 8px; font-size: 16px;">📍 ${props.NTAName || props.GEOID || 'Unknown Area'}</h3>
+      <h3 style="margin: 0 0 4px; font-size: 16px;">📍 ${props.NTAName || 'Unknown Area'}</h3>
+      <div style="font-size: 12px; margin-bottom: 8px; color: #888;">
+        Tract ID: ${props.GEOID || 'Unknown'}
+      </div>
       <div style="font-size: 14px; margin-bottom: 12px;">
         <div style="background: #f0f0f0; padding: 8px; border-radius: 4px; margin-bottom: 8px;">
           <strong style="font-size: 24px; color: ${scoreColor};">
