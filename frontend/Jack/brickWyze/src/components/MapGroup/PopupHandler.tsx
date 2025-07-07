@@ -72,7 +72,7 @@ export const renderPopup = (
             props.demographic_match_pct !== null &&
             props.demographic_match_pct !== undefined
               ? `<div style="margin: 4px 0; font-size: 11px; color: #666;">
-                   (${props.demographic_match_pct.toFixed(1)}% match)
+                   (${(props.demographic_match_pct * 100).toFixed(1)}% match)
                  </div>`
               : ''
           }

@@ -42,6 +42,7 @@ export default function Map({ weights, rentRange, selectedEthnicities }: MapProp
 
     if (!weights || !rentRange || !selectedEthnicities) return;
 
+    // ✅ DEBUG LOGGING
     console.log('📤 Sending to edge function:', {
       weights,
       rentRange,
