@@ -18,14 +18,15 @@ import {
   AlertDialogBody,
   AlertDialogFooter,
 } from '@chakra-ui/react';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { GiHamburgerMenu } from 'react-icons/gi';
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
 import WeightingPanel, { Weighting, Layer } from './ScoreWeightingGroup/WeightingPanel';
 import MyRangeSlider from './MyRangeSlider';
-import MyAgeSlider from './DemographicGroup/AgeGroup/MyAgeSlider'; // ✅ ADDED
+import MyAgeSlider from './DemographicGroup/AgeGroup/MyAgeSlider';
+import MyIncomeSlider from './DemographicGroup/MyIncomeGroup/MyIncomeSlider'; // ✅ ADDED
 import HierarchicalMultiSelect from './DemographicGroup/RaceDropDownGroup/HierarchicalMultiSelect';
 import { ethnicityData } from './DemographicGroup/RaceDropDownGroup/ethnicityData';
 import CancelResetButton from './ScoreWeightingGroup/CancelResetButton';
@@ -37,7 +38,8 @@ interface MyDrawerProps {
     rentRange: [number, number];
     selectedEthnicities: string[];
     selectedGenders: string[];
-    ageRange: [number, number]; // ✅ ADDED
+    ageRange: [number, number];
+    incomeRange: [number, number]; // ✅ ADDED
   }) => void;
 }
 
@@ -73,7 +75,8 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
   const [menuIsOpen, setMenuIsOpen] = useState(false);
   const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
-  const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]); // ✅ ADDED
+  const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]);
+  const [incomeRange, setIncomeRange] = useState<[number, number]>([30000, 120000]); // ✅ ADDED
 
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -106,7 +109,8 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
         rentRange: rangeValue,
         selectedEthnicities,
         selectedGenders,
-        ageRange, // ✅ ADDED
+        ageRange,
+        incomeRange, // ✅ ADDED
       });
     } else {
       console.warn('onSearchSubmit is not a function');
@@ -197,7 +201,8 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                 onChange={setRangeValue}
               />
 
-              <MyAgeSlider value={ageRange} onChange={setAgeRange} /> {/* ✅ ADDED */}
+              <MyAgeSlider value={ageRange} onChange={setAgeRange} />
+              <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} /> {/* ✅ ADDED */}
 
               <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
 

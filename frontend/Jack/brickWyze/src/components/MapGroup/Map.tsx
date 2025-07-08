@@ -26,7 +26,8 @@ interface MapProps {
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
-  ageRange?: [number, number]; // ✅ ADDED
+  ageRange?: [number, number];
+  incomeRange?: [number, number]; // ✅ ADDED
 }
 
 export default function Map({
@@ -35,6 +36,7 @@ export default function Map({
   selectedEthnicities,
   selectedGenders,
   ageRange,
+  incomeRange, // ✅ ADDED
 }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -63,7 +65,8 @@ export default function Map({
         rentRange,
         ethnicities: selectedEthnicities,
         genders: selectedGenders,
-        ageRange, // ✅ ADDED
+        ageRange,
+        incomeRange,
       });
     }
 
@@ -80,7 +83,8 @@ export default function Map({
           rentRange,
           ethnicities: selectedEthnicities,
           genders: selectedGenders || [],
-          ageRange: ageRange || [0, 100], // ✅ ADDED
+          ageRange: ageRange || [0, 100],
+          incomeRange: incomeRange || [0, 250000], // ✅ ADDED
         }),
       });
 
@@ -96,9 +100,9 @@ export default function Map({
         console.log('📥 Edge function returned zones:', zones.length);
         console.log('[✅ DEBUG] Ethnicities sent:', debug?.received_ethnicities);
         console.log('[✅ DEBUG] Genders sent:', debug?.received_genders);
-        console.log('[✅ DEBUG] Age range sent:', debug?.received_age_range); // ✅ ADDED
+        console.log('[✅ DEBUG] Age range sent:', debug?.received_age_range);
+        console.log('[✅ DEBUG] Income range sent:', debug?.received_income_range); // ✅ NEW
         console.log('[✅ DEBUG] Sample demo scores:', debug?.sample_demo_scores);
-        console.log('[✅ DEBUG] Watched tracts filtered by rent:', debug?.filtered_out_watched);
         console.log('[✅ DEBUG] Watched rent values:', debug?.watched_rents);
       }
 
@@ -182,7 +186,7 @@ export default function Map({
     });
 
     map.on('click', 'tracts-fill', (e) => {
-      renderPopup(e, weights, selectedEthnicities, selectedGenders); // gender popup support
+      renderPopup(e, weights, selectedEthnicities, selectedGenders);
     });
 
     map.on('mouseenter', 'tracts-fill', () => {
@@ -203,7 +207,15 @@ export default function Map({
     if (isMapLoaded && weights && rentRange && selectedEthnicities) {
       fetchAndApplyScores();
     }
-  }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange]); // ✅ ADDED ageRange
+  }, [
+    isMapLoaded,
+    weights,
+    rentRange,
+    selectedEthnicities,
+    selectedGenders,
+    ageRange,
+    incomeRange, // ✅ ADDED
+  ]);
 
   return (
     <div

@@ -77,7 +77,8 @@ export const renderPopup = (
           <div style="margin-top: 10px; font-size: 12px; color: #666;">
             <div><strong>Race/Ethnicity Match:</strong> ${formatPct(props.demographic_match_pct)}</div>
             <div><strong>Gender Match:</strong> ${formatPct(props.gender_match_pct)}</div>
-            <div><strong>Age Match:</strong> ${formatPct(props.age_match_pct)}</div> <!-- ✅ ADDED -->
+            <div><strong>Age Match:</strong> ${formatPct(props.age_match_pct)}</div>
+            <div><strong>Income Match:</strong> ${formatPct(props.income_match_pct)}</div> <!-- ✅ ADDED -->
             <div><strong>Combined Match:</strong> ${formatPct(props.combined_match_pct)}</div>
           </div>
 

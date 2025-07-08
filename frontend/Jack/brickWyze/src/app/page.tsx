@@ -10,7 +10,8 @@ interface SearchFilters {
   rentRange: [number, number];
   selectedEthnicities: string[];
   selectedGenders: string[];
-  ageRange: [number, number]; // ✅ ADDED
+  ageRange: [number, number];
+  incomeRange: [number, number]; // ✅ ADDED
 }
 
 export default function Page() {
@@ -28,7 +29,8 @@ export default function Page() {
         rentRange={searchFilters?.rentRange}
         selectedEthnicities={searchFilters?.selectedEthnicities}
         selectedGenders={searchFilters?.selectedGenders}
-        ageRange={searchFilters?.ageRange} // ✅ PASSED TO MAP
+        ageRange={searchFilters?.ageRange}
+        incomeRange={searchFilters?.incomeRange} // ✅ ADDED
       />
       <MyDrawer onSearchSubmit={handleSearchSubmit} />
     </Box>
