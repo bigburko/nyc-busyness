@@ -25,10 +25,11 @@ import type { FocusableElement } from '@chakra-ui/utils';
 
 import WeightingPanel, { Weighting, Layer } from './ScoreWeightingGroup/WeightingPanel';
 import MyRangeSlider from './MyRangeSlider';
+import MyAgeSlider from './DemographicGroup/AgeGroup/MyAgeSlider'; // ✅ ADDED
 import HierarchicalMultiSelect from './DemographicGroup/RaceDropDownGroup/HierarchicalMultiSelect';
 import { ethnicityData } from './DemographicGroup/RaceDropDownGroup/ethnicityData';
 import CancelResetButton from './ScoreWeightingGroup/CancelResetButton';
-import GenderSelect from './DemographicGroup/GenderGroup/GenderSelect'; // ✅ updated
+import GenderSelect from './DemographicGroup/GenderGroup/GenderSelect';
 
 interface MyDrawerProps {
   onSearchSubmit: (filters: {
@@ -36,6 +37,7 @@ interface MyDrawerProps {
     rentRange: [number, number];
     selectedEthnicities: string[];
     selectedGenders: string[];
+    ageRange: [number, number]; // ✅ ADDED
   }) => void;
 }
 
@@ -66,11 +68,12 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
 
   const [activeWeights, setActiveWeights] = useState<Weighting[]>(INITIAL_WEIGHTS);
   const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
-  const [selectedGenders, setSelectedGenders] = useState<string[]>(['male', 'female']); // ✅ both selected by default
+  const [selectedGenders, setSelectedGenders] = useState<string[]>(['male', 'female']);
   const [dropdownInput, setDropdownInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
   const [menuIsOpen, setMenuIsOpen] = useState(false);
   const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
+  const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]); // ✅ ADDED
 
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -103,6 +106,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
         rentRange: rangeValue,
         selectedEthnicities,
         selectedGenders,
+        ageRange, // ✅ ADDED
       });
     } else {
       console.warn('onSearchSubmit is not a function');
@@ -192,6 +196,8 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                 defaultRange={rangeValue}
                 onChange={setRangeValue}
               />
+
+              <MyAgeSlider value={ageRange} onChange={setAgeRange} /> {/* ✅ ADDED */}
 
               <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
 

@@ -24,7 +24,9 @@ interface Props {
   min?: number;
   max?: number;
   step?: number;
-  onChange?: (range: [number, number]) => void; // ✅ Add onChange handler
+  onChange?: (range: [number, number]) => void;
+  showSymbol?: boolean;      // ✅ NEW: toggle symbol
+  symbol?: string;           // ✅ NEW: customize symbol (e.g. '$', '', '%')
 }
 
 export default function MyRangeSlider({
@@ -38,6 +40,8 @@ export default function MyRangeSlider({
   step = 1,
   toolTipText,
   onChange,
+  showSymbol = true,         // ✅ default to true (e.g. for $)
+  symbol = '$',              // ✅ default symbol is dollar
 }: Props) {
   const MIN_GAP = 5;
   const [range, setRange] = useState<[number, number]>(defaultRange);
@@ -106,7 +110,7 @@ export default function MyRangeSlider({
               {label}
             </Text>
             <Input
-              value={`$${range[idx].toLocaleString()}`}
+              value={`${showSymbol ? symbol : ''}${range[idx].toLocaleString()}`}
               onChange={(e) => handleInput(e.target.value, idx as 0 | 1)}
               onBlur={(e) => handleInput(e.target.value, idx as 0 | 1)}
               onKeyDown={(e) =>

@@ -25,10 +25,17 @@ interface MapProps {
   weights?: any[];
   rentRange?: [number, number];
   selectedEthnicities?: string[];
-  selectedGenders?: string[]; // ✅ ONLY ADDITION
+  selectedGenders?: string[];
+  ageRange?: [number, number]; // ✅ ADDED
 }
 
-export default function Map({ weights, rentRange, selectedEthnicities, selectedGenders }: MapProps) {
+export default function Map({
+  weights,
+  rentRange,
+  selectedEthnicities,
+  selectedGenders,
+  ageRange,
+}: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -48,14 +55,15 @@ export default function Map({ weights, rentRange, selectedEthnicities, selectedG
     const cleaned = CleanGeojson(rawGeojson);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
 
-    if (!weights || !rentRange || !selectedEthnicities) return; // ✅ KEEP ORIGINAL LOGIC
+    if (!weights || !rentRange || !selectedEthnicities) return;
 
     if (DEBUG_MODE) {
       console.log('📤 Sending to edge function:', {
         weights,
         rentRange,
         ethnicities: selectedEthnicities,
-        genders: selectedGenders, // ✅ ONLY ADDITION
+        genders: selectedGenders,
+        ageRange, // ✅ ADDED
       });
     }
 
@@ -67,11 +75,12 @@ export default function Map({ weights, rentRange, selectedEthnicities, selectedG
           apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
           Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
         },
-        body: JSON.stringify({ 
-          weights, 
-          rentRange, 
+        body: JSON.stringify({
+          weights,
+          rentRange,
           ethnicities: selectedEthnicities,
-          genders: selectedGenders || [] // ✅ ONLY ADDITION
+          genders: selectedGenders || [],
+          ageRange: ageRange || [0, 100], // ✅ ADDED
         }),
       });
 
@@ -86,7 +95,8 @@ export default function Map({ weights, rentRange, selectedEthnicities, selectedG
       if (DEBUG_MODE) {
         console.log('📥 Edge function returned zones:', zones.length);
         console.log('[✅ DEBUG] Ethnicities sent:', debug?.received_ethnicities);
-        console.log('[✅ DEBUG] Genders sent:', debug?.received_genders); // ✅ ONLY ADDITION
+        console.log('[✅ DEBUG] Genders sent:', debug?.received_genders);
+        console.log('[✅ DEBUG] Age range sent:', debug?.received_age_range); // ✅ ADDED
         console.log('[✅ DEBUG] Sample demo scores:', debug?.sample_demo_scores);
         console.log('[✅ DEBUG] Watched tracts filtered by rent:', debug?.filtered_out_watched);
         console.log('[✅ DEBUG] Watched rent values:', debug?.watched_rents);
@@ -120,7 +130,7 @@ export default function Map({ weights, rentRange, selectedEthnicities, selectedG
               ...feat.properties,
               ...(match || { custom_score: 0 }),
               ...match,
-              hasScore: watchedGEOIDs.includes(geoid) || !!match, // ✅ KEEP EXACT ORIGINAL
+              hasScore: watchedGEOIDs.includes(geoid) || !!match,
             },
           };
         }),
@@ -172,7 +182,7 @@ export default function Map({ weights, rentRange, selectedEthnicities, selectedG
     });
 
     map.on('click', 'tracts-fill', (e) => {
-      renderPopup(e, weights, selectedEthnicities, selectedGenders); // ✅ ONLY ADDITION
+      renderPopup(e, weights, selectedEthnicities, selectedGenders); // gender popup support
     });
 
     map.on('mouseenter', 'tracts-fill', () => {
@@ -190,10 +200,10 @@ export default function Map({ weights, rentRange, selectedEthnicities, selectedG
   }, []);
 
   useEffect(() => {
-    if (isMapLoaded && weights && rentRange && selectedEthnicities) { // ✅ KEEP ORIGINAL CONDITION
+    if (isMapLoaded && weights && rentRange && selectedEthnicities) {
       fetchAndApplyScores();
     }
-  }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders]); // ✅ ONLY ADD TO DEPS
+  }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange]); // ✅ ADDED ageRange
 
   return (
     <div

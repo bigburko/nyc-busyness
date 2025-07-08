@@ -6,7 +6,7 @@ export const renderPopup = (
   e: mapboxgl.MapLayerMouseEvent,
   weights?: any[],
   selectedEthnicities?: string[],
-  selectedGenders?: string[] // ✅ NEW
+  selectedGenders?: string[]
 ) => {
   if (!e.features?.length) return;
   const feature = e.features[0];
@@ -77,6 +77,7 @@ export const renderPopup = (
           <div style="margin-top: 10px; font-size: 12px; color: #666;">
             <div><strong>Race/Ethnicity Match:</strong> ${formatPct(props.demographic_match_pct)}</div>
             <div><strong>Gender Match:</strong> ${formatPct(props.gender_match_pct)}</div>
+            <div><strong>Age Match:</strong> ${formatPct(props.age_match_pct)}</div> <!-- ✅ ADDED -->
             <div><strong>Combined Match:</strong> ${formatPct(props.combined_match_pct)}</div>
           </div>
 
