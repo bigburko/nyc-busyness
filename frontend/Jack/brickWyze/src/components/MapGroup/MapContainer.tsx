@@ -1,3 +1,4 @@
+// src/components/MapGroup/MapContainer.tsx
 'use client';
 
 import mapboxgl from 'mapbox-gl';
@@ -30,12 +31,22 @@ const MapContainer = ({ children }: Props) => {
 
     return () => {
       mapRef.current?.remove();
+      mapRef.current = null; // Clean up ref
     };
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once
 
   return (
-    <div ref={mapContainerRef} style={{ width: '100%', height: '100vh' }}>
-      {/* children won't be rendered into the map itself */}
+    // FIX: Render the `children` prop inside the div.
+    // Added `position: 'relative'` to create a positioning context for children.
+    <div
+      ref={mapContainerRef}
+      style={{
+        width: '100%',
+        height: '100vh',
+        position: 'relative',
+      }}
+    >
+      {children}
     </div>
   );
 };

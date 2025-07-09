@@ -1,11 +1,13 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
+import type { MapLayerMouseEvent } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 import rawGeojson from '@/components/MapGroup/manhattan_census_tracts.json';
-import { CleanGeojson } from '@/components/MapGroup/CleanGeojson';
+import { CleanGeojson, PotentiallyNonStandardFeatureCollection } from '@/components/MapGroup/CleanGeojson';
+import { ResilienceScore } from '@/components/MapGroup/fetchResilienceScores';
 import { ProcessGeojson } from '@/components/MapGroup/ProcessGeojson';
 import { addTractLayers, updateTractData } from '@/components/MapGroup/TractLayer';
 import { renderPopup } from '@/components/MapGroup/PopupHandler';
@@ -19,15 +21,15 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 const EDGE_FUNCTION_URL =
   'https://kwuwuutcvpdomfivdemt.supabase.co/functions/v1/calculate-resilience';
 
-const DEBUG_MODE = true;
+const DEBUG_MODE = process.env.NODE_ENV === 'development';
 
 interface MapProps {
-  weights?: any[];
+  weights?: number[];
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
   ageRange?: [number, number];
-  incomeRange?: [number, number]; // ✅ ADDED
+  incomeRange?: [number, number];
 }
 
 export default function Map({
@@ -36,79 +38,53 @@ export default function Map({
   selectedEthnicities,
   selectedGenders,
   ageRange,
-  incomeRange, // ✅ ADDED
+  incomeRange,
 }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-  const watchedGEOIDs = [
-    '36061019500', '36061019100', '36061018700',
-    '36061019300', '36061018900', '36061018500',
-  ];
-
-  const loadInitialTracts = () => {
-    const cleaned = CleanGeojson(rawGeojson);
-    const processed = ProcessGeojson(cleaned, { precision: 6 });
-    updateTractData(mapRef.current, processed);
-  };
-
-  const fetchAndApplyScores = async () => {
-    const cleaned = CleanGeojson(rawGeojson);
+  // Memoize the data fetching logic to prevent it being recreated on every render.
+  // This gives the useEffect hook a stable function reference.
+  const fetchAndApplyScores = useCallback(async () => {
+    const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
 
-    if (!weights || !rentRange || !selectedEthnicities) return;
+    // Guard clause to ensure all necessary props are defined before fetching.
+    if (!weights || !rentRange || !selectedEthnicities || !selectedGenders || !ageRange || !incomeRange) {
+      return;
+    }
 
     if (DEBUG_MODE) {
-      console.log('📤 Sending to edge function:', {
-        weights,
-        rentRange,
-        ethnicities: selectedEthnicities,
-        genders: selectedGenders,
-        ageRange,
-        incomeRange,
-      });
+      console.log('📤 Sending to edge function:', { weights, rentRange, ethnicities: selectedEthnicities, genders: selectedGenders, ageRange, incomeRange });
     }
 
     try {
       const response = await fetch(EDGE_FUNCTION_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
-        },
-        body: JSON.stringify({
-          weights,
-          rentRange,
-          ethnicities: selectedEthnicities,
-          genders: selectedGenders || [],
-          ageRange: ageRange || [0, 100],
-          incomeRange: incomeRange || [0, 250000], // ✅ ADDED
-        }),
+        headers: { 'Content-Type': 'application/json', apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '', Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}` },
+        body: JSON.stringify({ weights, rentRange, ethnicities: selectedEthnicities, genders: selectedGenders, ageRange, incomeRange }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`❌ Edge error ${response.status}:`, errorText);
-        throw new Error(errorText);
+        throw new Error(`Edge function failed: ${errorText}`);
       }
-
-      const { zones, debug } = await response.json();
+      
+      interface ApiResponse { zones: ResilienceScore[]; debug?: Record<string, unknown>; }
+      const { zones, debug } = (await response.json()) as ApiResponse;
 
       if (DEBUG_MODE) {
         console.log('📥 Edge function returned zones:', zones.length);
-        console.log('[✅ DEBUG] Ethnicities sent:', debug?.received_ethnicities);
-        console.log('[✅ DEBUG] Genders sent:', debug?.received_genders);
-        console.log('[✅ DEBUG] Age range sent:', debug?.received_age_range);
-        console.log('[✅ DEBUG] Income range sent:', debug?.received_income_range); // ✅ NEW
-        console.log('[✅ DEBUG] Sample demo scores:', debug?.sample_demo_scores);
-        console.log('[✅ DEBUG] Watched rent values:', debug?.watched_rents);
+        console.log('[✅ DEBUG] Data received by edge function:', debug);
       }
 
-      const scoreMap: Record<string, any> = {};
-      zones.forEach((s: any) => {
-        if (s?.geoid) scoreMap[s.geoid.toString().padStart(11, '0')] = s;
+      const scoreMap: Record<string, ResilienceScore> = {};
+      zones.forEach((score: ResilienceScore) => {
+        if (score?.geoid) {
+          scoreMap[score.geoid.toString().padStart(11, '0')] = score;
+        }
       });
 
       const updated = {
@@ -117,119 +93,67 @@ export default function Map({
           const rawGEOID = feat.properties?.GEOID;
           const geoid = rawGEOID?.toString().padStart(11, '0');
           const match = scoreMap[geoid];
-
-          if (DEBUG_MODE && watchedGEOIDs.includes(geoid)) {
-            console.log(`🧐 Match debug for ${geoid}`, {
-              raw: rawGEOID,
-              padded: geoid,
-              match,
-              foundInScoreMap: !!scoreMap[geoid],
-              props: feat.properties,
-            });
-          }
-
-          return {
-            ...feat,
-            properties: {
-              ...feat.properties,
-              ...(match || { custom_score: 0 }),
-              ...match,
-              hasScore: watchedGEOIDs.includes(geoid) || !!match,
-            },
-          };
+          return { ...feat, properties: { ...feat.properties, ...(match || { custom_score: 0 }), ...match, hasScore: !!match }};
         }),
       };
 
-      if (DEBUG_MODE) {
-        const missingHasScore = watchedGEOIDs.filter((id) => {
-          const padded = id.toString().padStart(11, '0');
-          const match = updated.features.find((f) => f.properties?.GEOID === padded);
-          return !match?.properties?.hasScore;
-        });
-
-        if (missingHasScore.length > 0) {
-          console.warn('⚠️ These tracts matched scoreMap but still have hasScore = false:', missingHasScore);
-        } else {
-          console.log('✅ All watched tracts have hasScore = true');
-        }
-
-        console.log('🧠 Updated GeoJSON with scores:', updated);
-      }
-
+      if (DEBUG_MODE) console.log('🧠 Updated GeoJSON with scores applied.');
+      
       updateTractData(mapRef.current, updated);
       showLegend();
-    } catch (err) {
-      console.error('[Error fetching scores]', err);
-    }
-  };
 
+    } catch (err) {
+      console.error('[Error fetching and applying scores]', err);
+    }
+  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange]);
+
+
+  // Effect for initializing the map and its event listeners.
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || mapRef.current) return; // Prevent re-initialization
 
     const map = new mapboxgl.Map({
-      container: containerRef.current,
-      center: INITIAL_CENTER,
-      zoom: INITIAL_ZOOM,
-      pitch: 20,
-      bearing: 29,
-      antialias: true,
-      style: 'mapbox://styles/mapbox/light-v11',
+      container: containerRef.current, center: INITIAL_CENTER, zoom: INITIAL_ZOOM,
+      pitch: 20, bearing: 29, antialias: true, style: 'mapbox://styles/mapbox/light-v11',
     });
-
     mapRef.current = map;
 
     map.on('load', () => {
       addTractLayers(map);
       createLegend(map);
-      loadInitialTracts();
+      const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
+      const processed = ProcessGeojson(cleaned, { precision: 6 });
+      updateTractData(mapRef.current, processed);
       setIsMapLoaded(true);
     });
 
-    map.on('click', 'tracts-fill', (e) => {
-      renderPopup(e, weights, selectedEthnicities, selectedGenders);
-    });
+    const handleClick = (e: MapLayerMouseEvent) => renderPopup(e, weights, selectedEthnicities, selectedGenders);
+    map.on('click', 'tracts-fill', handleClick);
+    map.on('mouseenter', 'tracts-fill', () => { if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'tracts-fill', () => { if (map.getCanvas()) map.getCanvas().style.cursor = ''; });
 
-    map.on('mouseenter', 'tracts-fill', () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-
-    map.on('mouseleave', 'tracts-fill', () => {
-      map.getCanvas().style.cursor = '';
-    });
-
-    return () => {
+    return () => { // Cleanup function
+      map.off('click', 'tracts-fill', handleClick);
       map.remove();
-      setIsMapLoaded(false);
+      mapRef.current = null;
     };
-  }, []);
+  }, [weights, selectedEthnicities, selectedGenders]);
 
+
+  // Effect for triggering data fetch when dependencies change.
   useEffect(() => {
-    if (isMapLoaded && weights && rentRange && selectedEthnicities) {
+    if (isMapLoaded) {
       fetchAndApplyScores();
     }
-  }, [
-    isMapLoaded,
-    weights,
-    rentRange,
-    selectedEthnicities,
-    selectedGenders,
-    ageRange,
-    incomeRange, // ✅ ADDED
-  ]);
+  }, [isMapLoaded, fetchAndApplyScores]);
+
 
   return (
     <div
       ref={containerRef}
       style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: '100%',
-        width: '100%',
-        zIndex: 0,
-        backgroundColor: '#e2e8f0',
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        height: '100%', width: '100%', zIndex: 0, backgroundColor: '#e2e8f0',
       }}
     />
   );

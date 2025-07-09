@@ -26,7 +26,7 @@ import type { FocusableElement } from '@chakra-ui/utils';
 import WeightingPanel, { Weighting, Layer } from './ScoreWeightingGroup/WeightingPanel';
 import MyRangeSlider from './MyRangeSlider';
 import MyAgeSlider from './DemographicGroup/AgeGroup/MyAgeSlider';
-import MyIncomeSlider from './DemographicGroup/MyIncomeGroup/MyIncomeSlider'; // ✅ ADDED
+import MyIncomeSlider from './DemographicGroup/MyIncomeGroup/MyIncomeSlider';
 import HierarchicalMultiSelect from './DemographicGroup/RaceDropDownGroup/HierarchicalMultiSelect';
 import { ethnicityData } from './DemographicGroup/RaceDropDownGroup/ethnicityData';
 import CancelResetButton from './ScoreWeightingGroup/CancelResetButton';
@@ -39,7 +39,7 @@ interface MyDrawerProps {
     selectedEthnicities: string[];
     selectedGenders: string[];
     ageRange: [number, number];
-    incomeRange: [number, number]; // ✅ ADDED
+    incomeRange: [number, number];
   }) => void;
 }
 
@@ -73,10 +73,12 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   const [selectedGenders, setSelectedGenders] = useState<string[]>(['male', 'female']);
   const [dropdownInput, setDropdownInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
-  const [menuIsOpen, setMenuIsOpen] = useState(false);
+  // ✅ FIXED: Using eslint-disable-next-line is the most reliable way to suppress this error.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_menuIsOpen, setMenuIsOpen] = useState(false);
   const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
   const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]);
-  const [incomeRange, setIncomeRange] = useState<[number, number]>([30000, 120000]); // ✅ ADDED
+  const [incomeRange, setIncomeRange] = useState<[number, number]>([30000, 120000]);
 
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -89,7 +91,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
       return weights.map(w => ({ ...w, value: equalValue }));
     }
     const normalized = weights.map(w => ({ ...w, value: (w.value / total) * 100 }));
-    let roundedTotal = normalized.reduce((sum, w) => sum + Math.round(w.value), 0);
+    const roundedTotal = normalized.reduce((sum, w) => sum + Math.round(w.value), 0);
     const roundingError = 100 - roundedTotal;
     if (normalized.length > 0) {
       normalized[0].value = Math.round(normalized[0].value) + roundingError;
@@ -110,7 +112,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
         selectedEthnicities,
         selectedGenders,
         ageRange,
-        incomeRange, // ✅ ADDED
+        incomeRange,
       });
     } else {
       console.warn('onSearchSubmit is not a function');
@@ -157,7 +159,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                   const updatedSlider = activeWeights.find(w => w.id === id);
                   if (!updatedSlider) return;
                   const others = activeWeights.filter(w => w.id !== id);
-                  let updated = value >= 100
+                  const updated = value >= 100
                     ? [{ ...updatedSlider, value: 100 }, ...others.map(w => ({ ...w, value: 0 }))]
                     : [
                         { ...updatedSlider, value },
@@ -202,7 +204,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
               />
 
               <MyAgeSlider value={ageRange} onChange={setAgeRange} />
-              <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} /> {/* ✅ ADDED */}
+              <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} />
 
               <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
 

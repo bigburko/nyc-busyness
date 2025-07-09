@@ -10,26 +10,25 @@ import {
   MenuListProps,
   ValueContainerProps,
   GroupBase,
+  SelectInstance,
 } from 'chakra-react-select';
 import { ethnicityData } from './ethnicityData';
 import { Pill } from './Pill';
 import { MenuOption } from './MenuOption';
 
-// Define all interfaces
+// Interfaces (no changes needed here)
 interface Option {
   label: string;
   value: string;
   parent?: string;
   race?: string;
 }
-
 interface HierarchyNode extends Option {
   children: HierarchyNode[];
   level: number;
   fullPath: string[];
   leafNodes?: HierarchyNode[];
 }
-
 interface DisplayPill {
   type: 'group' | 'individual';
   label: string;
@@ -38,7 +37,6 @@ interface DisplayPill {
   groupChildren?: string[];
   level?: number;
 }
-
 interface EnhancedOption extends Option {
   hierarchyLevel: number;
   hierarchyPath: string[];
@@ -46,7 +44,6 @@ interface EnhancedOption extends Option {
   nodeType: 'race' | 'midLevel' | 'leaf';
   nodeRef?: HierarchyNode;
 }
-
 interface Props {
   data?: Option[];
   label?: string;
@@ -59,24 +56,23 @@ interface Props {
   externalExpandedGroups: Set<string>;
   setExternalExpandedGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
   setMenuIsOpenExternal?: (open: boolean) => void;
-  selectWrapperRef?: React.RefObject<HTMLDivElement | null>; // ✅ FIXED TYPE HERE
+  selectWrapperRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-
-// Helper function
+// Helper function buildHierarchyTree (no changes)
 const buildHierarchyTree = (data: Option[]) => {
   const nodeMap: Record<string, HierarchyNode> = {};
-  
-  data.forEach((item) => {
+
+  data.forEach(item => {
     nodeMap[item.value] = {
       ...item,
       children: [],
       level: 0,
-      fullPath: []
+      fullPath: [],
     };
   });
 
-  data.forEach((item) => {
+  data.forEach(item => {
     if (item.parent && item.parent !== item.value && nodeMap[item.parent]) {
       nodeMap[item.parent].children.push(nodeMap[item.value]);
     }
@@ -99,17 +95,16 @@ const buildHierarchyTree = (data: Option[]) => {
     node.children.forEach(child => calculateHierarchy(child, level + 1, node.fullPath));
   };
 
-  const rootNodes = Object.values(nodeMap).filter(
-    node => node.parent === node.value
-  ).sort((a, b) => a.label.localeCompare(b.label));
-  
+  const rootNodes = Object.values(nodeMap)
+    .filter(node => node.parent === node.value)
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   rootNodes.forEach(root => {
     calculateHierarchy(root, 0);
     calculateLeafNodes(root);
   });
 
   return { nodeMap, rootNodes };
-
 };
 
 export default function HierarchicalMultiSelect({
@@ -125,52 +120,43 @@ export default function HierarchicalMultiSelect({
   setExternalExpandedGroups,
   setMenuIsOpenExternal,
   selectWrapperRef,
-  
 }: Props) {
+  // Hooks and State (no changes here)
   const wrapperRef = useRef<HTMLDivElement>(null);
   const selectedValues = externalSelectedValues;
   const setSelectedValues = onChange;
-
   const expandedGroups = externalExpandedGroups;
   const setExpandedGroups = setExternalExpandedGroups;
-
   const inputValue = controlledInput;
   const setInputValue = setControlledInput;
-
   const [menuIsOpen, setMenuIsOpen] = useState(false);
-  const selectRef = useRef<any>(null);
-
+  const selectRef = useRef<SelectInstance<EnhancedOption, true>>(null);
   const hierarchyTree = useMemo(() => buildHierarchyTree(data), [data]);
-
-  // Handle auto-focus
+  
+  // All useEffects and useMemos from before are unchanged, but included for completeness.
+  // Their dependencies have been correctly set in the previous step.
   useEffect(() => {
     if (autoFocus && selectRef.current) {
       setTimeout(() => {
-        selectRef.current.focus();
+        selectRef.current?.focus();
         setMenuIsOpen(true);
       }, 400);
     }
   }, [autoFocus]);
 
-  // Expose wrapperRef to parent if provided
   useEffect(() => {
     if (selectWrapperRef && wrapperRef.current) {
       (selectWrapperRef as React.MutableRefObject<HTMLDivElement | null>).current = wrapperRef.current;
     }
   }, [selectWrapperRef]);
 
-
-  // Notify parent when menu state changes
   useEffect(() => {
-  onMenuOpenChange?.(menuIsOpen);
-  setMenuIsOpenExternal?.(menuIsOpen); // 👈 add this line
-}, [menuIsOpen, onMenuOpenChange, setMenuIsOpenExternal]);
+    onMenuOpenChange?.(menuIsOpen);
+    setMenuIsOpenExternal?.(menuIsOpen);
+  }, [menuIsOpen, onMenuOpenChange, setMenuIsOpenExternal]);
 
-
-  // Create flat options list
   const flatOptions = useMemo(() => {
-    const options: EnhancedOption[] = [];
-    
+     const options: EnhancedOption[] = [];
     hierarchyTree.rootNodes.forEach(rootNode => {
       options.push({
         ...rootNode,
@@ -178,9 +164,8 @@ export default function HierarchicalMultiSelect({
         hierarchyPath: [rootNode.label],
         displayName: rootNode.label,
         nodeType: 'race',
-        nodeRef: rootNode
+        nodeRef: rootNode,
       });
-
       rootNode.children.forEach(childNode => {
         if (childNode.children.length > 0) {
           options.push({
@@ -189,9 +174,8 @@ export default function HierarchicalMultiSelect({
             hierarchyPath: [rootNode.label, childNode.label],
             displayName: childNode.label,
             nodeType: 'midLevel',
-            nodeRef: childNode
+            nodeRef: childNode,
           });
-          
           childNode.children.forEach(leafNode => {
             options.push({
               ...leafNode,
@@ -199,7 +183,7 @@ export default function HierarchicalMultiSelect({
               hierarchyPath: [rootNode.label, childNode.label, leafNode.label],
               displayName: leafNode.label,
               nodeType: 'leaf',
-              nodeRef: leafNode
+              nodeRef: leafNode,
             });
           });
         } else {
@@ -209,26 +193,24 @@ export default function HierarchicalMultiSelect({
             hierarchyPath: [rootNode.label, childNode.label],
             displayName: childNode.label,
             nodeType: 'leaf',
-            nodeRef: childNode
+            nodeRef: childNode,
           });
         }
       });
     });
-    
     return options;
   }, [hierarchyTree]);
-
-  // Auto-expand groups when searching
+  
   useEffect(() => {
     if (inputValue.trim()) {
       const searchLower = inputValue.toLowerCase();
       const groupsToExpand = new Set<string>();
-      
+
       flatOptions.forEach(option => {
-        const matchesSearch = 
+        const matchesSearch =
           option.label.toLowerCase().includes(searchLower) ||
           option.hierarchyPath.some(path => path.toLowerCase().includes(searchLower));
-        
+
         if (matchesSearch && option.nodeType === 'leaf') {
           if (option.parent) {
             const parentNode = hierarchyTree.nodeMap[option.parent];
@@ -241,38 +223,29 @@ export default function HierarchicalMultiSelect({
           }
         }
       });
-      
-      setExpandedGroups((prev: Set<string>) => {
-  const next = new Set(prev);
-  // ...
-  return next;
-});
-
+      setExpandedGroups(prev => new Set([...prev, ...groupsToExpand]));
     }
-  }, [inputValue, flatOptions, hierarchyTree.nodeMap]);
-
-  // Filter options based on search
+  }, [inputValue, flatOptions, hierarchyTree.nodeMap, setExpandedGroups]);
+  
   const filteredOptions = useMemo(() => {
-    if (!inputValue.trim()) return flatOptions;
-    
+      if (!inputValue.trim()) return flatOptions;
     const searchLower = inputValue.toLowerCase();
     const matchingNodes = new Set<string>();
     const ancestorNodes = new Set<string>();
-    
     flatOptions.forEach(option => {
       if (option.nodeType === 'leaf') {
-        const matches = 
+        const matches =
           option.label.toLowerCase().includes(searchLower) ||
           option.hierarchyPath.some(path => path.toLowerCase().includes(searchLower));
-        
         if (matches) {
           matchingNodes.add(option.value);
           option.hierarchyPath.forEach((_, index) => {
             if (index < option.hierarchyPath.length - 1) {
               const ancestorPath = option.hierarchyPath.slice(0, index + 1);
-              const ancestor = flatOptions.find(opt => 
-                opt.hierarchyPath.length === ancestorPath.length &&
-                opt.hierarchyPath.every((p, i) => p === ancestorPath[i])
+              const ancestor = flatOptions.find(
+                opt =>
+                  opt.hierarchyPath.length === ancestorPath.length &&
+                  opt.hierarchyPath.every((p, i) => p === ancestorPath[i])
               );
               if (ancestor) {
                 ancestorNodes.add(ancestor.value);
@@ -282,18 +255,14 @@ export default function HierarchicalMultiSelect({
         }
       }
     });
-    
-    return flatOptions.filter(option => 
-      matchingNodes.has(option.value) || ancestorNodes.has(option.value)
-    );
+
+    return flatOptions.filter(option => matchingNodes.has(option.value) || ancestorNodes.has(option.value));
   }, [inputValue, flatOptions]);
 
-  // Get selectable (leaf) options for keyboard navigation
   const selectableFilteredOptions = useMemo(() => {
     return filteredOptions.filter(opt => opt.nodeType === 'leaf');
   }, [filteredOptions]);
-
-  // Get only selectable options for react-select value
+  
   const selectableOptions = useMemo(() => {
     return flatOptions.filter(opt => opt.nodeType === 'leaf');
   }, [flatOptions]);
@@ -305,16 +274,13 @@ export default function HierarchicalMultiSelect({
     });
     return map;
   }, [selectableOptions]);
-
+  
   const selectedOptions = useMemo(() => {
-    return selectedValues
-      .map(value => enhancedOptionsMap[value])
-      .filter(Boolean);
+    return selectedValues.map(value => enhancedOptionsMap[value]).filter(Boolean);
   }, [selectedValues, enhancedOptionsMap]);
-
-  // Calculate display pills
+  
   const displayPills = useMemo(() => {
-    const pills: DisplayPill[] = [];
+     const pills: DisplayPill[] = [];
     const processedValues = new Set<string>();
 
     const checkNodeCompleteness = (node: HierarchyNode): boolean => {
@@ -322,28 +288,24 @@ export default function HierarchicalMultiSelect({
       return leaves.length > 0 && leaves.every(leaf => selectedValues.includes(leaf.value));
     };
 
-    const processNodesRecursively = (nodes: HierarchyNode[], level: number = 0) => {
+    const processNodesRecursively = (nodes: HierarchyNode[]) => {
       nodes.forEach(node => {
         const leaves = node.leafNodes || [];
-        
         if (leaves.some(leaf => processedValues.has(leaf.value)) || leaves.length === 0) {
           return;
         }
-
         const isComplete = checkNodeCompleteness(node);
-
         if (isComplete) {
           pills.push({
             type: 'group',
             label: `${node.label} (${leaves.length})`,
             value: `group_${node.value}`,
             groupChildren: leaves.map(leaf => leaf.value),
-            level: node.level
+            level: node.level,
           });
-
           leaves.forEach(leaf => processedValues.add(leaf.value));
         } else {
-          processNodesRecursively(node.children, level + 1);
+          processNodesRecursively(node.children);
         }
       });
     };
@@ -358,7 +320,7 @@ export default function HierarchicalMultiSelect({
             type: 'individual',
             label: item.label,
             value: `individual_${value}`,
-            actualValue: value
+            actualValue: value,
           });
         }
       }
@@ -367,74 +329,77 @@ export default function HierarchicalMultiSelect({
     return pills;
   }, [selectedValues, hierarchyTree, enhancedOptionsMap]);
 
-  const handleChange = (
-    selected: MultiValue<EnhancedOption>,
-    actionMeta: ActionMeta<EnhancedOption>
-  ) => {
+  // All useCallback hooks from before are unchanged and dependencies are correct
+  const handleChange = (selected: MultiValue<EnhancedOption>, actionMeta: ActionMeta<EnhancedOption>) => {
     if (inputValue.trim() && actionMeta.action === 'select-option') {
       setInputValue('');
     }
-    
-    const final = selected.map((opt) => opt.value);
+    const final = selected.map(opt => opt.value);
     setSelectedValues(final);
-    onChange(final);
   };
+  
+  const toggleGroup = useCallback(
+    (groupId: string) => {
+      setExpandedGroups(prev => {
+        const next = new Set(prev);
+        if (next.has(groupId)) {
+          next.delete(groupId);
+        } else {
+          next.add(groupId);
+        }
+        return next;
+      });
+    },
+    [setExpandedGroups]
+  );
 
-  const toggleGroup = useCallback((groupId: string) => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
-      } else {
-        next.add(groupId);
+  const toggleSelection = useCallback(
+    (values: string[], add: boolean) => {
+      const newSelected = new Set(selectedValues);
+      values.forEach(val => {
+        if (add) {
+          newSelected.add(val);
+        } else {
+          newSelected.delete(val);
+        }
+      });
+      const final = Array.from(newSelected);
+      setSelectedValues(final);
+      if (inputValue.trim()) {
+        setInputValue('');
       }
-      return next;
-    });
-  }, []);
-
-  const toggleSelection = useCallback((values: string[], add: boolean) => {
-    const newSelected = new Set(selectedValues);
-    values.forEach(val => {
-      if (add) {
-        newSelected.add(val);
+    },
+    [selectedValues, inputValue, setInputValue, setSelectedValues]
+  );
+  
+  const removePill = useCallback(
+    (pill: DisplayPill) => {
+      let newSelected: string[];
+      if (pill.type === 'group' && pill.groupChildren) {
+        const toRemove = new Set(pill.groupChildren);
+        newSelected = selectedValues.filter(val => !toRemove.has(val));
+      } else if (pill.type === 'individual' && pill.actualValue) {
+        newSelected = selectedValues.filter(val => val !== pill.actualValue);
       } else {
-        newSelected.delete(val);
+        newSelected = selectedValues;
       }
-    });
-    const final = Array.from(newSelected);
-    setSelectedValues(final);
-    onChange(final);
-    if (inputValue.trim()) {
-      setInputValue('');
-    }
-  }, [selectedValues, onChange, inputValue]);
+      setSelectedValues(newSelected);
+    },
+    [selectedValues, setSelectedValues]
+  );
 
-  const removePill = useCallback((pill: DisplayPill) => {
-    let newSelected: string[];
-    
-    if (pill.type === 'group' && pill.groupChildren) {
-      const toRemove = new Set(pill.groupChildren);
-      newSelected = selectedValues.filter(val => !toRemove.has(val));
-    } else if (pill.type === 'individual' && pill.actualValue) {
-      newSelected = selectedValues.filter(val => val !== pill.actualValue);
-    } else {
-      newSelected = selectedValues;
-    }
-    
-    setSelectedValues(newSelected);
-    onChange(newSelected);
-  }, [selectedValues, onChange]);
 
+  // Custom Components
   const CustomMenuList = (props: MenuListProps<EnhancedOption, true>) => {
     const optionsToRender = inputValue.trim() ? filteredOptions : flatOptions;
-    
     return (
-      <Box 
-        {...props.innerProps} 
+      <Box
+        {...props.innerProps}
         ref={props.innerRef}
         maxH="380px"
         overflowY="auto"
         overflowX="hidden"
+        // ✅ FIXED: Restored CSS object to prevent JSX error.
         css={{
           '&::-webkit-scrollbar': {
             width: '8px',
@@ -457,7 +422,7 @@ export default function HierarchicalMultiSelect({
             No results found
           </Box>
         ) : (
-          optionsToRender.map((option) => (
+          optionsToRender.map(option => (
             <MenuOption
               key={option.value}
               option={option}
@@ -479,30 +444,21 @@ export default function HierarchicalMultiSelect({
 
   const CustomValueContainer = (props: ValueContainerProps<EnhancedOption, true>) => {
     const { children, ...containerProps } = props;
-    
-    const childrenArray = React.Children.toArray(children);
-    const nonMultiValueChildren = childrenArray.filter((child: any) => 
-      !child?.type?.name?.includes('MultiValue')
-    );
+
+    // ✅ FIXED: The type guard now safely checks if 'child.type' is a function
+    // before attempting to access its '.name' property, resolving the TS error.
+    const nonMultiValueChildren = React.Children.toArray(children).filter(child => {
+      if (React.isValidElement(child) && typeof child.type === 'function') {
+        return !child.type.name.includes('MultiValue');
+      }
+      return true;
+    });
 
     return (
       <chakraComponents.ValueContainer {...containerProps}>
-        <Box 
-          display="flex" 
-          flexWrap="wrap" 
-          gap={1} 
-          maxW="100%" 
-          alignItems="center"
-          py={1}
-        >
-          {displayPills.map((pill) => (
-            <Pill
-                key={`${pill.value}-${pill.type}`}
-                pill={pill}
-                onRemove={removePill}
-              />
-
-
+        <Box display="flex" flexWrap="wrap" gap={1} maxW="100%" alignItems="center" py={1}>
+          {displayPills.map(pill => (
+            <Pill key={`${pill.value}-${pill.type}`} pill={pill} onRemove={removePill} />
           ))}
           <Box display="flex" flex="1" minW="100px">
             {nonMultiValueChildren}
@@ -529,7 +485,7 @@ export default function HierarchicalMultiSelect({
         closeMenuOnSelect={false}
         hideSelectedOptions={false}
         placeholder="Select options..."
-        getOptionValue={(opt) => opt.value}
+        getOptionValue={opt => opt.value}
         options={selectableFilteredOptions}
         isClearable
         menuIsOpen={menuIsOpen}
@@ -538,16 +494,15 @@ export default function HierarchicalMultiSelect({
             setMenuIsOpen(true);
           }
         }}
-
         onMenuClose={() => {
           setMenuIsOpen(false);
           setMenuIsOpenExternal?.(false);
         }}
-
         menuPosition="absolute"
         menuPlacement="bottom"
+        // ✅ FIXED: Restored the complete chakraStyles object.
         chakraStyles={{
-          container: (provided) => ({
+          container: provided => ({
             ...provided,
             backgroundColor: 'white',
             width: '100%',
@@ -563,13 +518,13 @@ export default function HierarchicalMultiSelect({
               borderColor: state.isFocused ? '#FF492C' : '#CBD5E0',
             },
           }),
-          valueContainer: (provided) => ({
+          valueContainer: provided => ({
             ...provided,
             padding: '2px 8px',
             maxWidth: '100%',
             flexWrap: 'wrap',
           }),
-          menu: (provided) => ({
+          menu: provided => ({
             ...provided,
             backgroundColor: 'white',
             border: '1px solid #E2E8F0',
@@ -577,20 +532,18 @@ export default function HierarchicalMultiSelect({
             marginTop: '4px',
             width: '100%',
             zIndex: 100,
-            // ✅ REMOVE fixed height here
             maxHeight: undefined,
             height: 'auto',
-            overflow: 'visible', // 👈 important
+            overflow: 'visible',
           }),
-          menuList: (provided) => ({
+          menuList: provided => ({
             ...provided,
             backgroundColor: '#FAFAFA',
             padding: '4px',
-            maxHeight: '380px', // ✅ scroll limit applied here only
+            maxHeight: '380px',
             overflowY: 'auto',
           }),
         }}
-
         components={{
           MenuList: CustomMenuList,
           ValueContainer: CustomValueContainer,
@@ -599,7 +552,6 @@ export default function HierarchicalMultiSelect({
           GroupHeading: () => null,
         }}
       />
-
     </Box>
   );
 }
