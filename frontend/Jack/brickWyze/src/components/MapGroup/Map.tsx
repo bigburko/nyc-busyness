@@ -1,72 +1,221 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import rawGeojson from './manhattan_census_tracts.json';
-import { CleanGeojson } from './CleanGeojson';
-import { ProcessGeojson } from './ProcessGeojson';
+import rawGeojson from '@/components/MapGroup/manhattan_census_tracts.json';
+import { CleanGeojson } from '@/components/MapGroup/CleanGeojson';
+import { ProcessGeojson } from '@/components/MapGroup/ProcessGeojson';
+import { addTractLayers, updateTractData } from '@/components/MapGroup/TractLayer';
+import { renderPopup } from '@/components/MapGroup/PopupHandler';
+import { createLegend, showLegend } from '@/components/MapGroup/Legend';
 
-const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831]; // Over Manhattan
-const INITIAL_ZOOM = 12.5;
+const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831];
+const INITIAL_ZOOM = 12;
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
-export default function Map() {
+const EDGE_FUNCTION_URL =
+  'https://kwuwuutcvpdomfivdemt.supabase.co/functions/v1/calculate-resilience';
+
+const DEBUG_MODE = true;
+
+interface MapProps {
+  weights?: any[];
+  rentRange?: [number, number];
+  selectedEthnicities?: string[];
+  selectedGenders?: string[];
+  ageRange?: [number, number];
+  incomeRange?: [number, number]; // ✅ ADDED
+}
+
+export default function Map({
+  weights,
+  rentRange,
+  selectedEthnicities,
+  selectedGenders,
+  ageRange,
+  incomeRange, // ✅ ADDED
+}: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+
+  const watchedGEOIDs = [
+    '36061019500', '36061019100', '36061018700',
+    '36061019300', '36061018900', '36061018500',
+  ];
+
+  const loadInitialTracts = () => {
+    const cleaned = CleanGeojson(rawGeojson);
+    const processed = ProcessGeojson(cleaned, { precision: 6 });
+    updateTractData(mapRef.current, processed);
+  };
+
+  const fetchAndApplyScores = async () => {
+    const cleaned = CleanGeojson(rawGeojson);
+    const processed = ProcessGeojson(cleaned, { precision: 6 });
+
+    if (!weights || !rentRange || !selectedEthnicities) return;
+
+    if (DEBUG_MODE) {
+      console.log('📤 Sending to edge function:', {
+        weights,
+        rentRange,
+        ethnicities: selectedEthnicities,
+        genders: selectedGenders,
+        ageRange,
+        incomeRange,
+      });
+    }
+
+    try {
+      const response = await fetch(EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
+        },
+        body: JSON.stringify({
+          weights,
+          rentRange,
+          ethnicities: selectedEthnicities,
+          genders: selectedGenders || [],
+          ageRange: ageRange || [0, 100],
+          incomeRange: incomeRange || [0, 250000], // ✅ ADDED
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Edge error ${response.status}:`, errorText);
+        throw new Error(errorText);
+      }
+
+      const { zones, debug } = await response.json();
+
+      if (DEBUG_MODE) {
+        console.log('📥 Edge function returned zones:', zones.length);
+        console.log('[✅ DEBUG] Ethnicities sent:', debug?.received_ethnicities);
+        console.log('[✅ DEBUG] Genders sent:', debug?.received_genders);
+        console.log('[✅ DEBUG] Age range sent:', debug?.received_age_range);
+        console.log('[✅ DEBUG] Income range sent:', debug?.received_income_range); // ✅ NEW
+        console.log('[✅ DEBUG] Sample demo scores:', debug?.sample_demo_scores);
+        console.log('[✅ DEBUG] Watched rent values:', debug?.watched_rents);
+      }
+
+      const scoreMap: Record<string, any> = {};
+      zones.forEach((s: any) => {
+        if (s?.geoid) scoreMap[s.geoid.toString().padStart(11, '0')] = s;
+      });
+
+      const updated = {
+        ...processed,
+        features: processed.features.map((feat) => {
+          const rawGEOID = feat.properties?.GEOID;
+          const geoid = rawGEOID?.toString().padStart(11, '0');
+          const match = scoreMap[geoid];
+
+          if (DEBUG_MODE && watchedGEOIDs.includes(geoid)) {
+            console.log(`🧐 Match debug for ${geoid}`, {
+              raw: rawGEOID,
+              padded: geoid,
+              match,
+              foundInScoreMap: !!scoreMap[geoid],
+              props: feat.properties,
+            });
+          }
+
+          return {
+            ...feat,
+            properties: {
+              ...feat.properties,
+              ...(match || { custom_score: 0 }),
+              ...match,
+              hasScore: watchedGEOIDs.includes(geoid) || !!match,
+            },
+          };
+        }),
+      };
+
+      if (DEBUG_MODE) {
+        const missingHasScore = watchedGEOIDs.filter((id) => {
+          const padded = id.toString().padStart(11, '0');
+          const match = updated.features.find((f) => f.properties?.GEOID === padded);
+          return !match?.properties?.hasScore;
+        });
+
+        if (missingHasScore.length > 0) {
+          console.warn('⚠️ These tracts matched scoreMap but still have hasScore = false:', missingHasScore);
+        } else {
+          console.log('✅ All watched tracts have hasScore = true');
+        }
+
+        console.log('🧠 Updated GeoJSON with scores:', updated);
+      }
+
+      updateTractData(mapRef.current, updated);
+      showLegend();
+    } catch (err) {
+      console.error('[Error fetching scores]', err);
+    }
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
-
-    console.log('[Map.tsx] Initializing map...');
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      pitch: 20,
+      bearing: 29,
+      antialias: true,
+      style: 'mapbox://styles/mapbox/light-v11',
     });
+
+    mapRef.current = map;
 
     map.on('load', () => {
-      console.log('[Mapbox] Map loaded successfully');
-
-      // ✅ Clean and process the raw GeoJSON
-      const cleaned = CleanGeojson(rawGeojson);
-      const processed = ProcessGeojson(cleaned, { precision: 6 });
-
-      map.addSource('tracts', {
-        type: 'geojson',
-        data: processed,
-      });
-
-      map.addLayer({
-        id: 'tracts-fill',
-        type: 'fill',
-        source: 'tracts',
-        paint: {
-          'fill-color': '#FF492C',
-          'fill-opacity': 0.4,
-        },
-      });
-
-      map.addLayer({
-        id: 'tracts-outline',
-        type: 'line',
-        source: 'tracts',
-        paint: {
-          'line-color': '#000000',
-          'line-width': 1,
-        },
-      });
+      addTractLayers(map);
+      createLegend(map);
+      loadInitialTracts();
+      setIsMapLoaded(true);
     });
 
-    map.on('error', (e) => {
-      console.error('[Mapbox ERROR]', e.error);
+    map.on('click', 'tracts-fill', (e) => {
+      renderPopup(e, weights, selectedEthnicities, selectedGenders);
     });
 
-    return () => map.remove();
+    map.on('mouseenter', 'tracts-fill', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'tracts-fill', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+    return () => {
+      map.remove();
+      setIsMapLoaded(false);
+    };
   }, []);
+
+  useEffect(() => {
+    if (isMapLoaded && weights && rentRange && selectedEthnicities) {
+      fetchAndApplyScores();
+    }
+  }, [
+    isMapLoaded,
+    weights,
+    rentRange,
+    selectedEthnicities,
+    selectedGenders,
+    ageRange,
+    incomeRange, // ✅ ADDED
+  ]);
 
   return (
     <div
