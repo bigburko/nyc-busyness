@@ -6,6 +6,16 @@ const config: ThemeConfig = {
   useSystemColorMode: false,
 };
 
-const theme = extendTheme({ config });
+const theme = extendTheme({
+  config,
+  styles: {
+    global: {
+      body: {
+        bg: '#FFDED8',       // 👈 match your drawer's light pink background
+        color: 'gray.800',   // 👈 ensure all text is dark and visible
+      },
+    },
+  },
+});
 
 export default theme;

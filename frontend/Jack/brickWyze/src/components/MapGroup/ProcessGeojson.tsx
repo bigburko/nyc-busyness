@@ -10,7 +10,7 @@ import type {
   MultiLineString,
   Polygon,
   MultiPolygon,
-  GeometryCollection,
+  GeoJsonProperties,
 } from 'geojson';
 
 /**
@@ -19,29 +19,32 @@ import type {
 function isCoordinateGeometry(
   geom: Geometry
 ): geom is Point | MultiPoint | LineString | MultiLineString | Polygon | MultiPolygon {
-  return (geom as any).coordinates !== undefined;
+  return 'coordinates' in geom;
 }
 
 function roundCoord(num: number, precision: number): number {
   return parseFloat(num.toFixed(precision));
 }
 
-function roundCoords(coords: any, precision: number): any {
-  if (typeof coords[0] === 'number') {
-    return coords.map((n: number) => roundCoord(n, precision));
+function roundCoords(coords: unknown, precision: number): unknown {
+  if (Array.isArray(coords)) {
+    if (typeof coords[0] === 'number') {
+      return (coords as number[]).map((n) => roundCoord(n, precision));
+    }
+    return coords.map((c) => roundCoords(c, precision));
   }
-  return coords.map((c: any) => roundCoords(c, precision));
+  return coords;
 }
 
 export function ProcessGeojson(
-  raw: FeatureCollection,
+  raw: FeatureCollection<Geometry, GeoJsonProperties>,
   options?: {
     precision?: number;
   }
-): FeatureCollection {
+): FeatureCollection<Geometry, GeoJsonProperties> {
   const precision = options?.precision ?? 6;
 
-  const cleanFeatures = raw.features.map((feature) => {
+  const cleanFeatures = raw.features.map((feature): Feature<Geometry, GeoJsonProperties> => {
     const { geometry } = feature;
 
     if (geometry && isCoordinateGeometry(geometry)) {
@@ -50,8 +53,8 @@ export function ProcessGeojson(
         geometry: {
           ...geometry,
           coordinates: roundCoords(geometry.coordinates, precision),
-        },
-      } as Feature;
+        } as Geometry,
+      };
     }
 
     // For GeometryCollection or null geometry, return as-is

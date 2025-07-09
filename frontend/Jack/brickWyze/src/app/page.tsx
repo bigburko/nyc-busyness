@@ -4,14 +4,15 @@ import { Box } from '@chakra-ui/react';
 import { useState } from 'react';
 import Map from '@/components/MapGroup/Map';
 import MyDrawer from '@/components/MyDrawer';
+import { Weighting } from '@/components/ScoreWeightingGroup/WeightingPanel';
 
 interface SearchFilters {
-  weights: any[];
+  weights: Weighting[];
   rentRange: [number, number];
   selectedEthnicities: string[];
   selectedGenders: string[];
   ageRange: [number, number];
-  incomeRange: [number, number]; // ✅ ADDED
+  incomeRange: [number, number];
 }
 
 export default function Page() {
@@ -24,13 +25,13 @@ export default function Page() {
 
   return (
     <Box position="relative" height="100vh" width="100vw" overflow="hidden">
-      <Map 
+      <Map
         weights={searchFilters?.weights}
         rentRange={searchFilters?.rentRange}
         selectedEthnicities={searchFilters?.selectedEthnicities}
         selectedGenders={searchFilters?.selectedGenders}
         ageRange={searchFilters?.ageRange}
-        incomeRange={searchFilters?.incomeRange} // ✅ ADDED
+        incomeRange={searchFilters?.incomeRange}
       />
       <MyDrawer onSearchSubmit={handleSearchSubmit} />
     </Box>

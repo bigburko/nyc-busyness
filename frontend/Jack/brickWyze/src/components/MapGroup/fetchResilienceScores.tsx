@@ -1,3 +1,5 @@
+// src/components/MapGroup/fetchResilienceScores.tsx
+
 export type ResilienceScore = {
   geoid: string;
   composite_score: number;
@@ -12,7 +14,8 @@ export type ResilienceScore = {
 };
 
 interface FetchParams {
-  weights?: any[];
+  // Corrected 'any[]' to 'number[]' for type safety
+  weights?: number[];
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
@@ -56,6 +59,7 @@ export async function fetchResilienceScores({
     throw new Error('Failed to fetch resilience scores');
   }
 
+  // Note: res.json() returns `any`. This type assertion is the common way to handle it.
   const result = await res.json();
   return result.zones as ResilienceScore[];
 }
