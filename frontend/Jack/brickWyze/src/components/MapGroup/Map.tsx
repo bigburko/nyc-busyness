@@ -23,8 +23,14 @@ const EDGE_FUNCTION_URL =
 
 const DEBUG_MODE = process.env.NODE_ENV === 'development';
 
+interface Weighting {
+  id: string;
+  label: string;
+  value: number;
+}
+
 interface MapProps {
-  weights?: number[];
+  weights?: Weighting[];
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
@@ -44,26 +50,41 @@ export default function Map({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-  // Memoize the data fetching logic to prevent it being recreated on every render.
-  // This gives the useEffect hook a stable function reference.
   const fetchAndApplyScores = useCallback(async () => {
     const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
 
-    // Guard clause to ensure all necessary props are defined before fetching.
     if (!weights || !rentRange || !selectedEthnicities || !selectedGenders || !ageRange || !incomeRange) {
       return;
     }
 
     if (DEBUG_MODE) {
-      console.log('📤 Sending to edge function:', { weights, rentRange, ethnicities: selectedEthnicities, genders: selectedGenders, ageRange, incomeRange });
+      console.log('📤 Sending to edge function:', {
+        weights,
+        rentRange,
+        ethnicities: selectedEthnicities,
+        genders: selectedGenders,
+        ageRange,
+        incomeRange,
+      });
     }
 
     try {
       const response = await fetch(EDGE_FUNCTION_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '', Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}` },
-        body: JSON.stringify({ weights, rentRange, ethnicities: selectedEthnicities, genders: selectedGenders, ageRange, incomeRange }),
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
+        },
+        body: JSON.stringify({
+          weights,
+          rentRange,
+          ethnicities: selectedEthnicities,
+          genders: selectedGenders,
+          ageRange,
+          incomeRange,
+        }),
       });
 
       if (!response.ok) {
@@ -71,8 +92,12 @@ export default function Map({
         console.error(`❌ Edge error ${response.status}:`, errorText);
         throw new Error(`Edge function failed: ${errorText}`);
       }
-      
-      interface ApiResponse { zones: ResilienceScore[]; debug?: Record<string, unknown>; }
+
+      interface ApiResponse {
+        zones: ResilienceScore[];
+        debug?: Record<string, unknown>;
+      }
+
       const { zones, debug } = (await response.json()) as ApiResponse;
 
       if (DEBUG_MODE) {
@@ -93,28 +118,38 @@ export default function Map({
           const rawGEOID = feat.properties?.GEOID;
           const geoid = rawGEOID?.toString().padStart(11, '0');
           const match = scoreMap[geoid];
-          return { ...feat, properties: { ...feat.properties, ...(match || { custom_score: 0 }), ...match, hasScore: !!match }};
+          return {
+            ...feat,
+            properties: {
+              ...feat.properties,
+              ...(match || { custom_score: 0 }),
+              ...match,
+              hasScore: !!match,
+            },
+          };
         }),
       };
 
       if (DEBUG_MODE) console.log('🧠 Updated GeoJSON with scores applied.');
-      
+
       updateTractData(mapRef.current, updated);
       showLegend();
-
     } catch (err) {
       console.error('[Error fetching and applying scores]', err);
     }
   }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange]);
 
-
-  // Effect for initializing the map and its event listeners.
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return; // Prevent re-initialization
+    if (!containerRef.current || mapRef.current) return;
 
     const map = new mapboxgl.Map({
-      container: containerRef.current, center: INITIAL_CENTER, zoom: INITIAL_ZOOM,
-      pitch: 20, bearing: 29, antialias: true, style: 'mapbox://styles/mapbox/light-v11',
+      container: containerRef.current,
+      center: INITIAL_CENTER,
+      zoom: INITIAL_ZOOM,
+      pitch: 20,
+      bearing: 29,
+      antialias: true,
+      style: 'mapbox://styles/mapbox/light-v11',
     });
     mapRef.current = map;
 
@@ -127,33 +162,44 @@ export default function Map({
       setIsMapLoaded(true);
     });
 
-    const handleClick = (e: MapLayerMouseEvent) => renderPopup(e, weights, selectedEthnicities, selectedGenders);
-    map.on('click', 'tracts-fill', handleClick);
-    map.on('mouseenter', 'tracts-fill', () => { if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer'; });
-    map.on('mouseleave', 'tracts-fill', () => { if (map.getCanvas()) map.getCanvas().style.cursor = ''; });
+    const handleClick = (e: MapLayerMouseEvent) => {
+      renderPopup(e, weights, selectedEthnicities, selectedGenders);
+    };
 
-    return () => { // Cleanup function
+    map.on('click', 'tracts-fill', handleClick);
+    map.on('mouseenter', 'tracts-fill', () => {
+      if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', 'tracts-fill', () => {
+      if (map.getCanvas()) map.getCanvas().style.cursor = '';
+    });
+
+    return () => {
       map.off('click', 'tracts-fill', handleClick);
       map.remove();
       mapRef.current = null;
     };
   }, [weights, selectedEthnicities, selectedGenders]);
 
-
-  // Effect for triggering data fetch when dependencies change.
   useEffect(() => {
     if (isMapLoaded) {
       fetchAndApplyScores();
     }
   }, [isMapLoaded, fetchAndApplyScores]);
 
-
   return (
     <div
       ref={containerRef}
       style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        height: '100%', width: '100%', zIndex: 0, backgroundColor: '#e2e8f0',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: '100%',
+        width: '100%',
+        zIndex: 0,
+        backgroundColor: '#e2e8f0',
       }}
     />
   );

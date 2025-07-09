@@ -13,6 +13,7 @@ import { IoIosInformationCircle } from 'react-icons/io';
 import React, { ReactNode, useState } from 'react';
 
 interface Props {
+  label?: string; // 👈 This prop was missing and caused the build error
   children?: ReactNode;
   background?: string;
   buttonText?: string;
@@ -20,10 +21,11 @@ interface Props {
 }
 
 export default function MyToolTip({
-  children = "Enter Text Here",
-  background = "white",
-  buttonText = "Learn More",
-  buttonColor = "#FF492C"
+  label = 'More Info',
+  children = 'Enter text here',
+  background = 'white',
+  buttonText = 'Learn More',
+  buttonColor = '#FF492C',
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -33,7 +35,7 @@ export default function MyToolTip({
   return (
     <Popover isOpen={isOpen} onClose={handleClose} onOpen={handleToggle} trigger="click" placement="top">
       <PopoverTrigger>
-        <Box as="span" cursor="pointer">
+        <Box as="span" cursor="pointer" aria-label={label}>
           <IoIosInformationCircle />
         </Box>
       </PopoverTrigger>
