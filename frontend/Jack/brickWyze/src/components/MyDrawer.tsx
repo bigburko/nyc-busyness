@@ -126,7 +126,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
           borderRadius="full"
           variant="outline"
           border="1px solid #E2E8F0"
-          bg="white"
+          bg="orange"
           _hover={{ bg: 'gray.50' }}
           _active={{ bg: 'gray.100' }}
         >
