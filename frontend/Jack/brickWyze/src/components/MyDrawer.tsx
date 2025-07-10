@@ -19,7 +19,7 @@ import {
   AlertDialogFooter,
 } from '@chakra-ui/react';
 import { useRef, useState } from 'react';
-import { GiHamburgerMenu } from 'react-icons/gi';
+import { FiSliders } from 'react-icons/fi'; // ✅ Import icon (matches image)
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
@@ -64,7 +64,7 @@ const INITIAL_WEIGHTS: Weighting[] = [
 
 export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const btnRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
   const selectWrapperRef = useRef<HTMLDivElement>(null);
@@ -115,9 +115,24 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
 
   return (
     <main>
-      <Box ref={btnRef} onClick={onOpen} position="absolute" top="16px" left="16px" zIndex={10} cursor="pointer">
-        <GiHamburgerMenu size={28} color="#2D3748" />
-      </Box>
+        <Button
+          ref={btnRef}
+          onClick={onOpen}
+          leftIcon={<FiSliders />}
+          position="absolute"
+          top="16px"
+          left="16px"
+          zIndex={10}
+          borderRadius="full"
+          variant="outline"
+          border="1px solid #E2E8F0"
+          bg="white"
+          _hover={{ bg: 'gray.50' }}
+          _active={{ bg: 'gray.100' }}
+        >
+          Filters
+        </Button>
+
 
       <Drawer
         isOpen={isOpen}
@@ -143,100 +158,112 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
             }}
           >
             <Flex direction="column" gap={4} pb={8}>
-              <MyRangeSlider
-                heading="Rent (PSF)"
-                toolTipText="Target Average Rent cost per Square foot in $USD"
-                defaultRange={rangeValue}
-                onChange={setRangeValue}
-              />
-
-              <CollapsibleSection
-                title="Demographic Fit Filters"
-                tooltip="Customize your target audience by age, income, gender, and race"
-              >
-                <MyAgeSlider value={ageRange} onChange={setAgeRange} />
-                <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} />
-                <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
-                <Box mt={4} />
-                <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
-                  <HierarchicalMultiSelect
-                    data={ethnicityData}
-                    label="Select Ethnicities"
-                    onChange={setSelectedEthnicities}
-                    autoFocus={false}
-                    onMenuOpenChange={(isOpen) => {
-                      setMenuIsOpen(isOpen);
-                      if (isOpen) {
-                        setTimeout(() => {
-                          if (ethnicityRef.current && drawerBodyRef.current) {
-                            const offsetTop = ethnicityRef.current.offsetTop;
-                            drawerBodyRef.current.scrollTo({ top: offsetTop - 50, behavior: 'smooth' });
-                          }
-                        }, 100);
-                      }
-                    }}
-                    controlledInput={dropdownInput}
-                    setControlledInput={setDropdownInput}
-                    externalSelectedValues={selectedEthnicities}
-                    externalExpandedGroups={expandedGroups}
-                    setExternalExpandedGroups={setExpandedGroups}
-                    setMenuIsOpenExternal={setMenuIsOpen}
-                    selectWrapperRef={selectWrapperRef}
-                  />
-                </Box>
-                {_menuIsOpen && <Box h="280px" />}
-              </CollapsibleSection>
-
-              <CollapsibleSection
-                title="Resilience Score Weighting"
-                tooltip="Adjust how different factors contribute to the overall score"
-              >
-                <WeightingPanel
-                  activeWeights={activeWeights}
-                  inactiveLayers={ALL_AVAILABLE_LAYERS.filter(
-                    layer => !activeWeights.some(active => active.id === layer.id)
-                  )}
-                  onSliderChangeEnd={(id, value) => {
-                    const updatedSlider = activeWeights.find(w => w.id === id);
-                    if (!updatedSlider) return;
-                    const others = activeWeights.filter(w => w.id !== id);
-                    const updated = value >= 100
-                      ? [{ ...updatedSlider, value: 100 }, ...others.map(w => ({ ...w, value: 0 }))] :
-                      [
-                        { ...updatedSlider, value },
-                        ...others.map(w => {
-                          const total = others.reduce((s, w) => s + w.value, 0);
-                          const share = total === 0 ? (100 - value) / others.length : (w.value / total) * (100 - value);
-                          return { ...w, value: share };
-                        }),
-                      ];
-                    setActiveWeights(normalizeWeights(updated));
-                  }}
-                  onRemove={id => setActiveWeights(normalizeWeights(activeWeights.filter(w => w.id !== id)))}
-                  onAdd={layer => {
-                    const newValue = 15;
-                    const scaled = activeWeights.map(w => ({ ...w, value: w.value * (1 - newValue / 100) }));
-                    const updated = [...scaled, { ...layer, value: newValue }];
-                    setActiveWeights(normalizeWeights(updated));
-                  }}
+              {/* Rent Slider */}
+              <Box bg="white" borderRadius="lg" p={4} boxShadow="sm">
+                <MyRangeSlider
+                  heading="Rent (PSF)"
+                  toolTipText="Target Average Rent cost per Square foot in $USD"
+                  defaultRange={rangeValue}
+                  onChange={setRangeValue}
                 />
-                <Flex justify="center" w="100%" mt={4}>
-                  <Button
-                    size="sm"
-                    bg="black"
-                    color="white"
-                    _hover={{ bg: 'black' }}
-                    _active={{ bg: 'black' }}
-                    borderRadius="md"
-                    px={4}
-                    py={2}
-                    onClick={() => setIsResetDialogOpen(true)}
-                  >
-                    Reset Weights to Default
-                  </Button>
-                </Flex>
-              </CollapsibleSection>
+              </Box>
+
+              {/* Demographic Fit Filters Box */}
+              <Box bg="white" borderRadius="lg" p={3} boxShadow="sm">
+                <CollapsibleSection
+                  title="Demographic Fit Filters"
+                  tooltip="Customize your target audience by age, income, gender, and race"
+                >
+                  <Flex direction="column" gap={4}>
+                    <MyAgeSlider value={ageRange} onChange={setAgeRange} />
+                    <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} />
+                    <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
+
+                    <Box mt={2} ref={ethnicityRef} borderRadius="md" minHeight="60px">
+                      <HierarchicalMultiSelect
+                        data={ethnicityData}
+                        label="Select Ethnicities"
+                        onChange={setSelectedEthnicities}
+                        autoFocus={false}
+                        onMenuOpenChange={(isOpen) => {
+                          setMenuIsOpen(isOpen);
+                          if (isOpen) {
+                            setTimeout(() => {
+                              if (ethnicityRef.current && drawerBodyRef.current) {
+                                const offsetTop = ethnicityRef.current.offsetTop;
+                                drawerBodyRef.current.scrollTo({ top: offsetTop - 50, behavior: 'smooth' });
+                              }
+                            }, 100);
+                          }
+                        }}
+                        controlledInput={dropdownInput}
+                        setControlledInput={setDropdownInput}
+                        externalSelectedValues={selectedEthnicities}
+                        externalExpandedGroups={expandedGroups}
+                        setExternalExpandedGroups={setExpandedGroups}
+                        setMenuIsOpenExternal={setMenuIsOpen}
+                        selectWrapperRef={selectWrapperRef}
+                      />
+                    </Box>
+                    {_menuIsOpen && <Box h="280px" />}
+                  </Flex>
+                </CollapsibleSection>
+              </Box>
+
+              {/* Score Weighting Box */}
+              <Box bg="white" borderRadius="lg" p={3} boxShadow="sm">
+                <CollapsibleSection
+                  title="Resilience Score Weighting"
+                  tooltip="Adjust how different factors contribute to the overall score"
+                >
+                  <WeightingPanel
+                    activeWeights={activeWeights}
+                    inactiveLayers={ALL_AVAILABLE_LAYERS.filter(
+                      layer => !activeWeights.some(active => active.id === layer.id)
+                    )}
+                    onSliderChangeEnd={(id, value) => {
+                      const updatedSlider = activeWeights.find(w => w.id === id);
+                      if (!updatedSlider) return;
+                      const others = activeWeights.filter(w => w.id !== id);
+                      const updated = value >= 100
+                        ? [{ ...updatedSlider, value: 100 }, ...others.map(w => ({ ...w, value: 0 }))] :
+                        [
+                          { ...updatedSlider, value },
+                          ...others.map(w => {
+                            const total = others.reduce((s, w) => s + w.value, 0);
+                            const share = total === 0 ? (100 - value) / others.length : (w.value / total) * (100 - value);
+                            return { ...w, value: share };
+                          }),
+                        ];
+                      setActiveWeights(normalizeWeights(updated));
+                    }}
+                    onRemove={id => setActiveWeights(normalizeWeights(activeWeights.filter(w => w.id !== id)))}
+                    onAdd={layer => {
+                      const newValue = 15;
+                      const scaled = activeWeights.map(w => ({ ...w, value: w.value * (1 - newValue / 100) }));
+                      const updated = [...scaled, { ...layer, value: newValue }];
+                      setActiveWeights(normalizeWeights(updated));
+                    }}
+                  />
+                  <Flex justify="center" w="100%" mt={4}>
+                    <Button
+                      size="sm"
+                      bg="black"
+                      color="white"
+                      _hover={{ bg: 'black' }}
+                      _active={{ bg: 'black' }}
+                      borderRadius="md"
+                      px={4}
+                      py={2}
+                      onClick={() => setIsResetDialogOpen(true)}
+                    >
+                      Reset Weights to Default
+                    </Button>
+                  </Flex>
+                </CollapsibleSection>
+              </Box>
             </Flex>
+
           </DrawerBody>
 
           <Box p={4} position="sticky" bottom="0" bg="#FFDED8" zIndex="sticky" borderTop="1px solid rgba(0,0,0,0.1)">
