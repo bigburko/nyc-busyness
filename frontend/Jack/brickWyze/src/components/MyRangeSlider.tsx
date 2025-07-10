@@ -10,6 +10,7 @@ import {
   Flex,
   Input,
   Text,
+  useColorMode,
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import MyToolTip from './MyToolTip';
@@ -25,8 +26,8 @@ interface Props {
   max?: number;
   step?: number;
   onChange?: (range: [number, number]) => void;
-  showSymbol?: boolean;      // ✅ NEW: toggle symbol
-  symbol?: string;           // ✅ NEW: customize symbol (e.g. '$', '', '%')
+  showSymbol?: boolean;
+  symbol?: string;
 }
 
 export default function MyRangeSlider({
@@ -40,15 +41,24 @@ export default function MyRangeSlider({
   step = 1,
   toolTipText,
   onChange,
-  showSymbol = true,         // ✅ default to true (e.g. for $)
-  symbol = '$',              // ✅ default symbol is dollar
+  showSymbol = true,
+  symbol = '$',
 }: Props) {
   const MIN_GAP = 5;
   const [range, setRange] = useState<[number, number]>(defaultRange);
+  const { colorMode } = useColorMode();
 
   useEffect(() => {
     onChange?.(range);
   }, [range, onChange]);
+
+  useEffect(() => {
+    console.log('🧪 MyRangeSlider mounted');
+    console.log('🌈 Chakra color mode:', colorMode);
+    console.log('🧩 <html> data-theme:', document.documentElement.getAttribute('data-theme'));
+    console.log('🧩 <body> class:', document.body.className);
+    console.log('🧩 <html> style:', document.documentElement.getAttribute('style'));
+  }, [colorMode]);
 
   const clamp = (val: [number, number]): [number, number] => {
     let [minVal, maxVal] = val;
@@ -75,7 +85,7 @@ export default function MyRangeSlider({
   return (
     <Box bg="#FFDED8" p={4} borderRadius="md" mb={6} w="100%">
       <Flex align="center" gap={2} mb={3}>
-        <Heading as="h4" size="md">
+        <Heading as="h4" size="md" color="black">
           {heading}
         </Heading>
         <MyToolTip>{toolTipText}</MyToolTip>
@@ -106,7 +116,7 @@ export default function MyRangeSlider({
       <Flex justify="space-between" mt={4}>
         {['Min', 'Max'].map((label, idx) => (
           <Box textAlign="center" key={label}>
-            <Text fontSize="xs" mb={1} color="gray.600">
+            <Text fontSize="xs" mb={1} color="black">
               {label}
             </Text>
             <Input
@@ -119,6 +129,7 @@ export default function MyRangeSlider({
               textAlign="center"
               borderRadius="full"
               bg="white"
+              color="black"
               w="80px"
               size="sm"
             />

@@ -1,6 +1,6 @@
 // src/app/layout.tsx
 import './globals.css';
-import { Providers } from '@/app/chakra-provider';
+import { Providers } from './chakra-provider';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
