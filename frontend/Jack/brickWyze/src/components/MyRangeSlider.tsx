@@ -30,6 +30,15 @@ interface Props {
   symbol?: string;
 }
 
+function formatCompactNumber(value: number): string {
+  if (value >= 1_000_000) {
+    return (value / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  } else if (value >= 1_000) {
+    return (value / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return value.toString();
+}
+
 export default function MyRangeSlider({
   heading = 'Range Slider',
   unFilledTrack = 'black',
@@ -120,7 +129,11 @@ export default function MyRangeSlider({
               {label}
             </Text>
             <Input
-              value={`${showSymbol ? symbol : ''}${range[idx].toLocaleString()}`}
+              value={
+                showSymbol
+                  ? `${symbol}${formatCompactNumber(range[idx])}`
+                  : formatCompactNumber(range[idx])
+              }
               onChange={(e) => handleInput(e.target.value, idx as 0 | 1)}
               onBlur={(e) => handleInput(e.target.value, idx as 0 | 1)}
               onKeyDown={(e) =>

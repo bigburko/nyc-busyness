@@ -77,8 +77,8 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_menuIsOpen, setMenuIsOpen] = useState(false);
   const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
-  const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]);
-  const [incomeRange, setIncomeRange] = useState<[number, number]>([30000, 120000]);
+  const [ageRange, setAgeRange] = useState<[number, number]>([0, 100]);
+  const [incomeRange, setIncomeRange] = useState<[number, number]>([0, 250000]);
 
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
