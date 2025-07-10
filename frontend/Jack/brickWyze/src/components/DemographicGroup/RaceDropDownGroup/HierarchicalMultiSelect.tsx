@@ -488,18 +488,10 @@ export default function HierarchicalMultiSelect({
         getOptionValue={opt => opt.value}
         options={selectableFilteredOptions}
         isClearable
-        menuIsOpen={menuIsOpen}
-        onMenuOpen={() => {
-          if (!menuIsOpen) {
-            setMenuIsOpen(true);
-          }
-        }}
-        onMenuClose={() => {
-          setMenuIsOpen(false);
-          setMenuIsOpenExternal?.(false);
-        }}
-        menuPosition="absolute"
         menuPlacement="bottom"
+
+
+
         // ✅ FIXED: Restored the complete chakraStyles object.
         chakraStyles={{
           container: provided => ({
@@ -507,6 +499,7 @@ export default function HierarchicalMultiSelect({
               backgroundColor: 'white',
               width: '100%',
               borderRadius: 'full',
+              position: "relative",
             }),
 
           control: (provided, state) => ({
@@ -543,21 +536,22 @@ export default function HierarchicalMultiSelect({
               overflow: 'hidden',            // ✅ prevent spill
             }),
 
-          menu: provided => ({
+          menu: (provided) => ({
             ...provided,
             backgroundColor: 'white',
-            border: '1px solid #CBD5E0',         // ✅ light gray border
+            border: '1px solid #CBD5E0',
             borderTop: 'none',
             borderBottomLeftRadius: '16px',
             borderBottomRightRadius: '16px',
             marginTop: '0px',
-            boxShadow: 'none',                   // ✅ remove weird shadows
+            boxShadow: 'none',
             width: '100%',
-            zIndex: 100,
             overflow: 'hidden',
-            outline: '1px solid #CBD5E0',        // ✅ matching soft outline
+            outline: '1px solid #CBD5E0',
             outlineOffset: '-1px',
+            position: 'relative', // ✅ Ensure it's in document flow
           }),
+
 
 
           menuList: provided => ({

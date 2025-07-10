@@ -139,29 +139,76 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
           <DrawerHeader>Priorities</DrawerHeader>
 
           <DrawerBody
-            ref={drawerBodyRef}
-            overflowY="auto"
-            css={{
-              '&::-webkit-scrollbar': { width: '8px' },
-              '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
-              '&::-webkit-scrollbar-thumb': {
-                background: '#888', borderRadius: '4px', '&:hover': { background: '#555' },
-              },
-            }}
-          >
-            <Flex direction="column" gap={4} pb={8}>
-              <WeightingPanel
-                activeWeights={activeWeights}
-                inactiveLayers={ALL_AVAILABLE_LAYERS.filter(
-                  layer => !activeWeights.some(active => active.id === layer.id)
-                )}
-                onSliderChangeEnd={(id, value) => {
-                  const updatedSlider = activeWeights.find(w => w.id === id);
-                  if (!updatedSlider) return;
-                  const others = activeWeights.filter(w => w.id !== id);
-                  const updated = value >= 100
-                    ? [{ ...updatedSlider, value: 100 }, ...others.map(w => ({ ...w, value: 0 }))]
-                    : [
+              ref={drawerBodyRef}
+              overflowY="auto"
+              css={{
+                '&::-webkit-scrollbar': { width: '8px' },
+                '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
+                '&::-webkit-scrollbar-thumb': {
+                  background: '#888', borderRadius: '4px', '&:hover': { background: '#555' },
+                },
+              }}
+            >
+              <Flex direction="column" gap={4} pb={8}>
+                <MyRangeSlider
+                  heading="Rent (PSF)"
+                  toolTipText="Target Average Rent cost per Square foot in $USD"
+                  defaultRange={rangeValue}
+                  onChange={setRangeValue}
+                />
+
+                <MyAgeSlider value={ageRange} onChange={setAgeRange} />
+                <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} />
+                <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
+
+                <Box mt={4} />
+                <Box
+                      ref={ethnicityRef}
+                      borderRadius="md"
+                      minHeight="60px"
+                    >
+                      <HierarchicalMultiSelect
+                        data={ethnicityData}
+                        label="Select Ethnicities"
+                        onChange={setSelectedEthnicities}
+                        autoFocus={false}
+                        onMenuOpenChange={(isOpen) => {
+                          setMenuIsOpen(isOpen);
+                          if (isOpen) {
+                            setTimeout(() => {
+                              if (ethnicityRef.current && drawerBodyRef.current) {
+                                const offsetTop = ethnicityRef.current.offsetTop;
+                                drawerBodyRef.current.scrollTo({ top: offsetTop - 50, behavior: 'smooth' });
+                              }
+                            }, 100);
+                          }
+                        }}
+                        controlledInput={dropdownInput}
+                        setControlledInput={setDropdownInput}
+                        externalSelectedValues={selectedEthnicities}
+                        externalExpandedGroups={expandedGroups}
+                        setExternalExpandedGroups={setExpandedGroups}
+                        setMenuIsOpenExternal={setMenuIsOpen}
+                        selectWrapperRef={selectWrapperRef}
+                      />
+                    </Box>
+                    {_menuIsOpen && (
+                      <Box h="280px" />  // 👈 This pushes the WeightingPanel down when dropdown is open
+                    )}
+
+
+                <WeightingPanel
+                  activeWeights={activeWeights}
+                  inactiveLayers={ALL_AVAILABLE_LAYERS.filter(
+                    layer => !activeWeights.some(active => active.id === layer.id)
+                  )}
+                  onSliderChangeEnd={(id, value) => {
+                    const updatedSlider = activeWeights.find(w => w.id === id);
+                    if (!updatedSlider) return;
+                    const others = activeWeights.filter(w => w.id !== id);
+                    const updated = value >= 100
+                      ? [{ ...updatedSlider, value: 100 }, ...others.map(w => ({ ...w, value: 0 }))] :
+                      [
                         { ...updatedSlider, value },
                         ...others.map(w => {
                           const total = others.reduce((s, w) => s + w.value, 0);
@@ -169,74 +216,35 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                           return { ...w, value: share };
                         }),
                       ];
-                  setActiveWeights(normalizeWeights(updated));
-                }}
-                onRemove={id => setActiveWeights(normalizeWeights(activeWeights.filter(w => w.id !== id)))}
-                onAdd={layer => {
-                  const newValue = 15;
-                  const scaled = activeWeights.map(w => ({ ...w, value: w.value * (1 - newValue / 100) }));
-                  const updated = [...scaled, { ...layer, value: newValue }];
-                  setActiveWeights(normalizeWeights(updated));
-                }}
-              />
-
-              <Flex justify="center" w="100%">
-                <Button
-                  size="sm"
-                  bg="black"
-                  color="white"
-                  _hover={{ bg: 'black' }}
-                  _active={{ bg: 'black' }}
-                  borderRadius="md"
-                  px={4}
-                  py={2}
-                  onClick={() => setIsResetDialogOpen(true)}
-                >
-                  Reset Weights to Default
-                </Button>
-              </Flex>
-
-              <MyRangeSlider
-                heading="Rent (PSF)"
-                toolTipText="Target Average Rent cost per Square foot in $USD"
-                defaultRange={rangeValue}
-                onChange={setRangeValue}
-              />
-
-              <MyAgeSlider value={ageRange} onChange={setAgeRange} />
-              <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} />
-
-              <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
-
-              <Box mt={4} />
-              <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
-                <HierarchicalMultiSelect
-                  data={ethnicityData}
-                  label="Select Ethnicities"
-                  onChange={setSelectedEthnicities}
-                  autoFocus={false}
-                  onMenuOpenChange={(isOpen) => {
-                    setMenuIsOpen(isOpen);
-                    if (isOpen) {
-                      setTimeout(() => {
-                        if (ethnicityRef.current && drawerBodyRef.current) {
-                          const offsetTop = ethnicityRef.current.offsetTop;
-                          drawerBodyRef.current.scrollTo({ top: offsetTop - 50, behavior: 'smooth' });
-                        }
-                      }, 100);
-                    }
+                    setActiveWeights(normalizeWeights(updated));
                   }}
-                  controlledInput={dropdownInput}
-                  setControlledInput={setDropdownInput}
-                  externalSelectedValues={selectedEthnicities}
-                  externalExpandedGroups={expandedGroups}
-                  setExternalExpandedGroups={setExpandedGroups}
-                  setMenuIsOpenExternal={setMenuIsOpen}
-                  selectWrapperRef={selectWrapperRef}
+                  onRemove={id => setActiveWeights(normalizeWeights(activeWeights.filter(w => w.id !== id)))}
+                  onAdd={layer => {
+                    const newValue = 15;
+                    const scaled = activeWeights.map(w => ({ ...w, value: w.value * (1 - newValue / 100) }));
+                    const updated = [...scaled, { ...layer, value: newValue }];
+                    setActiveWeights(normalizeWeights(updated));
+                  }}
                 />
-              </Box>
-            </Flex>
-          </DrawerBody>
+
+                <Flex justify="center" w="100%">
+                  <Button
+                    size="sm"
+                    bg="black"
+                    color="white"
+                    _hover={{ bg: 'black' }}
+                    _active={{ bg: 'black' }}
+                    borderRadius="md"
+                    px={4}
+                    py={2}
+                    onClick={() => setIsResetDialogOpen(true)}
+                  >
+                    Reset Weights to Default
+                  </Button>
+                </Flex>
+              </Flex>
+            </DrawerBody>
+
 
           <Box p={4} position="sticky" bottom="0" bg="#FFDED8" zIndex="sticky" borderTop="1px solid rgba(0,0,0,0.1)">
             <Flex justify="center">
