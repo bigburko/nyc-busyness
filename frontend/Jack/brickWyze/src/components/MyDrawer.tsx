@@ -183,10 +183,10 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
               <Flex justify="center" w="100%">
                 <Button
                   size="sm"
-                  bg="gray.700"
+                  bg="black"
                   color="white"
-                  _hover={{ bg: 'gray.600' }}
-                  _active={{ bg: 'gray.800' }}
+                  _hover={{ bg: 'black' }}
+                  _active={{ bg: 'black' }}
                   borderRadius="md"
                   px={4}
                   py={2}
