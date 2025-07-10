@@ -31,6 +31,7 @@ import HierarchicalMultiSelect from './DemographicGroup/RaceDropDownGroup/Hierar
 import { ethnicityData } from './DemographicGroup/RaceDropDownGroup/ethnicityData';
 import CancelResetButton from './ScoreWeightingGroup/CancelResetButton';
 import GenderSelect from './DemographicGroup/GenderGroup/GenderSelect';
+import CollapsibleSection from './CollapsibleSection';
 
 interface MyDrawerProps {
   onSearchSubmit: (filters: {
@@ -73,8 +74,6 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   const [selectedGenders, setSelectedGenders] = useState<string[]>(['male', 'female']);
   const [dropdownInput, setDropdownInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
-  // ✅ FIXED: Using eslint-disable-next-line is the most reliable way to suppress this error.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_menuIsOpen, setMenuIsOpen] = useState(false);
   const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
   const [ageRange, setAgeRange] = useState<[number, number]>([0, 100]);
@@ -84,7 +83,6 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   const normalizeWeights = (weights: Weighting[]): Weighting[] => {
-    if (weights.length === 0) return [];
     const total = weights.reduce((sum, w) => sum + w.value, 0);
     if (total === 0) {
       const equalValue = 100 / weights.length;
@@ -100,23 +98,18 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
   };
 
   const handleSubmit = () => {
-    if (typeof onSearchSubmit === 'function') {
-      if (selectedGenders.length === 0) {
-        alert('Please select at least one gender.');
-        return;
-      }
-
-      onSearchSubmit({
-        weights: normalizeWeights(activeWeights),
-        rentRange: rangeValue,
-        selectedEthnicities,
-        selectedGenders,
-        ageRange,
-        incomeRange,
-      });
-    } else {
-      console.warn('onSearchSubmit is not a function');
+    if (!selectedGenders.length) {
+      alert('Please select at least one gender.');
+      return;
     }
+    onSearchSubmit({
+      weights: normalizeWeights(activeWeights),
+      rentRange: rangeValue,
+      selectedEthnicities,
+      selectedGenders,
+      ageRange,
+      incomeRange,
+    });
     onClose();
   };
 
@@ -139,64 +132,65 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
           <DrawerHeader>Priorities</DrawerHeader>
 
           <DrawerBody
-              ref={drawerBodyRef}
-              overflowY="auto"
-              css={{
-                '&::-webkit-scrollbar': { width: '8px' },
-                '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
-                '&::-webkit-scrollbar-thumb': {
-                  background: '#888', borderRadius: '4px', '&:hover': { background: '#555' },
-                },
-              }}
-            >
-              <Flex direction="column" gap={4} pb={8}>
-                <MyRangeSlider
-                  heading="Rent (PSF)"
-                  toolTipText="Target Average Rent cost per Square foot in $USD"
-                  defaultRange={rangeValue}
-                  onChange={setRangeValue}
-                />
+            ref={drawerBodyRef}
+            overflowY="auto"
+            css={{
+              '&::-webkit-scrollbar': { width: '8px' },
+              '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' },
+              '&::-webkit-scrollbar-thumb': {
+                background: '#888', borderRadius: '4px', '&:hover': { background: '#555' },
+              },
+            }}
+          >
+            <Flex direction="column" gap={4} pb={8}>
+              <MyRangeSlider
+                heading="Rent (PSF)"
+                toolTipText="Target Average Rent cost per Square foot in $USD"
+                defaultRange={rangeValue}
+                onChange={setRangeValue}
+              />
 
+              <CollapsibleSection
+                title="Demographic Fit Filters"
+                tooltip="Customize your target audience by age, income, gender, and race"
+              >
                 <MyAgeSlider value={ageRange} onChange={setAgeRange} />
                 <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} />
                 <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
-
                 <Box mt={4} />
-                <Box
-                      ref={ethnicityRef}
-                      borderRadius="md"
-                      minHeight="60px"
-                    >
-                      <HierarchicalMultiSelect
-                        data={ethnicityData}
-                        label="Select Ethnicities"
-                        onChange={setSelectedEthnicities}
-                        autoFocus={false}
-                        onMenuOpenChange={(isOpen) => {
-                          setMenuIsOpen(isOpen);
-                          if (isOpen) {
-                            setTimeout(() => {
-                              if (ethnicityRef.current && drawerBodyRef.current) {
-                                const offsetTop = ethnicityRef.current.offsetTop;
-                                drawerBodyRef.current.scrollTo({ top: offsetTop - 50, behavior: 'smooth' });
-                              }
-                            }, 100);
+                <Box ref={ethnicityRef} borderRadius="md" minHeight="60px">
+                  <HierarchicalMultiSelect
+                    data={ethnicityData}
+                    label="Select Ethnicities"
+                    onChange={setSelectedEthnicities}
+                    autoFocus={false}
+                    onMenuOpenChange={(isOpen) => {
+                      setMenuIsOpen(isOpen);
+                      if (isOpen) {
+                        setTimeout(() => {
+                          if (ethnicityRef.current && drawerBodyRef.current) {
+                            const offsetTop = ethnicityRef.current.offsetTop;
+                            drawerBodyRef.current.scrollTo({ top: offsetTop - 50, behavior: 'smooth' });
                           }
-                        }}
-                        controlledInput={dropdownInput}
-                        setControlledInput={setDropdownInput}
-                        externalSelectedValues={selectedEthnicities}
-                        externalExpandedGroups={expandedGroups}
-                        setExternalExpandedGroups={setExpandedGroups}
-                        setMenuIsOpenExternal={setMenuIsOpen}
-                        selectWrapperRef={selectWrapperRef}
-                      />
-                    </Box>
-                    {_menuIsOpen && (
-                      <Box h="280px" />  // 👈 This pushes the WeightingPanel down when dropdown is open
-                    )}
+                        }, 100);
+                      }
+                    }}
+                    controlledInput={dropdownInput}
+                    setControlledInput={setDropdownInput}
+                    externalSelectedValues={selectedEthnicities}
+                    externalExpandedGroups={expandedGroups}
+                    setExternalExpandedGroups={setExpandedGroups}
+                    setMenuIsOpenExternal={setMenuIsOpen}
+                    selectWrapperRef={selectWrapperRef}
+                  />
+                </Box>
+                {_menuIsOpen && <Box h="280px" />}
+              </CollapsibleSection>
 
-
+              <CollapsibleSection
+                title="Resilience Score Weighting"
+                tooltip="Adjust how different factors contribute to the overall score"
+              >
                 <WeightingPanel
                   activeWeights={activeWeights}
                   inactiveLayers={ALL_AVAILABLE_LAYERS.filter(
@@ -226,8 +220,7 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                     setActiveWeights(normalizeWeights(updated));
                   }}
                 />
-
-                <Flex justify="center" w="100%">
+                <Flex justify="center" w="100%" mt={4}>
                   <Button
                     size="sm"
                     bg="black"
@@ -242,9 +235,9 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
                     Reset Weights to Default
                   </Button>
                 </Flex>
-              </Flex>
-            </DrawerBody>
-
+              </CollapsibleSection>
+            </Flex>
+          </DrawerBody>
 
           <Box p={4} position="sticky" bottom="0" bg="#FFDED8" zIndex="sticky" borderTop="1px solid rgba(0,0,0,0.1)">
             <Flex justify="center">
@@ -267,11 +260,9 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
               Reset Weightings
             </AlertDialogHeader>
-
             <AlertDialogBody>
               Are you sure you want to reset all weightings to their default values? This cannot be undone.
             </AlertDialogBody>
-
             <AlertDialogFooter>
               <CancelResetButton ref={cancelRef} onClick={() => setIsResetDialogOpen(false)} />
               <Button colorScheme="red" onClick={() => {

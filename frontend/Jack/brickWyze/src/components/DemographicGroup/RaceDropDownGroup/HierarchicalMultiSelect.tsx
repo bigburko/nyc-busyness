@@ -298,11 +298,12 @@ export default function HierarchicalMultiSelect({
         if (isComplete) {
           pills.push({
             type: 'group',
-            label: `${node.label} (${leaves.length})`,
+            label: node.label,
             value: `group_${node.value}`,
             groupChildren: leaves.map(leaf => leaf.value),
             level: node.level,
           });
+
           leaves.forEach(leaf => processedValues.add(leaf.value));
         } else {
           processNodesRecursively(node.children);
