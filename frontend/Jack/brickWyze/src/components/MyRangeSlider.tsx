@@ -131,9 +131,12 @@ export default function MyRangeSlider({
             <Input
               value={
                 showSymbol
-                  ? `${symbol}${formatCompactNumber(range[idx])}`
+                  ? symbol === '$'
+                    ? `${symbol}${formatCompactNumber(range[idx])}`
+                    : `${formatCompactNumber(range[idx])} ${symbol}`
                   : formatCompactNumber(range[idx])
               }
+
               onChange={(e) => handleInput(e.target.value, idx as 0 | 1)}
               onBlur={(e) => handleInput(e.target.value, idx as 0 | 1)}
               onKeyDown={(e) =>

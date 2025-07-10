@@ -19,7 +19,8 @@ export default function MyAgeSlider({
       step={1}
       filledTrack="#90CDF4"
       unFilledTrack="#BEE3F8"
-      showSymbol={false} // ✅ No dollar sign for age
+      showSymbol={true}          // ✅ Now showing symbol
+      symbol="yrs"               // ✅ "yrs" suffix like "25yrs"
       toolTipText="Filter census tracts where the selected age group is most represented."
       onChange={onChange}
     />
