@@ -1,24 +1,32 @@
+// ChatbotDrawer.tsx (final updated)
 'use client';
 
 import {
-  Drawer,
-  DrawerBody,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  Box,
-  Text,
-  Flex,
-  Input,
-  IconButton,
-  Collapse,
-  Button,
-  Spinner,
+  Drawer, DrawerBody, DrawerOverlay, DrawerContent, DrawerCloseButton,
+  Box, Text, Flex, Input, IconButton, Collapse, Button, Spinner
 } from '@chakra-ui/react';
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import { useRef, useState } from 'react';
-import { useGeminiStore } from './BrickyAiGroup/geminiStore'; // ✅ Zustand Gemini store
-import { useFilterStore } from '../DrawerGroup/filterStore';   // ✅ Zustand filter store
+import { useGeminiStore } from './BrickyAiGroup/geminiStore';
+import { useFilterStore } from '../DrawerGroup/filterStore';
+import { getEthnicityGroups } from './BrickyAiGroup/ethnicityUtils';
+
+const ETHNICITY_GROUPS = getEthnicityGroups();
+
+// maps common keywords from AI to actual weighting keys
+const WEIGHT_KEY_MAP: Record<string, string> = {
+  'foot_traffic': 'foot_traffic',
+  'crime': 'crime',
+  'crime_score': 'crime',
+  'rent': 'rent_score',
+  'rent_score': 'rent_score',
+  'demographic': 'demographic',
+  'demographics': 'demographic',
+  'flood': 'flood_risk',
+  'flood_risk': 'flood_risk',
+  'poi': 'poi',
+  'points_of_interest': 'poi',
+};
 
 interface ChatbotDrawerProps {
   isOpen: boolean;
@@ -35,63 +43,75 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
   const { sendToGemini } = useGeminiStore();
   const { setFilters } = useFilterStore();
 
- const handleSend = async () => {
-  const userMsg = input.trim();
-  if (!userMsg) return;
+  const handleSend = async () => {
+    const userMsg = input.trim();
+    if (!userMsg) return;
 
-  setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
-  setInput('');
-  setIsCollapsed(false);
-  setIsLoading(true);
+    setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
+    setInput('');
+    setIsCollapsed(false);
+    setIsLoading(true);
 
-  try {
-    const reply = await sendToGemini(userMsg);
-    console.log('[🧠 Gemini Reply]', reply);
+    try {
+      const reply = await sendToGemini(userMsg);
+      console.log('[🧠 Gemini Raw Reply]', reply);
 
-    // Always show something
-    const safeReply = typeof reply === 'string' ? reply : 'Bricky didn’t reply.';
+      const jsonMatch = reply.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No valid JSON block found');
 
-    // Match logic
-    const updatedFilters: any = {};
-    const normalized = safeReply.toLowerCase();
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('[✅ Parsed JSON]', parsed);
 
-    if (normalized.includes('asian')) {
-      updatedFilters.selectedEthnicities = ['Asian'];
+      // 🧬 Ethnicity Resolution
+      if (parsed.filters?.selectedEthnicities) {
+        const raw = parsed.filters.selectedEthnicities;
+        console.log('[🧬 Raw ethnicities]', raw);
+
+        const resolved = raw.flatMap((ethnicity: string) => {
+          const key = ethnicity.toLowerCase().replace(/[^a-z]/g, '');
+          return ETHNICITY_GROUPS[key] || [];
+        });
+
+        parsed.filters.selectedEthnicities = resolved;
+      }
+
+      // 📊 Weight Mapping Fix
+      if (parsed.filters?.weights) {
+        parsed.filters.weights = parsed.filters.weights
+          .map((w: { id: string; weight: number }) => {
+            const normalizedId = WEIGHT_KEY_MAP[w.id.toLowerCase()];
+            if (!normalizedId || isNaN(w.weight)) return null;
+
+            return {
+              id: normalizedId,
+              value: Math.min(1, Math.max(0, w.weight / 100)), // convert 100 to 1.0 scale
+            };
+          })
+          .filter(Boolean);
+      }
+
+      if (parsed.filters) {
+        console.log('[🧠 Final parsed filters]', parsed.filters);
+        setFilters(parsed.filters);
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: parsed.message || 'Filters updated!' },
+      ]);
+    } catch (err) {
+      console.error('[Gemini Error]', err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Bricky had trouble understanding. Try rephrasing your request.',
+        },
+      ]);
     }
-    if (normalized.includes('young')) {
-      updatedFilters.ageRange = [15, 30];
-    }
-    if (normalized.includes('middle-aged')) {
-      updatedFilters.ageRange = [35, 55];
-    }
-    if (normalized.includes('elderly') || normalized.includes('seniors')) {
-      updatedFilters.ageRange = [60, 100];
-    }
-    if (normalized.includes('low rent')) {
-      updatedFilters.rentRange = [0, 2500];
-    } else if (normalized.includes('medium rent')) {
-      updatedFilters.rentRange = [2500, 5000];
-    } else if (normalized.includes('high rent')) {
-      updatedFilters.rentRange = [5000, 10000];
-    }
 
-    if (Object.keys(updatedFilters).length > 0) {
-      setFilters(updatedFilters);
-    }
-
-    // ✅ Show reply in chat
-    setMessages((prev) => [...prev, { role: 'assistant', content: safeReply }]);
-  } catch (error) {
-    console.error('[Gemini Error]', error);
-    setMessages((prev) => [
-      ...prev,
-      { role: 'assistant', content: 'Sorry, something went wrong trying to answer that.' },
-    ]);
-  }
-
-  setIsLoading(false); // ✅ Always stop spinner
-};
-
+    setIsLoading(false);
+  };
 
   return (
     <Drawer isOpen={isOpen} placement="left" onClose={onClose} size="sm">
@@ -108,14 +128,10 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
       >
         <DrawerCloseButton />
 
-        {/* Header */}
         <Flex align="center" justify="space-between" px={4} pt={6} pb={2}>
-          <Text fontSize="lg" fontWeight="bold">
-            🧱 Bricky
-          </Text>
+          <Text fontSize="lg" fontWeight="bold">🧱 Bricky</Text>
         </Flex>
 
-        {/* Toggle Button */}
         <Box px={4} pb={4}>
           <Button
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -136,7 +152,6 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           </Button>
         </Box>
 
-        {/* Chat Body */}
         <Collapse in={!isCollapsed} animateOpacity>
           <DrawerBody display="flex" flexDirection="column" gap={4} pb={4}>
             <Box flex="1" overflowY="auto" maxH="400px">
@@ -166,7 +181,6 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
               )}
             </Box>
 
-            {/* Input */}
             <Flex gap={2}>
               <Input
                 ref={inputRef}

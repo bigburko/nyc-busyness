@@ -5,6 +5,29 @@ export async function POST(req: NextRequest) {
 
   console.log('✅ Gemini API route hit with message:', message);
 
+  const fallbackPrompt = `
+You are Bricky, an AI assistant helping entrepreneurs find resilient NYC neighborhoods.
+
+Reply ONLY with valid JSON in this format:
+
+{
+  "filters": {
+    "ageRange": [number, number],
+    "rentRange": [number, number],
+    "incomeRange": [number, number],
+    "selectedEthnicities": ["string"],
+    "selectedGenders": ["string"],
+    "weights": [
+      { "id": "foot_traffic", "weight": 40 },
+      { "id": "crime", "weight": 20 }
+    ]
+  },
+  "message": "Short summary of what you understood"
+}
+
+Only include filters you are confident about. Never add text outside the JSON block.
+  `;
+
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -15,7 +38,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+          { role: 'system', content: systemPrompt || fallbackPrompt },
           { role: 'user', content: message },
         ],
       }),
@@ -30,7 +53,7 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
     console.log('🧠 Gemini raw data:', data);
 
-    const reply = data.choices?.[0]?.message?.content || null;
+    const reply = data.choices?.[0]?.message?.content ?? null;
     return NextResponse.json({ reply });
   } catch (error) {
     console.error('❌ Gemini fetch failed:', error);
