@@ -17,19 +17,20 @@ import {
   AlertDialogBody,
   AlertDialogFooter,
 } from '@chakra-ui/react';
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
-import WeightingPanel, { Weighting, Layer } from './ScoreWeightingGroup/WeightingPanel';
-import MyRangeSlider from './MyRangeSlider';
-import MyAgeSlider from './DemographicGroup/AgeGroup/MyAgeSlider';
-import MyIncomeSlider from './DemographicGroup/MyIncomeGroup/MyIncomeSlider';
-import HierarchicalMultiSelect from './DemographicGroup/RaceDropDownGroup/HierarchicalMultiSelect';
-import { ethnicityData } from './DemographicGroup/RaceDropDownGroup/ethnicityData';
-import CancelResetButton from './ScoreWeightingGroup/CancelResetButton';
-import GenderSelect from './DemographicGroup/GenderGroup/GenderSelect';
-import CollapsibleSection from './CollapsibleSection';
+import { useFilterStore } from './filterStore';
+import WeightingPanel, { Weighting, Layer } from '../ScoreWeightingGroup/WeightingPanel';
+import MyRangeSlider from '../MyRangeSlider';
+import MyAgeSlider from '../DemographicGroup/AgeGroup/MyAgeSlider';
+import MyIncomeSlider from '../DemographicGroup/MyIncomeGroup/MyIncomeSlider';
+import HierarchicalMultiSelect from '../DemographicGroup/RaceDropDownGroup/HierarchicalMultiSelect';
+import { ethnicityData } from '../DemographicGroup/RaceDropDownGroup/ethnicityData';
+import CancelResetButton from '../ScoreWeightingGroup/CancelResetButton';
+import GenderSelect from '../DemographicGroup/GenderGroup/GenderSelect';
+import CollapsibleSection from '../CollapsibleSection';
 
 interface MyDrawerProps {
   isOpen: boolean;
@@ -43,8 +44,6 @@ interface MyDrawerProps {
     incomeRange: [number, number];
   }) => void;
 }
-
-
 
 const ALL_AVAILABLE_LAYERS: Layer[] = [
   { id: 'foot_traffic', label: 'Foot Traffic', icon: '🚶', color: '#4299E1' },
@@ -70,22 +69,56 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
   const drawerBodyRef = useRef<HTMLDivElement>(null);
   const selectWrapperRef = useRef<HTMLDivElement>(null);
 
-  const [activeWeights, setActiveWeights] = useState<Weighting[]>(INITIAL_WEIGHTS);
-  const [selectedEthnicities, setSelectedEthnicities] = useState<string[]>([]);
-  const [selectedGenders, setSelectedGenders] = useState<string[]>(['male', 'female']);
+  const {
+    weights: activeWeights,
+    rentRange: rangeValue,
+    ageRange,
+    incomeRange,
+    selectedEthnicities,
+    selectedGenders,
+    setFilters,
+  } = useFilterStore();
+
   const [dropdownInput, setDropdownInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(() => new Set<string>());
   const [_menuIsOpen, setMenuIsOpen] = useState(false);
-  const [rangeValue, setRangeValue] = useState<[number, number]>([26, 160]);
-  const [ageRange, setAgeRange] = useState<[number, number]>([0, 100]);
-  const [incomeRange, setIncomeRange] = useState<[number, number]>([0, 250000]);
-
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+
+  const handleRentRangeChange = useCallback((newVal: [number, number]) => {
+    if (JSON.stringify(newVal) !== JSON.stringify(rangeValue)) {
+      setFilters({ rentRange: newVal });
+    }
+  }, [rangeValue, setFilters]);
+
+  const handleAgeRangeChange = useCallback((newVal: [number, number]) => {
+    if (JSON.stringify(newVal) !== JSON.stringify(ageRange)) {
+      setFilters({ ageRange: newVal });
+    }
+  }, [ageRange, setFilters]);
+
+  const handleIncomeRangeChange = useCallback((newVal: [number, number]) => {
+    if (JSON.stringify(newVal) !== JSON.stringify(incomeRange)) {
+      setFilters({ incomeRange: newVal });
+    }
+  }, [incomeRange, setFilters]);
+
+  const handleGenderChange = useCallback((newVal: string[]) => {
+    if (JSON.stringify(newVal) !== JSON.stringify(selectedGenders)) {
+      setFilters({ selectedGenders: newVal });
+    }
+  }, [selectedGenders, setFilters]);
+
+  const handleEthnicityChange = useCallback((newVal: string[]) => {
+    if (JSON.stringify(newVal) !== JSON.stringify(selectedEthnicities)) {
+      setFilters({ selectedEthnicities: newVal });
+    }
+  }, [selectedEthnicities, setFilters]);
 
   const normalizeWeights = (weights: Weighting[]): Weighting[] => {
     const total = weights.reduce((sum, w) => sum + w.value, 0);
     if (total === 0) {
+      if (weights.length === 0) return [];
       const equalValue = 100 / weights.length;
       return weights.map(w => ({ ...w, value: equalValue }));
     }
@@ -97,6 +130,13 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
     }
     return normalized.map(w => ({ ...w, value: Math.round(w.value) }));
   };
+
+  const handleWeightChange = useCallback((newWeights: Weighting[]) => {
+    const normalized = normalizeWeights(newWeights);
+    if (JSON.stringify(normalized) !== JSON.stringify(activeWeights)) {
+        setFilters({ weights: normalized });
+    }
+  }, [activeWeights, setFilters]);
 
   const handleSubmit = () => {
     if (!selectedGenders.length) {
@@ -146,7 +186,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                   heading="Rent (PSF)"
                   toolTipText="Target Average Rent cost per Square foot in $USD"
                   defaultRange={rangeValue}
-                  onChange={setRangeValue}
+                  onChangeEnd={handleRentRangeChange}
                 />
               </Box>
 
@@ -157,15 +197,15 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                   tooltip="Customize your target audience by age, income, gender, and race"
                 >
                   <Flex direction="column" gap={4}>
-                    <MyAgeSlider value={ageRange} onChange={setAgeRange} />
-                    <MyIncomeSlider value={incomeRange} onChange={setIncomeRange} />
-                    <GenderSelect value={selectedGenders} onChange={setSelectedGenders} />
+                    <MyAgeSlider value={ageRange} onChangeEnd={handleAgeRangeChange} />
+                    <MyIncomeSlider value={incomeRange} onChangeEnd={handleIncomeRangeChange} />
+                    <GenderSelect value={selectedGenders} onChange={handleGenderChange} />
 
                     <Box mt={2} ref={ethnicityRef} borderRadius="md" minHeight="60px">
                       <HierarchicalMultiSelect
                         data={ethnicityData}
                         label="Select Ethnicities"
-                        onChange={setSelectedEthnicities}
+                        onChange={handleEthnicityChange}
                         autoFocus={false}
                         onMenuOpenChange={(isOpen) => {
                           setMenuIsOpen(isOpen);
@@ -217,14 +257,14 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                             return { ...w, value: share };
                           }),
                         ];
-                      setActiveWeights(normalizeWeights(updated));
+                      handleWeightChange(updated);
                     }}
-                    onRemove={id => setActiveWeights(normalizeWeights(activeWeights.filter(w => w.id !== id)))}
+                    onRemove={id => handleWeightChange(activeWeights.filter(w => w.id !== id))}
                     onAdd={layer => {
                       const newValue = 15;
                       const scaled = activeWeights.map(w => ({ ...w, value: w.value * (1 - newValue / 100) }));
                       const updated = [...scaled, { ...layer, value: newValue }];
-                      setActiveWeights(normalizeWeights(updated));
+                      handleWeightChange(updated);
                     }}
                   />
                   <Flex justify="center" w="100%" mt={4}>
@@ -275,7 +315,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
             <AlertDialogFooter>
               <CancelResetButton ref={cancelRef} onClick={() => setIsResetDialogOpen(false)} />
               <Button colorScheme="red" onClick={() => {
-                setActiveWeights(INITIAL_WEIGHTS);
+                setFilters({ weights: INITIAL_WEIGHTS });
                 setIsResetDialogOpen(false);
               }} ml={3}>
                 Reset

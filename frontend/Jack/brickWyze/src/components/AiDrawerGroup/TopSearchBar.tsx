@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Box,
   Button,
   Flex,
   IconButton,
@@ -11,10 +10,24 @@ import {
 import { FiSliders } from 'react-icons/fi';
 import { SearchIcon } from '@chakra-ui/icons';
 import { useRef } from 'react';
-import MyDrawer from '../MyDrawer';
-import ChatbotDrawer from './ChatbotDrawer'; // ✅ adjust path as needed
+import MyDrawer from './MyDrawer';
+import ChatbotDrawer from './ChatbotDrawer';
+import { Weighting } from '../ScoreWeightingGroup/WeightingPanel';
 
-export default function TopSearchBar() {
+interface SearchFilters {
+  weights: Weighting[];
+  rentRange: [number, number];
+  selectedEthnicities: string[];
+  selectedGenders: string[];
+  ageRange: [number, number];
+  incomeRange: [number, number];
+}
+
+export default function TopSearchBar({
+  onSearchSubmit,
+}: {
+  onSearchSubmit: (filters: SearchFilters) => void;
+}) {
   const {
     isOpen: isDrawerOpen,
     onOpen: openDrawer,
@@ -86,8 +99,8 @@ export default function TopSearchBar() {
         isOpen={isDrawerOpen}
         onClose={closeDrawer}
         onSearchSubmit={(filters) => {
-          console.log('Submitted filters:', filters);
-          // TODO: Trigger edge function or update Zustand state
+          console.log('🔍 Submitted filters:', filters);
+          onSearchSubmit(filters); // ✅ Forward to Page component
         }}
       />
 

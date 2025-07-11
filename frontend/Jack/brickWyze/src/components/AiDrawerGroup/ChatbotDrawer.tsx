@@ -26,7 +26,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false); // 🟢 default to expanded
 
   const handleSend = () => {
     if (input.trim() === '') return;

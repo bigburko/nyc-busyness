@@ -5,7 +5,7 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Weighting } from '@/components/ScoreWeightingGroup/WeightingPanel';
 
-// ✅ Dynamically import map only (MyDrawer is now inside TopSearchBar)
+// ✅ Dynamically import components
 const Map = dynamic(() => import('@/components/MapGroup/Map'), { ssr: false });
 const TopSearchBar = dynamic(() => import('@/components/AiDrawerGroup/TopSearchBar'), { ssr: false });
 
@@ -22,14 +22,14 @@ export default function Page() {
   const [searchFilters, setSearchFilters] = useState<SearchFilters | null>(null);
 
   const handleSearchSubmit = (filters: SearchFilters) => {
-    console.log('[Search Submitted]', filters);
+    console.log('[Page.tsx] 🔎 Received filters:', filters);
     setSearchFilters(filters);
   };
 
   return (
     <Box position="relative" height="100vh" width="100vw" overflow="hidden">
       {/* Top floating search bar */}
-      <TopSearchBar />
+      <TopSearchBar onSearchSubmit={handleSearchSubmit} />
 
       {/* Map receives the current filters */}
       <Map
