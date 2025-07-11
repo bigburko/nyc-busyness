@@ -1,9 +1,9 @@
-// src/components/AiDrawerGroup/geminiStore.ts
+// src/components/BrickyAiGroup/geminiStore.ts
 import { create } from 'zustand';
 
 interface GeminiStore {
   lastMessage: string;
-  sendToGemini: (message: string) => void;
+  sendToGemini: (message: string) => Promise<string>;
 }
 
 export const useGeminiStore = create<GeminiStore>((set) => ({
@@ -17,5 +17,6 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
 
     const data = await res.json();
     set({ lastMessage: data.reply });
+    return data.reply; // ✅ return it
   },
 }));

@@ -13,9 +13,12 @@ import {
   IconButton,
   Collapse,
   Button,
+  Spinner,
 } from '@chakra-ui/react';
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import { useRef, useState } from 'react';
+import { useGeminiStore } from './BrickyAiGroup/geminiStore'; // ✅ Zustand Gemini store
+import { useFilterStore } from '../DrawerGroup/filterStore';   // ✅ Zustand filter store
 
 interface ChatbotDrawerProps {
   isOpen: boolean;
@@ -24,16 +27,71 @@ interface ChatbotDrawerProps {
 
 export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
   const [input, setInput] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(false); // 🟢 default to expanded
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = () => {
-    if (input.trim() === '') return;
-    setMessages((prev) => [...prev, input]);
-    setInput('');
-    setIsCollapsed(false); // Auto-expand on message
-  };
+  const { sendToGemini } = useGeminiStore();
+  const { setFilters } = useFilterStore();
+
+ const handleSend = async () => {
+  const userMsg = input.trim();
+  if (!userMsg) return;
+
+  setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
+  setInput('');
+  setIsCollapsed(false);
+  setIsLoading(true);
+
+  try {
+    const reply = await sendToGemini(userMsg);
+    console.log('[🧠 Gemini Reply]', reply);
+
+    // Always show something
+    const safeReply = typeof reply === 'string' ? reply : 'Bricky didn’t reply.';
+
+    // Match logic
+    const updatedFilters: any = {};
+    const normalized = safeReply.toLowerCase();
+
+    if (normalized.includes('asian')) {
+      updatedFilters.selectedEthnicities = ['Asian'];
+    }
+    if (normalized.includes('young')) {
+      updatedFilters.ageRange = [15, 30];
+    }
+    if (normalized.includes('middle-aged')) {
+      updatedFilters.ageRange = [35, 55];
+    }
+    if (normalized.includes('elderly') || normalized.includes('seniors')) {
+      updatedFilters.ageRange = [60, 100];
+    }
+    if (normalized.includes('low rent')) {
+      updatedFilters.rentRange = [0, 2500];
+    } else if (normalized.includes('medium rent')) {
+      updatedFilters.rentRange = [2500, 5000];
+    } else if (normalized.includes('high rent')) {
+      updatedFilters.rentRange = [5000, 10000];
+    }
+
+    if (Object.keys(updatedFilters).length > 0) {
+      setFilters(updatedFilters);
+    }
+
+    // ✅ Show reply in chat
+    setMessages((prev) => [...prev, { role: 'assistant', content: safeReply }]);
+  } catch (error) {
+    console.error('[Gemini Error]', error);
+    setMessages((prev) => [
+      ...prev,
+      { role: 'assistant', content: 'Sorry, something went wrong trying to answer that.' },
+    ]);
+  }
+
+  setIsLoading(false); // ✅ Always stop spinner
+};
+
 
   return (
     <Drawer isOpen={isOpen} placement="left" onClose={onClose} size="sm">
@@ -57,7 +115,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           </Text>
         </Flex>
 
-        {/* Toggle styled like collapsible section */}
+        {/* Toggle Button */}
         <Box px={4} pb={4}>
           <Button
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -79,9 +137,8 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
         </Box>
 
         {/* Chat Body */}
-        <Collapse in={!isCollapsed} animateOpacity style={{ overflow: 'auto' }}>
+        <Collapse in={!isCollapsed} animateOpacity>
           <DrawerBody display="flex" flexDirection="column" gap={4} pb={4}>
-            {/* Message list */}
             <Box flex="1" overflowY="auto" maxH="400px">
               {messages.length === 0 ? (
                 <Text color="gray.500" textAlign="center" mt={10}>
@@ -91,16 +148,21 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
                 messages.map((msg, idx) => (
                   <Box
                     key={idx}
-                    bg="orange.100"
+                    bg={msg.role === 'user' ? 'orange.100' : 'gray.100'}
                     borderRadius="md"
                     p={2}
                     mb={2}
                     maxW="80%"
-                    ml="auto"
+                    ml={msg.role === 'user' ? 'auto' : '0'}
                   >
-                    <Text>{msg}</Text>
+                    <Text>{msg.content}</Text>
                   </Box>
                 ))
+              )}
+              {isLoading && (
+                <Box textAlign="center" mt={2}>
+                  <Spinner color="orange.400" size="sm" />
+                </Box>
               )}
             </Box>
 

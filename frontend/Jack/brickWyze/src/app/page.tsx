@@ -7,7 +7,7 @@ import { Weighting } from '@/components/ScoreWeightingGroup/WeightingPanel';
 
 // ✅ Dynamically import components
 const Map = dynamic(() => import('@/components/MapGroup/Map'), { ssr: false });
-const TopSearchBar = dynamic(() => import('@/components/AiDrawerGroup/TopSearchBar'), { ssr: false });
+const TopSearchBar = dynamic(() => import('@/components/DrawerGroup/TopSearchBar'), { ssr: false });
 
 interface SearchFilters {
   weights: Weighting[];
