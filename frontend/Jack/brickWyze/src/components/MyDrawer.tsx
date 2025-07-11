@@ -7,7 +7,6 @@ import {
   DrawerOverlay,
   DrawerContent,
   DrawerCloseButton,
-  useDisclosure,
   Flex,
   Box,
   Button,
@@ -19,7 +18,6 @@ import {
   AlertDialogFooter,
 } from '@chakra-ui/react';
 import { useRef, useState } from 'react';
-import { FiSliders } from 'react-icons/fi'; // ✅ Import icon (matches image)
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
@@ -34,6 +32,8 @@ import GenderSelect from './DemographicGroup/GenderGroup/GenderSelect';
 import CollapsibleSection from './CollapsibleSection';
 
 interface MyDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
   onSearchSubmit: (filters: {
     weights: Weighting[];
     rentRange: [number, number];
@@ -43,6 +43,8 @@ interface MyDrawerProps {
     incomeRange: [number, number];
   }) => void;
 }
+
+
 
 const ALL_AVAILABLE_LAYERS: Layer[] = [
   { id: 'foot_traffic', label: 'Foot Traffic', icon: '🚶', color: '#4299E1' },
@@ -62,8 +64,7 @@ const INITIAL_WEIGHTS: Weighting[] = [
   { id: 'poi', label: 'Points of Interest', icon: '📍', color: '#9F7AEA', value: 5 },
 ];
 
-export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
@@ -115,25 +116,6 @@ export default function MyDrawer({ onSearchSubmit }: MyDrawerProps) {
 
   return (
     <main>
-        <Button
-          ref={btnRef}
-          onClick={onOpen}
-          leftIcon={<FiSliders />}
-          position="absolute"
-          top="16px"
-          left="16px"
-          zIndex={10}
-          borderRadius="full"
-          variant="outline"
-          border="1px solid #E2E8F0"
-          bg="orange"
-          _hover={{ bg: 'gray.50' }}
-          _active={{ bg: 'gray.100' }}
-        >
-          Filters
-        </Button>
-
-
       <Drawer
         isOpen={isOpen}
         onClose={onClose}

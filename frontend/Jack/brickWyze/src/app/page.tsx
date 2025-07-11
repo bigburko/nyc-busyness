@@ -5,9 +5,9 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Weighting } from '@/components/ScoreWeightingGroup/WeightingPanel';
 
-// ✅ Dynamically import both to prevent SSR mismatches
-const MyDrawer = dynamic(() => import('@/components/MyDrawer'), { ssr: false });
+// ✅ Dynamically import map only (MyDrawer is now inside TopSearchBar)
 const Map = dynamic(() => import('@/components/MapGroup/Map'), { ssr: false });
+const TopSearchBar = dynamic(() => import('@/components/AiDrawerGroup/TopSearchBar'), { ssr: false });
 
 interface SearchFilters {
   weights: Weighting[];
@@ -28,6 +28,10 @@ export default function Page() {
 
   return (
     <Box position="relative" height="100vh" width="100vw" overflow="hidden">
+      {/* Top floating search bar */}
+      <TopSearchBar />
+
+      {/* Map receives the current filters */}
       <Map
         weights={searchFilters?.weights}
         rentRange={searchFilters?.rentRange}
@@ -36,7 +40,6 @@ export default function Page() {
         ageRange={searchFilters?.ageRange}
         incomeRange={searchFilters?.incomeRange}
       />
-      <MyDrawer onSearchSubmit={handleSearchSubmit} />
     </Box>
   );
 }
