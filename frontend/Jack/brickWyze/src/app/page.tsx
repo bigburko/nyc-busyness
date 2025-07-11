@@ -2,9 +2,12 @@
 
 import { Box } from '@chakra-ui/react';
 import { useState } from 'react';
-import Map from '@/components/MapGroup/Map';
-import MyDrawer from '@/components/MyDrawer';
+import dynamic from 'next/dynamic';
 import { Weighting } from '@/components/ScoreWeightingGroup/WeightingPanel';
+
+// ✅ Dynamically import both to prevent SSR mismatches
+const MyDrawer = dynamic(() => import('@/components/MyDrawer'), { ssr: false });
+const Map = dynamic(() => import('@/components/MapGroup/Map'), { ssr: false });
 
 interface SearchFilters {
   weights: Weighting[];
