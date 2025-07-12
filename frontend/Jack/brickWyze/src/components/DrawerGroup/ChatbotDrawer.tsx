@@ -17,6 +17,16 @@ const WEIGHT_KEY_MAP: Record<string, string> = {
   'poi': 'poi', 'points_of_interest': 'poi',
 };
 
+// Weight normalization helper
+function normalizeWeight(weight: number): number {
+  // Handle decimal weights (0.75 → 75)
+  if (weight <= 1) {
+    return Math.round(weight * 100);
+  }
+  // Handle already normalized weights
+  return Math.round(Math.min(100, Math.max(0, weight)));
+}
+
 interface ChatbotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -44,6 +54,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
 
     try {
       const reply = await sendToGemini(userMsg);
+      console.log('[Gemini Raw Reply]', reply);
       const jsonMatch = reply.match(/```json\n([\s\S]*?)\n```/);
       if (!jsonMatch || !jsonMatch[1]) {
         throw new Error('No valid JSON code block found in AI response.');
@@ -57,6 +68,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
 
       if (parsed.filters) {
         const aiFilters = parsed.filters;
+        console.log('[Gemini Filters]', aiFilters);
 
         if (aiFilters.rentRange && Array.isArray(aiFilters.rentRange)) {
           let [min, max] = aiFilters.rentRange;
@@ -84,26 +96,63 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           updates.incomeRange = [min, max];
         }
 
-        if (aiFilters.selectedGenders) {
+        // IMPROVED GENDER HANDLING - Always keep at least one selected
+        if (aiFilters.selectedGenders && Array.isArray(aiFilters.selectedGenders)) {
           const normalize = (g: string) => {
             const val = g.toLowerCase();
             if (['female', 'woman', 'f'].includes(val)) return 'female';
             if (['male', 'man', 'm'].includes(val)) return 'male';
             return null;
           };
-          updates.selectedGenders = aiFilters.selectedGenders.map(normalize).filter(Boolean);
+          
+          const normalizedGenders = aiFilters.selectedGenders.map(normalize).filter(Boolean);
+          
+          // Ensure at least one gender is always selected
+          if (normalizedGenders.length === 0) {
+            // Don't update - keep current selection
+            console.log('⏸️ AI returned empty genders - keeping current selection');
+          } else {
+            updates.selectedGenders = normalizedGenders;
+            console.log('[📍Updated Genders]', normalizedGenders);
+          }
         }
 
+        // IMPROVED ETHNICITY HANDLING - Don't clear when AI asks questions
         if (aiFilters.selectedEthnicities) {
-          updates.selectedEthnicities = resolveEthnicities(aiFilters.selectedEthnicities);
+          console.log('[Raw Ethnicity Input]', aiFilters.selectedEthnicities);
+          
+          if (aiFilters.selectedEthnicities.length === 0) {
+            // Don't update filters when AI returns empty array (asking for clarification)
+            console.log('⏸️ AI returned empty ethnicities - not updating filters');
+          } else {
+            const resolved = resolveEthnicities(aiFilters.selectedEthnicities);
+            
+            if (resolved.length === 0) {
+              // Fallback: warn user about unrecognized ethnicities
+              console.warn('⚠️ No ethnicities were resolved from:', aiFilters.selectedEthnicities);
+              setMessages((prev) => [...prev, {
+                role: 'assistant', 
+                content: `I couldn't recognize the ethnicity terms: ${aiFilters.selectedEthnicities.join(', ')}. Try terms like "South Asian", "Black", "Hispanic", etc.`
+              }]);
+            } else {
+              // 🎯 REPLACE previous selection
+              updates.selectedEthnicities = resolved;
+              console.log('[📍Final Resolved Ethnicities (REPLACED)]', updates.selectedEthnicities);
+            }
+          }
         }
 
+        // IMPROVED WEIGHT HANDLING
         if (aiFilters.weights && Array.isArray(aiFilters.weights)) {
           const newWeights = [...currentState.weights];
           aiFilters.weights.forEach((aiWeight: { id: string; weight: number }) => {
             const id = WEIGHT_KEY_MAP[aiWeight.id.toLowerCase()] || aiWeight.id;
+            const normalizedWeight = normalizeWeight(aiWeight.weight);
             const i = newWeights.findIndex(w => w.id === id);
-            if (i !== -1) newWeights[i].value = Math.round(aiWeight.weight);
+            if (i !== -1) {
+              newWeights[i].value = normalizedWeight;
+              console.log(`🎯 Normalized weight ${aiWeight.id}: ${aiWeight.weight} → ${normalizedWeight}`);
+            }
           });
           updates.weights = newWeights;
         }
@@ -160,6 +209,24 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
             _active={{ bg: '#ffcbb3' }}
           >
             Ask Bricky anything about NYC neighborhoods...
+          </Button>
+          
+          {/* Clear Filters Button */}
+          <Button
+            onClick={() => {
+              useFilterStore.getState().reset();
+              setMessages((prev) => [...prev, {
+                role: 'assistant',
+                content: 'All filters have been cleared! 🧹'
+              }]);
+            }}
+            size="sm"
+            colorScheme="gray"
+            variant="outline"
+            w="100%"
+            mt={2}
+          >
+            Clear All Filters
           </Button>
         </Box>
         <Collapse in={!isCollapsed} animateOpacity>
