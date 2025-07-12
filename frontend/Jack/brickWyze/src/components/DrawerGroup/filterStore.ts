@@ -30,18 +30,20 @@ export interface FilterState {
   reset: () => void;
 }
 
-// --- INITIAL STATE ---
+// --- INITIAL STATE (Updated to your new requirements) ---
 export const INITIAL_WEIGHTS: Weighting[] = [
-  { id: 'foot_traffic', label: 'Foot Traffic', value: 30, icon: '🚶', color: '#4299E1' },
-  { id: 'demographic', label: 'Demographics', value: 30, icon: '👥', color: '#48BB78' },
-  { id: 'crime', label: 'Crime Score', value: 20, icon: '🚨', color: '#E53E3E' },
-  { id: 'rent_score', label: 'Rent Score', value: 20, icon: '💰', color: '#ED8936' },
+  { id: 'foot_traffic', label: 'Foot Traffic', value: 35, icon: '🚶', color: '#4299E1' },
+  { id: 'demographic', label: 'Demographics', value: 25, icon: '👥', color: '#48BB78' },
+  { id: 'crime', label: 'Crime Score', value: 15, icon: '🚨', color: '#E53E3E' },
+  { id: 'flood_risk', label: 'Flood Risk', value: 10, icon: '🌊', color: '#3182CE' },
+  { id: 'rent_score', label: 'Rent Score', value: 10, icon: '💰', color: '#ED8936' },
+  { id: 'poi', label: 'Points of Interest', value: 5, icon: '📍', color: '#805AD5' },
 ];
 
 const INITIAL_STATE = {
   weights: INITIAL_WEIGHTS,
   rentRange: [26, 160] as [number, number],
-  ageRange: [18, 65] as [number, number],
+  ageRange: [0, 100] as [number, number],        // Updated to 0-100
   incomeRange: [0, 250000] as [number, number],
   selectedEthnicities: [] as string[],
   selectedGenders: ['male', 'female'] as string[],

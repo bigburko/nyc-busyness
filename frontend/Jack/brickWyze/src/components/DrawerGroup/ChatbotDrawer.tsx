@@ -89,7 +89,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
 
         if (aiFilters.incomeRange && Array.isArray(aiFilters.incomeRange)) {
           let [min, max] = aiFilters.incomeRange;
-          const MIN = 0, MAX = 100_000, GAP = 5000;
+          const MIN = 0, MAX = 250000, GAP = 5000;
           min = Math.max(MIN, Math.min(min || MIN, MAX));
           max = Math.max(MIN, Math.min(max || MAX, MAX));
           if (max - min < GAP) max = Math.min(MAX, min + GAP);
@@ -142,15 +142,15 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           }
         }
 
-        // IMPROVED WEIGHT HANDLING
+        // IMPROVED WEIGHT HANDLING (Updated to work with your existing weight structure)
         if (aiFilters.weights && Array.isArray(aiFilters.weights)) {
           const newWeights = [...currentState.weights];
           aiFilters.weights.forEach((aiWeight: { id: string; weight: number }) => {
             const id = WEIGHT_KEY_MAP[aiWeight.id.toLowerCase()] || aiWeight.id;
             const normalizedWeight = normalizeWeight(aiWeight.weight);
-            const i = newWeights.findIndex(w => w.id === id);
-            if (i !== -1) {
-              newWeights[i].value = normalizedWeight;
+            const weightIndex = newWeights.findIndex(w => w.id === id);
+            if (weightIndex !== -1) {
+              newWeights[weightIndex] = { ...newWeights[weightIndex], value: normalizedWeight };
               console.log(`🎯 Normalized weight ${aiWeight.id}: ${aiWeight.weight} → ${normalizedWeight}`);
             }
           });
@@ -161,11 +161,19 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
       console.log('[SetFilters Payload]', updates);
       if (Object.keys(updates).length > 0) {
         setFilters(updates);
+        // Enhanced logging for debugging
+        console.log('🎯 [Final Filter State]', useFilterStore.getState());
       }
+
+      // Enhanced user feedback
+      const ethnicityCount = updates.selectedEthnicities?.length || 0;
+      const feedbackMessage = parsed.message + 
+        (ethnicityCount > 0 ? ` (${ethnicityCount} ethnicities selected)` : '') || 
+        'Filters updated!';
 
       setMessages((prev) => [...prev, {
         role: 'assistant',
-        content: parsed.message || 'Filters updated!',
+        content: feedbackMessage,
       }]);
     } catch (err) {
       console.error('[Bricky Drawer Error]', err);
@@ -211,13 +219,13 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
             Ask Bricky anything about NYC neighborhoods...
           </Button>
           
-          {/* Clear Filters Button */}
+          {/* Reset to Default Weights Button */}
           <Button
             onClick={() => {
               useFilterStore.getState().reset();
               setMessages((prev) => [...prev, {
                 role: 'assistant',
-                content: 'All filters have been cleared! 🧹'
+                content: 'All filters have been reset to defaults! 🔄 (35% foot traffic, 25% demographic, 15% crime, 10% flood risk, 10% rent, 5% POI)'
               }]);
             }}
             size="sm"
@@ -226,8 +234,39 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
             w="100%"
             mt={2}
           >
-            Clear All Filters
+            Reset to Default Weights
           </Button>
+
+          {/* Quick Action Buttons */}
+          <Flex gap={2} mt={2} wrap="wrap">
+            <Button 
+              size="xs" 
+              onClick={() => setInput("Show me diverse neighborhoods")}
+              bg="blue.100"
+              color="blue.800"
+              _hover={{ bg: "blue.200" }}
+            >
+              🌍 Diverse
+            </Button>
+            <Button 
+              size="xs" 
+              onClick={() => setInput("Low crime areas")}
+              bg="green.100"
+              color="green.800"
+              _hover={{ bg: "green.200" }}
+            >
+              🛡️ Safe
+            </Button>
+            <Button 
+              size="xs" 
+              onClick={() => setInput("High foot traffic")}
+              bg="orange.100"
+              color="orange.800"
+              _hover={{ bg: "orange.200" }}
+            >
+              🚶 Busy
+            </Button>
+          </Flex>
         </Box>
         <Collapse in={!isCollapsed} animateOpacity>
           <DrawerBody display="flex" flexDirection="column" gap={4} pb={4}>

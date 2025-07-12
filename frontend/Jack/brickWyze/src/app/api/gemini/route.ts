@@ -37,14 +37,20 @@ GENDER RULES:
 - If user asks for "women" use ["female"], if "men" use ["male"]
 - Otherwise always include both genders
 
+WEIGHT RULES:
+- Default weights are: foot_traffic(35%), demographic(25%), crime(15%), flood_risk(10%), rent_score(10%), poi(5%)
+- Only include weights if user specifically wants to change them
+- Weight IDs: "foot_traffic", "crime", "demographic", "rent_score", "flood_risk", "poi"
+- Values: 0-100 integers that should roughly sum to 100
+
 IMPORTANT: 
 - Only return empty selectedEthnicities array when truly asking for clarification
 - Each query REPLACES previous ethnicity selection
 - Don't include weight/range data unless user specifically mentions them
 - Always preserve gender selection unless explicitly requested to change
+- Age range defaults to [0, 100] - only change if user specifies age preferences
 
-WEIGHT IDs: "foot_traffic", "crime", "demographic", "rent_score", "flood_risk", "poi"
-RANGES: rentRange [26, 160], ageRange [18, 85], incomeRange [0, 250000]
+RANGES: rentRange [26, 160], ageRange [0, 100], incomeRange [0, 250000]
 
 Do NOT include explanations outside JSON block.
 `;
