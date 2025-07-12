@@ -298,11 +298,12 @@ export default function HierarchicalMultiSelect({
         if (isComplete) {
           pills.push({
             type: 'group',
-            label: `${node.label} (${leaves.length})`,
+            label: node.label,
             value: `group_${node.value}`,
             groupChildren: leaves.map(leaf => leaf.value),
             level: node.level,
           });
+
           leaves.forEach(leaf => processedValues.add(leaf.value));
         } else {
           processNodesRecursively(node.children);
@@ -488,61 +489,81 @@ export default function HierarchicalMultiSelect({
         getOptionValue={opt => opt.value}
         options={selectableFilteredOptions}
         isClearable
-        menuIsOpen={menuIsOpen}
-        onMenuOpen={() => {
-          if (!menuIsOpen) {
-            setMenuIsOpen(true);
-          }
-        }}
-        onMenuClose={() => {
-          setMenuIsOpen(false);
-          setMenuIsOpenExternal?.(false);
-        }}
-        menuPosition="absolute"
         menuPlacement="bottom"
+
+
+
         // ✅ FIXED: Restored the complete chakraStyles object.
         chakraStyles={{
           container: provided => ({
-            ...provided,
-            backgroundColor: 'white',
-            width: '100%',
-          }),
+              ...provided,
+              backgroundColor: 'white',
+              width: '100%',
+              borderRadius: 'full',
+              position: "relative",
+            }),
+
           control: (provided, state) => ({
+              ...provided,
+              backgroundColor: 'white !important',
+              borderColor: '#E2E8F0',
+              boxShadow: 'none !important',
+              outline: 'none !important', // ✅ this line fully removes the blue edge
+              minHeight: '48px',
+              height: 'auto',
+              width: '100%',
+              borderTopLeftRadius: '16px',
+              borderTopRightRadius: '16px',
+              borderBottomLeftRadius: state.menuIsOpen ? '0px' : '16px',
+              borderBottomRightRadius: state.menuIsOpen ? '0px' : '16px',
+              borderBottomWidth: state.menuIsOpen ? '0px' : '1px',
+              transition: 'all 0.2s ease',
+              paddingTop: '2px',
+              paddingBottom: '2px',
+              '&:hover': {
+                borderColor: '#CBD5E0',
+              },
+            }),
+
+
+
+
+
+          valueContainer: (provided) => ({
+              ...provided,
+              padding: '2px 8px',
+              maxWidth: '100%',
+              flexWrap: 'wrap',
+              overflow: 'hidden',            // ✅ prevent spill
+            }),
+
+          menu: (provided) => ({
             ...provided,
             backgroundColor: 'white',
-            borderColor: state.isFocused ? '#FF492C' : '#E2E8F0',
-            boxShadow: state.isFocused ? '0 0 0 1px #FF492C' : 'none',
-            minHeight: 'auto',
+            border: '1px solid #CBD5E0',
+            borderTop: 'none',
+            borderBottomLeftRadius: '16px',
+            borderBottomRightRadius: '16px',
+            marginTop: '0px',
+            boxShadow: 'none',
             width: '100%',
-            '&:hover': {
-              borderColor: state.isFocused ? '#FF492C' : '#CBD5E0',
-            },
+            overflow: 'hidden',
+            outline: '1px solid #CBD5E0',
+            outlineOffset: '-1px',
+            position: 'relative', // ✅ Ensure it's in document flow
           }),
-          valueContainer: provided => ({
-            ...provided,
-            padding: '2px 8px',
-            maxWidth: '100%',
-            flexWrap: 'wrap',
-          }),
-          menu: provided => ({
-            ...provided,
-            backgroundColor: 'white',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            marginTop: '4px',
-            width: '100%',
-            zIndex: 100,
-            maxHeight: undefined,
-            height: 'auto',
-            overflow: 'visible',
-          }),
+
+
+
           menuList: provided => ({
             ...provided,
             backgroundColor: '#FAFAFA',
-            padding: '4px',
+            paddingTop: '8px',
+            paddingBottom: '8px',
             maxHeight: '380px',
             overflowY: 'auto',
           }),
+
         }}
         components={{
           MenuList: CustomMenuList,

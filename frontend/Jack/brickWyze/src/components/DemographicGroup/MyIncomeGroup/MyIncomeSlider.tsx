@@ -5,10 +5,10 @@ import MyRangeSlider from '../../MyRangeSlider';
 
 export default function MyIncomeSlider({
   value,
-  onChange,
+  onChangeEnd,
 }: {
   value: [number, number];
-  onChange: (range: [number, number]) => void;
+  onChangeEnd: (range: [number, number]) => void; // Use onChangeEnd
 }) {
   return (
     <MyRangeSlider
@@ -17,12 +17,12 @@ export default function MyIncomeSlider({
       min={0}
       max={250000}
       step={5000}
-      filledTrack="#68D391"        // green tone
+      filledTrack="#68D391"
       unFilledTrack="#C6F6D5"
-      showSymbol={true}            // ✅ keep dollar sign
+      showSymbol={true}
       symbol="$"
       toolTipText="Filter census tracts by household income range in USD"
-      onChange={onChange}
+      onChangeEnd={onChangeEnd} // Pass onChangeEnd through
     />
   );
 }

@@ -1,18 +1,33 @@
-// src/lib/theme.ts
-import { extendTheme, ThemeConfig } from '@chakra-ui/react';
+import { extendTheme, theme as baseTheme, ThemeConfig } from '@chakra-ui/react';
 
 const config: ThemeConfig = {
-  initialColorMode: 'light',  // 👈 Force light mode
+  initialColorMode: 'light',
   useSystemColorMode: false,
 };
 
 const theme = extendTheme({
+  ...baseTheme,
   config,
   styles: {
     global: {
       body: {
-        bg: '#FFDED8',       // 👈 match your drawer's light pink background
-        color: 'gray.800',   // 👈 ensure all text is dark and visible
+        bg: '#FFDED8',
+        color: 'gray.800',
+      },
+    },
+  },
+  colors: {
+    ...baseTheme.colors, // explicitly provide base colors
+  },
+  semanticTokens: {
+    colors: {
+      text: {
+        default: 'gray.800',
+        _dark: 'whiteAlpha.900',
+      },
+      background: {
+        default: '#FFDED8',
+        _dark: 'gray.800',
       },
     },
   },

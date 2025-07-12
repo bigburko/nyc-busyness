@@ -2,9 +2,12 @@
 
 import { Box } from '@chakra-ui/react';
 import { useState } from 'react';
-import Map from '@/components/MapGroup/Map';
-import MyDrawer from '@/components/MyDrawer';
+import dynamic from 'next/dynamic';
 import { Weighting } from '@/components/ScoreWeightingGroup/WeightingPanel';
+
+// ✅ Dynamically import components
+const Map = dynamic(() => import('@/components/MapGroup/Map'), { ssr: false });
+const TopSearchBar = dynamic(() => import('@/components/DrawerGroup/TopSearchBar'), { ssr: false });
 
 interface SearchFilters {
   weights: Weighting[];
@@ -19,12 +22,16 @@ export default function Page() {
   const [searchFilters, setSearchFilters] = useState<SearchFilters | null>(null);
 
   const handleSearchSubmit = (filters: SearchFilters) => {
-    console.log('[Search Submitted]', filters);
+    console.log('[Page.tsx] 🔎 Received filters:', filters);
     setSearchFilters(filters);
   };
 
   return (
     <Box position="relative" height="100vh" width="100vw" overflow="hidden">
+      {/* Top floating search bar */}
+      <TopSearchBar onSearchSubmit={handleSearchSubmit} />
+
+      {/* Map receives the current filters */}
       <Map
         weights={searchFilters?.weights}
         rentRange={searchFilters?.rentRange}
@@ -33,7 +40,6 @@ export default function Page() {
         ageRange={searchFilters?.ageRange}
         incomeRange={searchFilters?.incomeRange}
       />
-      <MyDrawer onSearchSubmit={handleSearchSubmit} />
     </Box>
   );
 }
