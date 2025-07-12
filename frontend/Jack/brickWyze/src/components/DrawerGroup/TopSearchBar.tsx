@@ -100,12 +100,19 @@ export default function TopSearchBar({
         onClose={closeDrawer}
         onSearchSubmit={(filters) => {
           console.log('🔍 Submitted filters:', filters);
-          onSearchSubmit(filters); // ✅ Forward to Page component
+          onSearchSubmit(filters);
         }}
       />
 
-      {/* Chatbot Drawer */}
-      <ChatbotDrawer isOpen={isChatbotOpen} onClose={closeChatbot} />
+      {/* Chatbot Drawer - FIX: Added missing isOpen and onClose props */}
+      <ChatbotDrawer 
+        isOpen={isChatbotOpen}
+        onClose={closeChatbot}
+        onSearchSubmit={(filters) => {
+          console.log('🤖 Bricky submitted filters:', filters);
+          onSearchSubmit(filters);
+        }}
+      />
     </>
   );
 }

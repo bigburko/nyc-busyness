@@ -17,22 +17,20 @@ const WEIGHT_KEY_MAP: Record<string, string> = {
   'poi': 'poi', 'points_of_interest': 'poi',
 };
 
-// Weight normalization helper
 function normalizeWeight(weight: number): number {
-  // Handle decimal weights (0.75 → 75)
   if (weight <= 1) {
     return Math.round(weight * 100);
   }
-  // Handle already normalized weights
   return Math.round(Math.min(100, Math.max(0, weight)));
 }
 
 interface ChatbotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onSearchSubmit: (filters: any) => void;  // 🎯 Same signature as MyDrawer
 }
 
-export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
+export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: ChatbotDrawerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
@@ -65,6 +63,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
 
       const currentState = useFilterStore.getState();
       const updates: Partial<FilterState> = {};
+      let shouldTriggerSearch = false;
 
       if (parsed.filters) {
         const aiFilters = parsed.filters;
@@ -76,6 +75,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           max = Math.min(160, max || 160);
           if (min > max) min = max - 5;
           updates.rentRange = [Math.max(26, min), max];
+          shouldTriggerSearch = true;
         }
 
         if (aiFilters.ageRange && Array.isArray(aiFilters.ageRange)) {
@@ -85,6 +85,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           max = Math.max(MIN, Math.min(max || MAX, MAX));
           if (max - min < GAP) max = Math.min(MAX, min + GAP);
           updates.ageRange = [min, max];
+          shouldTriggerSearch = true;
         }
 
         if (aiFilters.incomeRange && Array.isArray(aiFilters.incomeRange)) {
@@ -94,9 +95,9 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           max = Math.max(MIN, Math.min(max || MAX, MAX));
           if (max - min < GAP) max = Math.min(MAX, min + GAP);
           updates.incomeRange = [min, max];
+          shouldTriggerSearch = true;
         }
 
-        // IMPROVED GENDER HANDLING - Always keep at least one selected
         if (aiFilters.selectedGenders && Array.isArray(aiFilters.selectedGenders)) {
           const normalize = (g: string) => {
             const val = g.toLowerCase();
@@ -107,42 +108,37 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           
           const normalizedGenders = aiFilters.selectedGenders.map(normalize).filter(Boolean);
           
-          // Ensure at least one gender is always selected
           if (normalizedGenders.length === 0) {
-            // Don't update - keep current selection
             console.log('⏸️ AI returned empty genders - keeping current selection');
           } else {
             updates.selectedGenders = normalizedGenders;
+            shouldTriggerSearch = true;
             console.log('[📍Updated Genders]', normalizedGenders);
           }
         }
 
-        // IMPROVED ETHNICITY HANDLING - Don't clear when AI asks questions
         if (aiFilters.selectedEthnicities) {
           console.log('[Raw Ethnicity Input]', aiFilters.selectedEthnicities);
           
           if (aiFilters.selectedEthnicities.length === 0) {
-            // Don't update filters when AI returns empty array (asking for clarification)
             console.log('⏸️ AI returned empty ethnicities - not updating filters');
           } else {
             const resolved = resolveEthnicities(aiFilters.selectedEthnicities);
             
             if (resolved.length === 0) {
-              // Fallback: warn user about unrecognized ethnicities
               console.warn('⚠️ No ethnicities were resolved from:', aiFilters.selectedEthnicities);
               setMessages((prev) => [...prev, {
                 role: 'assistant', 
                 content: `I couldn't recognize the ethnicity terms: ${aiFilters.selectedEthnicities.join(', ')}. Try terms like "South Asian", "Black", "Hispanic", etc.`
               }]);
             } else {
-              // 🎯 REPLACE previous selection
               updates.selectedEthnicities = resolved;
+              shouldTriggerSearch = true;
               console.log('[📍Final Resolved Ethnicities (REPLACED)]', updates.selectedEthnicities);
             }
           }
         }
 
-        // IMPROVED WEIGHT HANDLING (Updated to work with your existing weight structure)
         if (aiFilters.weights && Array.isArray(aiFilters.weights)) {
           const newWeights = [...currentState.weights];
           aiFilters.weights.forEach((aiWeight: { id: string; weight: number }) => {
@@ -155,17 +151,25 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
             }
           });
           updates.weights = newWeights;
+          shouldTriggerSearch = true;
         }
       }
 
       console.log('[SetFilters Payload]', updates);
       if (Object.keys(updates).length > 0) {
         setFilters(updates);
-        // Enhanced logging for debugging
         console.log('🎯 [Final Filter State]', useFilterStore.getState());
+        
+        // 🎯 AUTO-TRIGGER SEARCH using your existing onSearchSubmit function
+        if (shouldTriggerSearch) {
+          setTimeout(() => {
+            const finalState = useFilterStore.getState();
+            console.log('🔍 [Bricky Auto-Search] Submitting:', finalState);
+            onSearchSubmit(finalState);
+          }, 500);
+        }
       }
 
-      // Enhanced user feedback
       const ethnicityCount = updates.selectedEthnicities?.length || 0;
       const feedbackMessage = parsed.message + 
         (ethnicityCount > 0 ? ` (${ethnicityCount} ethnicities selected)` : '') || 
@@ -173,7 +177,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
 
       setMessages((prev) => [...prev, {
         role: 'assistant',
-        content: feedbackMessage,
+        content: feedbackMessage + (shouldTriggerSearch ? ' 🔍 Searching map...' : ''),
       }]);
     } catch (err) {
       console.error('[Bricky Drawer Error]', err);
@@ -184,6 +188,19 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
     }
 
     setIsLoading(false);
+  };
+
+  const handleReset = () => {
+    useFilterStore.getState().reset();
+    setTimeout(() => {
+      const resetState = useFilterStore.getState();
+      console.log('🔄 [Bricky Reset] Submitting:', resetState);
+      onSearchSubmit(resetState);
+    }, 300);
+    setMessages((prev) => [...prev, {
+      role: 'assistant',
+      content: 'All filters have been reset to defaults! 🔄 Searching map...'
+    }]);
   };
 
   useEffect(() => {
@@ -219,15 +236,8 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
             Ask Bricky anything about NYC neighborhoods...
           </Button>
           
-          {/* Reset to Default Weights Button */}
           <Button
-            onClick={() => {
-              useFilterStore.getState().reset();
-              setMessages((prev) => [...prev, {
-                role: 'assistant',
-                content: 'All filters have been reset to defaults! 🔄 (35% foot traffic, 25% demographic, 15% crime, 10% flood risk, 10% rent, 5% POI)'
-              }]);
-            }}
+            onClick={handleReset}
             size="sm"
             colorScheme="gray"
             variant="outline"
@@ -237,7 +247,6 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
             Reset to Default Weights
           </Button>
 
-          {/* Quick Action Buttons */}
           <Flex gap={2} mt={2} wrap="wrap">
             <Button 
               size="xs" 

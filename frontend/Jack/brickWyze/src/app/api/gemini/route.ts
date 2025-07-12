@@ -25,6 +25,7 @@ RESPOND ONLY WITH VALID JSON IN A CODE BLOCK:
 \`\`\`
 
 ETHNICITY RULES:
+- For "diverse" or "mix of everything": use ["White", "Black", "Hispanic", "South Asian", "East Asian"] (5 major groups only)
 - ALWAYS provide specific ethnicity terms when user gives clear intent
 - Use: "South Asian", "East Asian", "Southeast Asian", "Black", "White", "Hispanic", "Middle Eastern"
 - For countries: "Chinese", "Korean", "Japanese", "Filipino", "Vietnamese", "Thai", "Indian", "Pakistani", "Mexican"
