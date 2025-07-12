@@ -1,5 +1,3 @@
-// src/components/DrawerGroup/ChatbotDrawer.tsx
-
 'use client';
 
 import {
@@ -12,8 +10,8 @@ import { useGeminiStore } from './BrickyAiGroup/geminiStore';
 import { useFilterStore, FilterState } from './filterStore';
 import { getEthnicityGroups } from './BrickyAiGroup/ethnicityUtils';
 
-// --- DATA MAPPINGS ---
 const ETHNICITY_GROUPS = getEthnicityGroups();
+
 const WEIGHT_KEY_MAP: Record<string, string> = {
   'foot_traffic': 'foot_traffic', 'crime': 'crime', 'crime_score': 'crime',
   'rent': 'rent_score', 'rent_score': 'rent_score', 'demographic': 'demographic',
@@ -62,6 +60,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
       if (parsed.filters) {
         const aiFilters = parsed.filters;
 
+        // ✅ Clamp rent range
         if (aiFilters.rentRange && Array.isArray(aiFilters.rentRange)) {
           let [aiMin, aiMax] = aiFilters.rentRange;
           let newMin = Math.max(26, aiMin || 26);
@@ -71,14 +70,58 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
         }
 
         if (aiFilters.ageRange && Array.isArray(aiFilters.ageRange)) {
-          updates.ageRange = [aiFilters.ageRange[0] || 0, aiFilters.ageRange[1] || 100];
+          let [minAge, maxAge] = aiFilters.ageRange;
+          const MIN_AGE = 0;
+          const MAX_AGE = 100;
+          const MIN_GAP = 2;
+
+          minAge = typeof minAge === 'number' ? minAge : MIN_AGE;
+          maxAge = typeof maxAge === 'number' ? maxAge : MAX_AGE;
+
+          minAge = Math.max(MIN_AGE, Math.min(minAge, MAX_AGE));
+          maxAge = Math.max(MIN_AGE, Math.min(maxAge, MAX_AGE));
+
+          if (maxAge - minAge < MIN_GAP) {
+            if (minAge + MIN_GAP <= MAX_AGE) {
+              maxAge = minAge + MIN_GAP;
+            } else {
+              minAge = maxAge - MIN_GAP;
+            }
+          }
+
+          updates.ageRange = [minAge, maxAge];
         }
 
-        if (aiFilters.incomeRange) {
-          updates.incomeRange = aiFilters.incomeRange;
+
+        // ✅ Clamp income range
+       if (aiFilters.incomeRange && Array.isArray(aiFilters.incomeRange)) {
+          let [minIncome, maxIncome] = aiFilters.incomeRange;
+          const MIN_INCOME = 0;
+          const MAX_INCOME = 100_000;
+          const MIN_GAP = 5000;
+
+          // Defaults
+          minIncome = typeof minIncome === 'number' ? minIncome : MIN_INCOME;
+          maxIncome = typeof maxIncome === 'number' ? maxIncome : MAX_INCOME;
+
+          // Clamp to bounds
+          minIncome = Math.max(MIN_INCOME, Math.min(minIncome, MAX_INCOME));
+          maxIncome = Math.max(MIN_INCOME, Math.min(maxIncome, MAX_INCOME));
+
+          // Enforce minimum gap
+          if (maxIncome - minIncome < MIN_GAP) {
+            if (minIncome + MIN_GAP <= MAX_INCOME) {
+              maxIncome = minIncome + MIN_GAP;
+            } else {
+              minIncome = maxIncome - MIN_GAP;
+            }
+          }
+
+          updates.incomeRange = [minIncome, maxIncome];
         }
 
-        // ✅ Gender normalization restored from original logic
+
+        // ✅ Gender normalization
         if (aiFilters.selectedGenders) {
           const normalize = (g: string) => {
             const val = g.toLowerCase();
@@ -89,6 +132,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           updates.selectedGenders = aiFilters.selectedGenders.map(normalize).filter(Boolean);
         }
 
+        // ✅ Ethnicity resolution
         if (aiFilters.selectedEthnicities) {
           const resolved = aiFilters.selectedEthnicities.flatMap(
             (eth: string) => ETHNICITY_GROUPS[eth.toLowerCase().replace(/[^a-z]/g, '')] || []
@@ -96,6 +140,7 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           updates.selectedEthnicities = Array.from(new Set(resolved));
         }
 
+        // ✅ Weight mapping
         if (aiFilters.weights && Array.isArray(aiFilters.weights)) {
           const newWeights = [...currentState.weights];
           aiFilters.weights.forEach((aiWeight: { id: string; weight: number }) => {
