@@ -8,9 +8,7 @@ import { SearchIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import { useRef, useState, useEffect } from 'react';
 import { useGeminiStore } from './BrickyAiGroup/geminiStore';
 import { useFilterStore, FilterState } from './filterStore';
-import { getEthnicityGroups } from './BrickyAiGroup/ethnicityUtils';
-
-const ETHNICITY_GROUPS = getEthnicityGroups();
+import { resolveEthnicities } from './BrickyAiGroup/resolveEthnicities';
 
 const WEIGHT_KEY_MAP: Record<string, string> = {
   'foot_traffic': 'foot_traffic', 'crime': 'crime', 'crime_score': 'crime',
@@ -60,68 +58,32 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
       if (parsed.filters) {
         const aiFilters = parsed.filters;
 
-        // ✅ Clamp rent range
         if (aiFilters.rentRange && Array.isArray(aiFilters.rentRange)) {
-          let [aiMin, aiMax] = aiFilters.rentRange;
-          let newMin = Math.max(26, aiMin || 26);
-          let newMax = Math.min(160, aiMax || 160);
-          if (newMin > newMax) newMin = newMax - 5;
-          updates.rentRange = [Math.max(26, newMin), newMax];
+          let [min, max] = aiFilters.rentRange;
+          min = Math.max(26, min || 26);
+          max = Math.min(160, max || 160);
+          if (min > max) min = max - 5;
+          updates.rentRange = [Math.max(26, min), max];
         }
 
         if (aiFilters.ageRange && Array.isArray(aiFilters.ageRange)) {
-          let [minAge, maxAge] = aiFilters.ageRange;
-          const MIN_AGE = 0;
-          const MAX_AGE = 100;
-          const MIN_GAP = 2;
-
-          minAge = typeof minAge === 'number' ? minAge : MIN_AGE;
-          maxAge = typeof maxAge === 'number' ? maxAge : MAX_AGE;
-
-          minAge = Math.max(MIN_AGE, Math.min(minAge, MAX_AGE));
-          maxAge = Math.max(MIN_AGE, Math.min(maxAge, MAX_AGE));
-
-          if (maxAge - minAge < MIN_GAP) {
-            if (minAge + MIN_GAP <= MAX_AGE) {
-              maxAge = minAge + MIN_GAP;
-            } else {
-              minAge = maxAge - MIN_GAP;
-            }
-          }
-
-          updates.ageRange = [minAge, maxAge];
+          let [min, max] = aiFilters.ageRange;
+          const MIN = 0, MAX = 100, GAP = 2;
+          min = Math.max(MIN, Math.min(min || MIN, MAX));
+          max = Math.max(MIN, Math.min(max || MAX, MAX));
+          if (max - min < GAP) max = Math.min(MAX, min + GAP);
+          updates.ageRange = [min, max];
         }
 
-
-        // ✅ Clamp income range
-       if (aiFilters.incomeRange && Array.isArray(aiFilters.incomeRange)) {
-          let [minIncome, maxIncome] = aiFilters.incomeRange;
-          const MIN_INCOME = 0;
-          const MAX_INCOME = 100_000;
-          const MIN_GAP = 5000;
-
-          // Defaults
-          minIncome = typeof minIncome === 'number' ? minIncome : MIN_INCOME;
-          maxIncome = typeof maxIncome === 'number' ? maxIncome : MAX_INCOME;
-
-          // Clamp to bounds
-          minIncome = Math.max(MIN_INCOME, Math.min(minIncome, MAX_INCOME));
-          maxIncome = Math.max(MIN_INCOME, Math.min(maxIncome, MAX_INCOME));
-
-          // Enforce minimum gap
-          if (maxIncome - minIncome < MIN_GAP) {
-            if (minIncome + MIN_GAP <= MAX_INCOME) {
-              maxIncome = minIncome + MIN_GAP;
-            } else {
-              minIncome = maxIncome - MIN_GAP;
-            }
-          }
-
-          updates.incomeRange = [minIncome, maxIncome];
+        if (aiFilters.incomeRange && Array.isArray(aiFilters.incomeRange)) {
+          let [min, max] = aiFilters.incomeRange;
+          const MIN = 0, MAX = 100_000, GAP = 5000;
+          min = Math.max(MIN, Math.min(min || MIN, MAX));
+          max = Math.max(MIN, Math.min(max || MAX, MAX));
+          if (max - min < GAP) max = Math.min(MAX, min + GAP);
+          updates.incomeRange = [min, max];
         }
 
-
-        // ✅ Gender normalization
         if (aiFilters.selectedGenders) {
           const normalize = (g: string) => {
             const val = g.toLowerCase();
@@ -132,23 +94,16 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
           updates.selectedGenders = aiFilters.selectedGenders.map(normalize).filter(Boolean);
         }
 
-        // ✅ Ethnicity resolution
         if (aiFilters.selectedEthnicities) {
-          const resolved = aiFilters.selectedEthnicities.flatMap(
-            (eth: string) => ETHNICITY_GROUPS[eth.toLowerCase().replace(/[^a-z]/g, '')] || []
-          );
-          updates.selectedEthnicities = Array.from(new Set(resolved));
+          updates.selectedEthnicities = resolveEthnicities(aiFilters.selectedEthnicities);
         }
 
-        // ✅ Weight mapping
         if (aiFilters.weights && Array.isArray(aiFilters.weights)) {
           const newWeights = [...currentState.weights];
           aiFilters.weights.forEach((aiWeight: { id: string; weight: number }) => {
-            const targetId = WEIGHT_KEY_MAP[aiWeight.id.toLowerCase()] || aiWeight.id;
-            const weightIndex = newWeights.findIndex(w => w.id === targetId);
-            if (weightIndex !== -1) {
-              newWeights[weightIndex].value = Math.round(aiWeight.weight);
-            }
+            const id = WEIGHT_KEY_MAP[aiWeight.id.toLowerCase()] || aiWeight.id;
+            const i = newWeights.findIndex(w => w.id === id);
+            if (i !== -1) newWeights[i].value = Math.round(aiWeight.weight);
           });
           updates.weights = newWeights;
         }
