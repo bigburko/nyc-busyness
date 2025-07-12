@@ -1,4 +1,5 @@
-// ChatbotDrawer.tsx (final updated)
+// src/components/DrawerGroup/ChatbotDrawer.tsx
+
 'use client';
 
 import {
@@ -6,26 +7,18 @@ import {
   Box, Text, Flex, Input, IconButton, Collapse, Button, Spinner
 } from '@chakra-ui/react';
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useGeminiStore } from './BrickyAiGroup/geminiStore';
-import { useFilterStore } from '../DrawerGroup/filterStore';
+import { useFilterStore, FilterState } from './filterStore';
 import { getEthnicityGroups } from './BrickyAiGroup/ethnicityUtils';
 
+// --- DATA MAPPINGS ---
 const ETHNICITY_GROUPS = getEthnicityGroups();
-
-// maps common keywords from AI to actual weighting keys
 const WEIGHT_KEY_MAP: Record<string, string> = {
-  'foot_traffic': 'foot_traffic',
-  'crime': 'crime',
-  'crime_score': 'crime',
-  'rent': 'rent_score',
-  'rent_score': 'rent_score',
-  'demographic': 'demographic',
-  'demographics': 'demographic',
-  'flood': 'flood_risk',
-  'flood_risk': 'flood_risk',
-  'poi': 'poi',
-  'points_of_interest': 'poi',
+  'foot_traffic': 'foot_traffic', 'crime': 'crime', 'crime_score': 'crime',
+  'rent': 'rent_score', 'rent_score': 'rent_score', 'demographic': 'demographic',
+  'demographics': 'demographic', 'flood': 'flood_risk', 'flood_risk': 'flood_risk',
+  'poi': 'poi', 'points_of_interest': 'poi',
 };
 
 interface ChatbotDrawerProps {
@@ -35,17 +28,18 @@ interface ChatbotDrawerProps {
 
 export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const chatBodyRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
   const [input, setInput] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const { sendToGemini } = useGeminiStore();
-  const { setFilters } = useFilterStore();
+  const setFilters = useFilterStore((state: FilterState) => state.setFilters);
 
   const handleSend = async () => {
     const userMsg = input.trim();
-    if (!userMsg) return;
+    if (!userMsg || isLoading) return;
 
     setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
@@ -54,84 +48,101 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
 
     try {
       const reply = await sendToGemini(userMsg);
-      console.log('[🧠 Gemini Raw Reply]', reply);
-
-      const jsonMatch = reply.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('No valid JSON block found');
-
-      const parsed = JSON.parse(jsonMatch[0]);
-      console.log('[✅ Parsed JSON]', parsed);
-
-      // 🧬 Ethnicity Resolution
-      if (parsed.filters?.selectedEthnicities) {
-        const raw = parsed.filters.selectedEthnicities;
-        console.log('[🧬 Raw ethnicities]', raw);
-
-        const resolved = raw.flatMap((ethnicity: string) => {
-          const key = ethnicity.toLowerCase().replace(/[^a-z]/g, '');
-          return ETHNICITY_GROUPS[key] || [];
-        });
-
-        parsed.filters.selectedEthnicities = resolved;
+      const jsonMatch = reply.match(/```json\n([\s\S]*?)\n```/);
+      if (!jsonMatch || !jsonMatch[1]) {
+        throw new Error('No valid JSON code block found in AI response.');
       }
 
-      // 📊 Weight Mapping Fix
-      if (parsed.filters?.weights) {
-        parsed.filters.weights = parsed.filters.weights
-          .map((w: { id: string; weight: number }) => {
-            const normalizedId = WEIGHT_KEY_MAP[w.id.toLowerCase()];
-            if (!normalizedId || isNaN(w.weight)) return null;
+      const parsed = JSON.parse(jsonMatch[1]);
+      console.log('[AI Parsed]', parsed);
 
-            return {
-              id: normalizedId,
-              value: Math.min(1, Math.max(0, w.weight / 100)), // convert 100 to 1.0 scale
-            };
-          })
-          .filter(Boolean);
-      }
+      const currentState = useFilterStore.getState();
+      const updates: Partial<FilterState> = {};
 
       if (parsed.filters) {
-        console.log('[🧠 Final parsed filters]', parsed.filters);
-        setFilters(parsed.filters);
+        const aiFilters = parsed.filters;
+
+        if (aiFilters.rentRange && Array.isArray(aiFilters.rentRange)) {
+          let [aiMin, aiMax] = aiFilters.rentRange;
+          let newMin = Math.max(26, aiMin || 26);
+          let newMax = Math.min(160, aiMax || 160);
+          if (newMin > newMax) newMin = newMax - 5;
+          updates.rentRange = [Math.max(26, newMin), newMax];
+        }
+
+        if (aiFilters.ageRange && Array.isArray(aiFilters.ageRange)) {
+          updates.ageRange = [aiFilters.ageRange[0] || 0, aiFilters.ageRange[1] || 100];
+        }
+
+        if (aiFilters.incomeRange) {
+          updates.incomeRange = aiFilters.incomeRange;
+        }
+
+        // ✅ Gender normalization restored from original logic
+        if (aiFilters.selectedGenders) {
+          const normalize = (g: string) => {
+            const val = g.toLowerCase();
+            if (['female', 'woman', 'f'].includes(val)) return 'female';
+            if (['male', 'man', 'm'].includes(val)) return 'male';
+            return null;
+          };
+          updates.selectedGenders = aiFilters.selectedGenders.map(normalize).filter(Boolean);
+        }
+
+        if (aiFilters.selectedEthnicities) {
+          const resolved = aiFilters.selectedEthnicities.flatMap(
+            (eth: string) => ETHNICITY_GROUPS[eth.toLowerCase().replace(/[^a-z]/g, '')] || []
+          );
+          updates.selectedEthnicities = Array.from(new Set(resolved));
+        }
+
+        if (aiFilters.weights && Array.isArray(aiFilters.weights)) {
+          const newWeights = [...currentState.weights];
+          aiFilters.weights.forEach((aiWeight: { id: string; weight: number }) => {
+            const targetId = WEIGHT_KEY_MAP[aiWeight.id.toLowerCase()] || aiWeight.id;
+            const weightIndex = newWeights.findIndex(w => w.id === targetId);
+            if (weightIndex !== -1) {
+              newWeights[weightIndex].value = Math.round(aiWeight.weight);
+            }
+          });
+          updates.weights = newWeights;
+        }
       }
 
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: parsed.message || 'Filters updated!' },
-      ]);
+      console.log('[SetFilters Payload]', updates);
+      if (Object.keys(updates).length > 0) {
+        setFilters(updates);
+      }
+
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: parsed.message || 'Filters updated!',
+      }]);
     } catch (err) {
-      console.error('[Gemini Error]', err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Bricky had trouble understanding. Try rephrasing your request.',
-        },
-      ]);
+      console.error('[Bricky Drawer Error]', err);
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: 'Bricky had trouble understanding. Try rephrasing your request.',
+      }]);
     }
 
     setIsLoading(false);
   };
 
+  useEffect(() => {
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [messages, isLoading]);
+
   return (
     <Drawer isOpen={isOpen} placement="left" onClose={onClose} size="sm">
       <DrawerOverlay />
-      <DrawerContent
-        mt="0"
-        h="100%"
-        borderTopLeftRadius="0"
-        borderBottomLeftRadius="0"
-        bg="white"
-        borderRight="1px solid rgba(0,0,0,0.05)"
-        display="flex"
-        flexDirection="column"
-      >
+      <DrawerContent mt="0" h="100%" bg="white" borderRight="1px solid rgba(0,0,0,0.05)" display="flex" flexDirection="column">
         <DrawerCloseButton />
-
         <Flex align="center" justify="space-between" px={4} pt={6} pb={2}>
           <Text fontSize="lg" fontWeight="bold">🧱 Bricky</Text>
         </Flex>
-
         <Box px={4} pb={4}>
           <Button
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -151,25 +162,16 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
             Ask Bricky anything about NYC neighborhoods...
           </Button>
         </Box>
-
         <Collapse in={!isCollapsed} animateOpacity>
           <DrawerBody display="flex" flexDirection="column" gap={4} pb={4}>
-            <Box flex="1" overflowY="auto" maxH="400px">
+            <Box ref={chatBodyRef} flex="1" overflowY="auto" maxH="400px">
               {messages.length === 0 ? (
                 <Text color="gray.500" textAlign="center" mt={10}>
                   No messages yet. Start chatting below.
                 </Text>
               ) : (
                 messages.map((msg, idx) => (
-                  <Box
-                    key={idx}
-                    bg={msg.role === 'user' ? 'orange.100' : 'gray.100'}
-                    borderRadius="md"
-                    p={2}
-                    mb={2}
-                    maxW="80%"
-                    ml={msg.role === 'user' ? 'auto' : '0'}
-                  >
+                  <Box key={idx} bg={msg.role === 'user' ? 'orange.100' : 'gray.100'} borderRadius="md" p={2} mb={2} maxW="80%" ml={msg.role === 'user' ? 'auto' : '0'}>
                     <Text>{msg.content}</Text>
                   </Box>
                 ))
@@ -180,7 +182,6 @@ export default function ChatbotDrawer({ isOpen, onClose }: ChatbotDrawerProps) {
                 </Box>
               )}
             </Box>
-
             <Flex gap={2}>
               <Input
                 ref={inputRef}

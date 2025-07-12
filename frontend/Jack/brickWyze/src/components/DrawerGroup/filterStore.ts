@@ -1,41 +1,95 @@
-// filterStore.ts
-import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
-import { Weighting } from '../ScoreWeightingGroup/WeightingPanel';
+// src/components/DrawerGroup/filterStore.ts
 
-export interface FilterStore {
+import { create, StateCreator } from 'zustand';
+
+// --- TYPE DEFINITIONS ---
+export interface Weighting {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  value: number;
+}
+
+export interface Layer {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+}
+
+export interface FilterState {
   weights: Weighting[];
   rentRange: [number, number];
   ageRange: [number, number];
   incomeRange: [number, number];
   selectedEthnicities: string[];
   selectedGenders: string[];
-  setFilters: (updates: Partial<FilterStore>) => void;
+  setFilters: (newFilters: Partial<FilterState>) => void;
+  updateWeight: (id: string, value: number) => void;
+  reset: () => void;
 }
 
+// --- INITIAL STATE ---
 export const INITIAL_WEIGHTS: Weighting[] = [
-  { id: 'foot_traffic', label: 'Foot Traffic', icon: '🚶', color: '#4299E1', value: 35 },
-  { id: 'demographic', label: 'Demographics', icon: '👥', color: '#48BB78', value: 25 },
-  { id: 'crime', label: 'Crime Score', icon: '🚨', color: '#E53E3E', value: 15 },
-  { id: 'flood_risk', label: 'Flood Risk', icon: '🌊', color: '#38B2AC', value: 10 },
-  { id: 'rent_score', label: 'Rent Score', icon: '💰', color: '#ED8936', value: 10 },
-  { id: 'poi', label: 'Points of Interest', icon: '📍', color: '#9F7AEA', value: 5 },
+  { id: 'foot_traffic', label: 'Foot Traffic', value: 30, icon: '🚶', color: '#4299E1' },
+  { id: 'demographic', label: 'Demographics', value: 30, icon: '👥', color: '#48BB78' },
+  { id: 'crime', label: 'Crime Score', value: 20, icon: '🚨', color: '#E53E3E' },
+  { id: 'rent_score', label: 'Rent Score', value: 20, icon: '💰', color: '#ED8936' },
 ];
 
-export const useFilterStore = create<FilterStore>()(
-  subscribeWithSelector((set) => ({
-    weights: INITIAL_WEIGHTS,
-    rentRange: [26, 160],
-    ageRange: [0, 100],
-    incomeRange: [0, 250000],
-    selectedEthnicities: [],
-    selectedGenders: ['male', 'female'],
+const INITIAL_STATE = {
+  weights: INITIAL_WEIGHTS,
+  rentRange: [26, 160] as [number, number],
+  ageRange: [18, 65] as [number, number],
+  incomeRange: [0, 250000] as [number, number],
+  selectedEthnicities: [] as string[],
+  selectedGenders: ['male', 'female'] as string[],
+};
 
-    setFilters: (updates) =>
-      set((state) => {
-        const newState = { ...state, ...updates };
-        console.log('🧠 Zustand store updated:', updates); // ✅ Debug log
-        return newState;
-      }),
-  }))
-);
+// --- STORE CREATION LOGIC ---
+const createFilterSlice: StateCreator<FilterState> = (set, get) => ({
+  ...INITIAL_STATE,
+
+  setFilters: (newFilters) => set((state) => ({ ...state, ...newFilters })),
+
+  updateWeight: (id, value) => {
+    const currentWeights = get().weights;
+    const movingSlider = currentWeights.find(w => w.id === id);
+    if (!movingSlider) return;
+    const oldValue = movingSlider.value;
+    const delta = value - oldValue;
+    let otherTotal = 100 - oldValue;
+    if (otherTotal <= 0) otherTotal = 1;
+
+    let updatedWeights = currentWeights.map(w => {
+      if (w.id === id) return { ...w, value };
+      const share = w.value / otherTotal;
+      return { ...w, value: w.value - (delta * share) };
+    });
+    
+    const currentTotal = updatedWeights.reduce((sum, w) => sum + w.value, 0);
+    const normalizationFactor = 100 / currentTotal;
+    const finalWeights = updatedWeights.map(w => ({
+      ...w,
+      value: Math.round(w.value * normalizationFactor)
+    }));
+
+    const finalSum = finalWeights.reduce((sum, w) => sum + w.value, 0);
+    if (finalSum !== 100) {
+      const diff = 100 - finalSum;
+      const sliderToAdjust = finalWeights.find(w => w.id === id) || finalWeights[0];
+      sliderToAdjust.value += diff;
+    }
+    set({ weights: finalWeights });
+  },
+
+  reset: () => set(INITIAL_STATE),
+});
+
+// =========================================================================================
+// THE FINAL, DEFINITIVE CHANGE IS HERE.
+// We are using the create<T>()(...) pattern. This locks in the type `FilterState` first,
+// and then passes the implementation. This is the most TypeScript-robust way to create a store.
+// =========================================================================================
+export const useFilterStore = create<FilterState>()(createFilterSlice);
