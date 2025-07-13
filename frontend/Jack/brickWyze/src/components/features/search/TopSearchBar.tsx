@@ -1,118 +1,56 @@
 'use client';
-
-import {
-  Button,
-  Flex,
-  IconButton,
-  Input,
-  useDisclosure,
-} from '@chakra-ui/react';
+import { Flex, IconButton, Button, Text } from '@chakra-ui/react';
 import { FiSliders } from 'react-icons/fi';
-import { SearchIcon } from '@chakra-ui/icons';
-import { useRef } from 'react';
-import MyDrawer from './MyDrawer';
-import ChatbotDrawer from './ChatbotDrawer';
-import { Weighting } from '../filters/ScoreWeightingGroup/WeightingPanel';
+import { SearchIcon, CloseIcon } from '@chakra-ui/icons';
+import { useUiStore } from '@/stores/uiStore';
+import { useFilterStore } from '@/stores/filterStore';
 
-interface SearchFilters {
-  weights: Weighting[];
-  rentRange: [number, number];
-  selectedEthnicities: string[];
-  selectedGenders: string[];
-  ageRange: [number, number];
-  incomeRange: [number, number];
+interface TopSearchBarProps {
+  onFilterClick: () => void;
+  isResultsViewActive?: boolean;
 }
 
-export default function TopSearchBar({
-  onSearchSubmit,
-}: {
-  onSearchSubmit: (filters: SearchFilters) => void;
-}) {
-  const {
-    isOpen: isDrawerOpen,
-    onOpen: openDrawer,
-    onClose: closeDrawer,
-  } = useDisclosure();
+export const TOP_BAR_HEIGHT = 48;
 
-  const {
-    isOpen: isChatbotOpen,
-    onOpen: openChatbot,
-    onClose: closeChatbot,
-  } = useDisclosure();
+export default function TopSearchBar({ onFilterClick, isResultsViewActive = false }: TopSearchBarProps) {
+  const { viewState, searchQuery, focusSearch, clearSearch } = useUiStore();
+  const areFiltersActive = useFilterStore(
+    (state) => state.selectedEthnicities.length > 0
+  );
 
-  const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const isTyping = viewState === 'typing';
+  const showCloseButton = isResultsViewActive;
+  const showStaticQuery = isResultsViewActive && !isTyping;
+  const showPlaceholder = !isResultsViewActive && !isTyping;
 
   return (
-    <>
-      <Flex
-        position="absolute"
-        top="16px"
-        left="16px"
-        zIndex="overlay"
-        bg="white"
-        borderRadius="full"
-        boxShadow="md"
-        align="center"
-        px={3}
-        py={1}
-        w="600px"
-        maxW="95%"
+    <Flex align="center" gap="2" p={2} h={`${TOP_BAR_HEIGHT}px`}>
+      <Button
+        onClick={onFilterClick}
+        leftIcon={<FiSliders />}
+        variant="ghost"
+        color={areFiltersActive ? 'orange.500' : 'gray.700'}
       >
-        {/* Filters Button */}
-        <Button
-          ref={filterButtonRef}
-          onClick={openDrawer}
-          leftIcon={<FiSliders />}
-          borderRadius="full"
-          variant="ghost"
-          fontWeight="medium"
-          px={4}
-          mr={2}
-        >
-          Filters
-        </Button>
-
-        {/* Search Input */}
-        <Input
-          placeholder="Search BrickWyze..."
-          border="none"
-          _focus={{ outline: 'none' }}
-          _placeholder={{ color: 'gray.500' }}
-          onClick={openChatbot}
-          cursor="pointer"
-          bg="transparent"
-          flex="1"
-        />
-
-        {/* Search Icon (optional trigger) */}
-        <IconButton
-          aria-label="Search"
-          icon={<SearchIcon />}
-          variant="ghost"
-          borderRadius="full"
-          ml={2}
-        />
+        Filters
+      </Button>
+      <Flex flex="1" h="100%" align="center" onClick={focusSearch} cursor="pointer">
+        {showStaticQuery && (
+          <Text pl={2} noOfLines={1} fontWeight="medium">
+            {searchQuery}
+          </Text>
+        )}
+        {showPlaceholder && (
+          <Text pl={2} color="gray.400">Ask Bricky...</Text>
+        )}
       </Flex>
-
-      {/* Filters Drawer */}
-      <MyDrawer
-        isOpen={isDrawerOpen}
-        onClose={closeDrawer}
-        onSearchSubmit={(filters) => {
-          console.log('🔍 Submitted filters:', filters);
-          onSearchSubmit(filters);
-        }}
+      <IconButton
+        aria-label={showCloseButton ? 'Clear Search' : 'Search'}
+        icon={showCloseButton ? <CloseIcon /> : <SearchIcon />}
+        isRound
+        variant="ghost"
+        onClick={showCloseButton ? clearSearch : undefined}
+        pointerEvents={showCloseButton ? 'auto' : 'none'}
       />
-
-      {/* Chatbot Drawer - FIX: Added missing isOpen and onClose props */}
-      <ChatbotDrawer 
-        isOpen={isChatbotOpen}
-        onClose={closeChatbot}
-        onSearchSubmit={(filters) => {
-          console.log('🤖 Bricky submitted filters:', filters);
-          onSearchSubmit(filters);
-        }}
-      />
-    </>
+    </Flex>
   );
 }

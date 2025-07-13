@@ -1,3 +1,4 @@
+// src/components/features/map/Map.tsx
 'use client';
 
 import { useRef, useEffect, useState, useCallback } from 'react';
@@ -5,6 +6,7 @@ import mapboxgl from 'mapbox-gl';
 import type { MapLayerMouseEvent } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+import { useUiStore } from '@/stores/uiStore';
 import rawGeojson from './manhattan_census_tracts.json';
 import { CleanGeojson, PotentiallyNonStandardFeatureCollection } from './CleanGeojson';
 import { ResilienceScore } from './fetchResilienceScores';
@@ -49,6 +51,7 @@ export default function Map({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const openResultsPanel = useUiStore((state) => state.openResultsPanel);
 
   const fetchAndApplyScores = useCallback(async () => {
     const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
@@ -122,7 +125,7 @@ export default function Map({
             ...feat,
             properties: {
               ...feat.properties,
-              ...(match || { custom_score: 0 }),
+              ...(match || { resilience_score: 0 }),
               ...match,
               hasScore: !!match,
             },
@@ -163,7 +166,10 @@ export default function Map({
     });
 
     const handleClick = (e: MapLayerMouseEvent) => {
-      renderPopup(e, weights, selectedEthnicities, selectedGenders);
+      const tractData = e.features && e.features[0]?.properties;
+      if (tractData) {
+        openResultsPanel(tractData);
+      }
     };
 
     map.on('click', 'tracts-fill', handleClick);
@@ -179,7 +185,7 @@ export default function Map({
       map.remove();
       mapRef.current = null;
     };
-  }, [weights, selectedEthnicities, selectedGenders]);
+  }, [openResultsPanel]);
 
   useEffect(() => {
     if (isMapLoaded) {
@@ -191,15 +197,10 @@ export default function Map({
     <div
       ref={containerRef}
       style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        position: 'relative',
         height: '100%',
         width: '100%',
         zIndex: 0,
-        backgroundColor: '#e2e8f0',
       }}
     />
   );
