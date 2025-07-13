@@ -13,7 +13,7 @@ import {
   SelectInstance,
 } from 'chakra-react-select';
 import { ethnicityData } from './ethnicityData';
-import { Pill } from './Pill';
+import { Pill } from '../../../../ui/Pill';
 import { MenuOption } from './MenuOption';
 
 // Interfaces (no changes needed here)

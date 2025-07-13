@@ -12,17 +12,17 @@ import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
 // We NO LONGER need 'shallow'
-import { useFilterStore, INITIAL_WEIGHTS, Weighting, Layer, FilterState } from './filterStore';
+import { useFilterStore, INITIAL_WEIGHTS, Weighting, Layer, FilterState } from '../../../stores/filterStore';
 
-import WeightingPanel from '../ScoreWeightingGroup/WeightingPanel';
-import MyRangeSlider from '../MyRangeSlider';
-import MyAgeSlider from '../DemographicGroup/AgeGroup/MyAgeSlider';
-import MyIncomeSlider from '../DemographicGroup/MyIncomeGroup/MyIncomeSlider';
-import HierarchicalMultiSelect from '../DemographicGroup/RaceDropDownGroup/HierarchicalMultiSelect';
-import { ethnicityData } from '../DemographicGroup/RaceDropDownGroup/ethnicityData';
-import CancelResetButton from '../ScoreWeightingGroup/CancelResetButton';
-import GenderSelect from '../DemographicGroup/GenderGroup/GenderSelect';
-import CollapsibleSection from '../CollapsibleSection';
+import WeightingPanel from '../filters/ScoreWeightingGroup/WeightingPanel';
+import MyRangeSlider from '../../ui/MyRangeSlider';
+import MyAgeSlider from '../filters/DemographicGroup/MyAgeSlider';
+import MyIncomeSlider from '../filters/DemographicGroup/MyIncomeSlider';
+import HierarchicalMultiSelect from '../filters/DemographicGroup/RaceDropDownGroup/HierarchicalMultiSelect';
+import { ethnicityData } from '../filters/DemographicGroup/RaceDropDownGroup/ethnicityData';
+import CancelResetButton from '../filters/ScoreWeightingGroup/CancelResetButton';
+import GenderSelect from '../filters/DemographicGroup/GenderSelect';
+import CollapsibleSection from '../../ui/CollapsibleSection';
 
 interface MyDrawerProps {
   isOpen: boolean;

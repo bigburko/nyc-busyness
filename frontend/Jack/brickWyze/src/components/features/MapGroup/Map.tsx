@@ -5,13 +5,13 @@ import mapboxgl from 'mapbox-gl';
 import type { MapLayerMouseEvent } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import rawGeojson from '@/components/MapGroup/manhattan_census_tracts.json';
-import { CleanGeojson, PotentiallyNonStandardFeatureCollection } from '@/components/MapGroup/CleanGeojson';
-import { ResilienceScore } from '@/components/MapGroup/fetchResilienceScores';
-import { ProcessGeojson } from '@/components/MapGroup/ProcessGeojson';
-import { addTractLayers, updateTractData } from '@/components/MapGroup/TractLayer';
-import { renderPopup } from '@/components/MapGroup/PopupHandler';
-import { createLegend, showLegend } from '@/components/MapGroup/Legend';
+import rawGeojson from '../Map/manhattan_census_tracts.json';
+import { CleanGeojson, PotentiallyNonStandardFeatureCollection } from '../Map/CleanGeojson';
+import { ResilienceScore } from '../Map/fetchResilienceScores';
+import { ProcessGeojson } from '../Map/ProcessGeojson';
+import { addTractLayers, updateTractData } from '../Map/TractLayer';
+import { renderPopup } from '../Map/PopupHandler';
+import { createLegend, showLegend } from '../Map/Legend';
 
 const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831];
 const INITIAL_ZOOM = 12;

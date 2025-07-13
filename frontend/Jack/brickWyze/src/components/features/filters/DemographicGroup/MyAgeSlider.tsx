@@ -1,7 +1,7 @@
 // components/MyAgeSlider.tsx
 'use client';
 
-import MyRangeSlider from '../../MyRangeSlider';
+import MyRangeSlider from '../../../ui/MyRangeSlider';
 
 export default function MyAgeSlider({
   value,

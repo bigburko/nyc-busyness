@@ -8,9 +8,9 @@ import {
 } from '@chakra-ui/react';
 import { SearchIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import { useRef, useState, useEffect } from 'react';
-import { useGeminiStore } from './BrickyAiGroup/geminiStore';
-import { useFilterStore, FilterState } from './filterStore';
-import { resolveEthnicities } from './BrickyAiGroup/resolveEthnicities';
+import { useGeminiStore } from '../../../stores/geminiStore';
+import { useFilterStore, FilterState } from '../../../stores/filterStore';
+import { resolveEthnicities } from '../../../lib/resolveEthnicities';
 
 const WEIGHT_KEY_MAP: Record<string, string> = {
   'foot_traffic': 'foot_traffic', 'crime': 'crime', 'crime_score': 'crime',

@@ -1,6 +1,6 @@
 // src/components/DrawerGroup/BrickyAiGroup/resolveEthnicities.ts
 
-import { ethnicityData } from '../../DemographicGroup/RaceDropDownGroup/ethnicityData';
+import { ethnicityData } from '../components/features/filters/DemographicGroup/RaceDropDownGroup/ethnicityData';
 
 // --- MAPPINGS ---
 // This map is kept simple. It connects a user-friendly term to the TOP-LEVEL parent code in your data.

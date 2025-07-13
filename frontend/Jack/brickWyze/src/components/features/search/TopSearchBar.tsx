@@ -12,7 +12,7 @@ import { SearchIcon } from '@chakra-ui/icons';
 import { useRef } from 'react';
 import MyDrawer from './MyDrawer';
 import ChatbotDrawer from './ChatbotDrawer';
-import { Weighting } from '../ScoreWeightingGroup/WeightingPanel';
+import { Weighting } from '../filters/ScoreWeightingGroup/WeightingPanel';
 
 interface SearchFilters {
   weights: Weighting[];

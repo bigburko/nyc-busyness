@@ -3,11 +3,11 @@
 import { Box } from '@chakra-ui/react';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Weighting } from '@/components/ScoreWeightingGroup/WeightingPanel';
+import { Weighting } from '@/components/features/filters/ScoreWeightingGroup/WeightingPanel';
 
 // ✅ Dynamically import components
-const Map = dynamic(() => import('@/components/MapGroup/Map'), { ssr: false });
-const TopSearchBar = dynamic(() => import('@/components/DrawerGroup/TopSearchBar'), { ssr: false });
+const Map = dynamic(() => import('../components/features/Map/Map'), { ssr: false });
+const TopSearchBar = dynamic(() => import('@/components/features/search/TopSearchBar'), { ssr: false });
 
 interface SearchFilters {
   weights: Weighting[];
