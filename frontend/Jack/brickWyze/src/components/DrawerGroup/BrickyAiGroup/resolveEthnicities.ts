@@ -1,29 +1,146 @@
 import { ethnicityData } from '../../DemographicGroup/RaceDropDownGroup/ethnicityData';
 
-// Hierarchical mapping with fuzzy matching support
+// Comprehensive ethnicity mappings based on your actual data structure
 const ETHNICITY_MAPPINGS: Record<string, string[]> = {
-  // Make these more specific to avoid too many results
-  'white': ['W'], // Just use the root category
-  'european': ['WEur'], // Specific European subcategory
-  'middleeastern': ['WMENA'], // Keep specific
-  
-  // Keep everything else the same...
-  'asian': ['AEA', 'ASA', 'ASEA', 'ACA'],
-  'black': ['BAfrAm', 'BCrb', 'BSSAf'],
-  'hispanic': ['H'],
-  'latino': ['H'],
-  'nativeamerican': ['AIANA'],
-  'americanindian': ['AIANA'],
-  'pacificislander': ['NHPI'],
-  'someotherrace': ['SOR'],
-  
+  // ===== WHITE CATEGORY - Include ALL White subcategories =====
+  'white': [
+    'W',  // Root White category
+    // European subcategory + ALL European ethnicities
+    'WEur', 'WEurAlbn', 'WEurArmn', 'WEurAstrn', 'WEurAzrbjn', 'WEurBlrsn', 
+    'WEurBlgn', 'WEurBsHrz', 'WEurBrtsh', 'WEurBlgrn', 'WEurCrtn', 'WEurCyprt',
+    'WEurCzch', 'WEurDnsh', 'WEurDtch', 'WEurEnglsh', 'WEurEstn', 'WEurFnnsh',
+    'WEurFrnch', 'WEurGrgn', 'WEurGrmn', 'WEurGrk', 'WEurHngrn', 'WEurIrsh',
+    'WEurItln', 'WEurKsvn', 'WEurLtvn', 'WEurLthn', 'WEurMcdn', 'WEurMlts',
+    'WEurMldvn', 'WEurMntgrn', 'WEurNrwgn', 'WEurPlsh', 'WEurPrtgs', 'WEurRmn',
+    'WEurRsn', 'WEurScndvn', 'WEurStIrsh', 'WEurSctsh', 'WEurSrbn', 'WEurSlvc',
+    'WEurSlvk', 'WEurSlvn', 'WEurSwdsh', 'WEurSwiss', 'WEurTrksh', 'WEurUrkrn', 'WEurWlsh',
+    // Middle Eastern/North African subcategory + ALL MENA ethnicities
+    'WMENA', 'WMENAAlgrn', 'WMENAArab', 'WMENAEgptn', 'WMENAIrn', 'WMENAIrq',
+    'WMENAIsrl', 'WMENAJrdn', 'WMENALbns', 'WMENAMrcn', 'WMENAPlstn', 'WMENASyrn',
+    'WMENATnsn', 'WMENAYmn',
+    // Other White subcategory + ALL Other White ethnicities
+    'WOth', 'WOthAstrln', 'WOthCndn', 'WOthFrCndn', 'WOthNZlndr'
+  ],
+
+  // ===== HISPANIC CATEGORY - Include ALL Hispanic subcategories =====
+  'hispanic': [
+    'H',  // Root Hispanic category
+    'HMex',  // Mexican
+    // Central American subcategory + ALL Central American ethnicities
+    'HCA', 'HCACstRcn', 'HCAGutmln', 'HCAHndrn', 'HCANcrgn', 'HCAPnmn', 'HCASlvdrn',
+    // South American subcategory + ALL South American ethnicities
+    'HSA', 'HSAArgntn', 'HSABlvn', 'HSAChln', 'HSAClmbn', 'HSAEcudrn', 'HSAPrguyn',
+    'HSAPrvn', 'HSAUrgyn', 'HSAVnzuln',
+    // Caribbean Hispanic subcategory + ALL Caribbean Hispanic ethnicities
+    'HCH', 'HCHCuban', 'HCHDmncn', 'HCHPrtRcn',
+    // Other Hispanic subcategory + ALL Other Hispanic ethnicities
+    'HOth', 'HOthSpnrd', 'HOthSpnsh', 'HOthSpnAm', 'HOthGrfna'
+  ],
+
+  // ===== BLACK CATEGORY - Include ALL Black subcategories =====
+  'black': [
+    'B',  // Root Black category
+    'BAfrAm',  // African American
+    // Sub-Saharan African subcategory + ALL Sub-Saharan ethnicities
+    'BSSAf', 'BSSAfBrknb', 'BSSAfCmrn', 'BSSAfCngls', 'BSSAfEthpn', 'BSSAfGmbn',
+    'BSSAfGhn', 'BSSAfGnn', 'BSSAfIvrn', 'BSSAfKnyn', 'BSSAfLbrn', 'BSSAfMln',
+    'BSSAfNgrn', 'BSSAfSngls', 'BSSAfSrLn', 'BSSAfSAfr', 'BSSAfSdns', 'BSSAfTgls',
+    // Caribbean subcategory + ALL Caribbean ethnicities
+    'BCrb', 'BCrbAntBrb', 'BCrbBhmn', 'BCrbBrbdn', 'BCrbDmncIs', 'BCrbGrndn',
+    'BCrbHtn', 'BCrbJmcn', 'BCrbKtnNev', 'BCrbStLuc', 'BCrbTrTob', 'BCrbUSVgIs',
+    'BCrbVncntn', 'BCrbWind',
+    // Other Black
+    'BOth'
+  ],
+
+  // ===== ASIAN CATEGORY - Include ALL Asian subcategories =====
+  'asian': [
+    'A',  // Root Asian category
+    // East Asian subcategory + ALL East Asian ethnicities
+    'AEA', 'AEAChnsNoT', 'AEAJpns', 'AEAKrn', 'AEATwns',
+    // Central Asian subcategory + ALL Central Asian ethnicities
+    'ACA', 'ACAAfghan', 'ACAKazakh', 'ACAKyrgyz', 'ACATajik', 'ACAUzbek',
+    // South Asian subcategory + ALL South Asian ethnicities
+    'ASA', 'ASAAsnInd', 'ASABngldsh', 'ASANpls', 'ASAPkstn', 'ASASikh', 'ASASrLnkn',
+    // Southeast Asian subcategory + ALL Southeast Asian ethnicities
+    'ASEA', 'ASEABrms', 'ASEACmbdn', 'ASEAFlpn', 'ASEAIndnsn', 'ASEAMlysn',
+    'ASEASngprn', 'ASEAThai', 'ASEAVtnms',
+    // Other Asian
+    'AOth'
+  ],
+
+  // ===== More specific subcategories =====
+  'european': [
+    'WEur', 'WEurAlbn', 'WEurArmn', 'WEurAstrn', 'WEurAzrbjn', 'WEurBlrsn', 
+    'WEurBlgn', 'WEurBsHrz', 'WEurBrtsh', 'WEurBlgrn', 'WEurCrtn', 'WEurCyprt',
+    'WEurCzch', 'WEurDnsh', 'WEurDtch', 'WEurEnglsh', 'WEurEstn', 'WEurFnnsh',
+    'WEurFrnch', 'WEurGrgn', 'WEurGrmn', 'WEurGrk', 'WEurHngrn', 'WEurIrsh',
+    'WEurItln', 'WEurKsvn', 'WEurLtvn', 'WEurLthn', 'WEurMcdn', 'WEurMlts',
+    'WEurMldvn', 'WEurMntgrn', 'WEurNrwgn', 'WEurPlsh', 'WEurPrtgs', 'WEurRmn',
+    'WEurRsn', 'WEurScndvn', 'WEurStIrsh', 'WEurSctsh', 'WEurSrbn', 'WEurSlvc',
+    'WEurSlvk', 'WEurSlvn', 'WEurSwdsh', 'WEurSwiss', 'WEurTrksh', 'WEurUrkrn', 'WEurWlsh'
+  ],
+
+  'middleeastern': [
+    'WMENA', 'WMENAAlgrn', 'WMENAArab', 'WMENAEgptn', 'WMENAIrn', 'WMENAIrq',
+    'WMENAIsrl', 'WMENAJrdn', 'WMENALbns', 'WMENAMrcn', 'WMENAPlstn', 'WMENASyrn',
+    'WMENATnsn', 'WMENAYmn'
+  ],
+
   // Asian subcategories
-  'southasian': ['ASA'],
-  'eastasian': ['AEA'],
-  'southeastasian': ['ASEA'],
-  'centralasian': ['ACA'],
-  
-  // Specific groups
+  'southasian': ['ASA', 'ASAAsnInd', 'ASABngldsh', 'ASANpls', 'ASAPkstn', 'ASASikh', 'ASASrLnkn'],
+  'eastasian': ['AEA', 'AEAChnsNoT', 'AEAJpns', 'AEAKrn', 'AEATwns'],
+  'southeastasian': ['ASEA', 'ASEABrms', 'ASEACmbdn', 'ASEAFlpn', 'ASEAIndnsn', 'ASEAMlysn', 'ASEASngprn', 'ASEAThai', 'ASEAVtnms'],
+  'centralasian': ['ACA', 'ACAAfghan', 'ACAKazakh', 'ACAKyrgyz', 'ACATajik', 'ACAUzbek'],
+
+  // Black subcategories
+  'africanamerican': ['BAfrAm'],
+  'caribbean': ['BCrb', 'BCrbAntBrb', 'BCrbBhmn', 'BCrbBrbdn', 'BCrbDmncIs', 'BCrbGrndn', 'BCrbHtn', 'BCrbJmcn', 'BCrbKtnNev', 'BCrbStLuc', 'BCrbTrTob', 'BCrbUSVgIs', 'BCrbVncntn', 'BCrbWind'],
+  'subsaharanafrican': ['BSSAf', 'BSSAfBrknb', 'BSSAfCmrn', 'BSSAfCngls', 'BSSAfEthpn', 'BSSAfGmbn', 'BSSAfGhn', 'BSSAfGnn', 'BSSAfIvrn', 'BSSAfKnyn', 'BSSAfLbrn', 'BSSAfMln', 'BSSAfNgrn', 'BSSAfSngls', 'BSSAfSrLn', 'BSSAfSAfr', 'BSSAfSdns', 'BSSAfTgls'],
+
+  // Hispanic variations and aliases
+  'latino': [
+    'H', 'HMex', 'HCA', 'HCACstRcn', 'HCAGutmln', 'HCAHndrn', 'HCANcrgn', 'HCAPnmn', 'HCASlvdrn',
+    'HSA', 'HSAArgntn', 'HSABlvn', 'HSAChln', 'HSAClmbn', 'HSAEcudrn', 'HSAPrguyn', 'HSAPrvn', 'HSAUrgyn', 'HSAVnzuln',
+    'HCH', 'HCHCuban', 'HCHDmncn', 'HCHPrtRcn', 'HOth', 'HOthSpnrd', 'HOthSpnsh', 'HOthSpnAm', 'HOthGrfna'
+  ],
+  'latinx': [
+    'H', 'HMex', 'HCA', 'HCACstRcn', 'HCAGutmln', 'HCAHndrn', 'HCANcrgn', 'HCAPnmn', 'HCASlvdrn',
+    'HSA', 'HSAArgntn', 'HSABlvn', 'HSAChln', 'HSAClmbn', 'HSAEcudrn', 'HSAPrguyn', 'HSAPrvn', 'HSAUrgyn', 'HSAVnzuln',
+    'HCH', 'HCHCuban', 'HCHDmncn', 'HCHPrtRcn', 'HOth', 'HOthSpnrd', 'HOthSpnsh', 'HOthSpnAm', 'HOthGrfna'
+  ],
+
+  // Specific country/ethnicity mappings
+  'mexican': ['HMex'],
+  'cuban': ['HCHCuban'],
+  'dominican': ['HCHDmncn'],
+  'puertoricans': ['HCHPrtRcn'],
+  'colombian': ['HSAClmbn'],
+  'peruvian': ['HSAPrvn'],
+  'ecuadorian': ['HSAEcudrn'],
+  'salvadoran': ['HCASlvdrn'],
+  'guatemalan': ['HCAGutmln'],
+  'honduran': ['HCAHndrn'],
+  'nicaraguan': ['HCANcrgn'],
+  'argentinean': ['HSAArgntn'],
+  'venezuelan': ['HSAVnzuln'],
+
+  'italian': ['WEurItln'],
+  'irish': ['WEurIrsh'], 
+  'german': ['WEurGrmn'],
+  'polish': ['WEurPlsh'],
+  'russian': ['WEurRsn'],
+  'english': ['WEurEnglsh'],
+  'french': ['WEurFrnch'],
+  'greek': ['WEurGrk'],
+  'swedish': ['WEurSwdsh'],
+  'norwegian': ['WEurNrwgn'],
+  'danish': ['WEurDnsh'],
+  'finnish': ['WEurFnnsh'],
+  'british': ['WEurBrtsh'],
+  'scottish': ['WEurSctsh'],
+  'welsh': ['WEurWlsh'],
+
   'chinese': ['AEAChnsNoT'],
   'japanese': ['AEAJpns'],
   'korean': ['AEAKrn'],
@@ -38,33 +155,27 @@ const ETHNICITY_MAPPINGS: Record<string, string[]> = {
   'bangladeshi': ['ASABngldsh'],
   'srilankan': ['ASASrLnkn'],
   'nepalese': ['ASANpls'],
-  
-  // Black subcategories
-  'africanamerican': ['BAfrAm'],
-  'caribbean': ['BCrb'],
-  'subsaharanafrican': ['BSSAf'],
+
   'jamaican': ['BCrbJmcn'],
   'haitian': ['BCrbHtn'],
   'nigerian': ['BSSAfNgrn'],
-  
-  // Hispanic variations
-  'latinx': ['H'],
-  'mexican': ['HMex'],
-  'dominican': ['HCHDmncn'],
-  'puertoricans': ['HCHPrtRcn'],
-  'cuban': ['HCHCuban'],
-  'colombian': ['HSAClmbn'],
-  'salvadoran': ['HCASlvdrn'],
-  
-  // Add some specific white ethnicities
-  'italian': ['WEurItln'],
-  'irish': ['WEurIrsh'],
-  'german': ['WEurGrmn'],
-  'polish': ['WEurPlsh'],
-  'russian': ['WEurRsn'],
+  'ghanaian': ['BSSAfGhn'],
+  'ethiopian': ['BSSAfEthpn'],
+  'kenyan': ['BSSAfKnyn'],
+
   'arab': ['WMENAArab'],
   'iranian': ['WMENAIrn'],
-  'turkish': ['WEurTrksh'],
+  'lebanese': ['WMENALbns'],
+  'syrian': ['WMENASyrn'],
+  'egyptian': ['WMENAEgptn'],
+  'moroccan': ['WMENAMrcn'],
+  'palestinian': ['WMENAPlstn'],
+
+  // Other categories
+  'nativeamerican': ['AIANA'],
+  'americanindian': ['AIANA'],
+  'pacificislander': ['NHPI'],
+  'someotherrace': ['SOR'],
 };
 
 export function resolveEthnicities(inputList: string[]): string[] {
@@ -91,17 +202,16 @@ export function resolveEthnicities(inputList: string[]): string[] {
 
     let matched = false;
 
-    // 1. Try exact mapping first
+    // 1. Try exact mapping first - this will now include ALL subcategories
     if (ETHNICITY_MAPPINGS[normalized]) {
       ETHNICITY_MAPPINGS[normalized].forEach(code => {
-        const items = getEthnicityItemsByCode(code);
-        items.forEach(item => resolved.add(item.value));
+        resolved.add(code);
       });
       matched = true;
       continue;
     }
 
-    // 2. Try fuzzy label matching
+    // 2. Try fuzzy label matching (fallback)
     for (const item of ethnicityData) {
       const labelNormalized = item.label.toLowerCase().replace(/[^a-z]/g, '');
       
@@ -120,19 +230,6 @@ export function resolveEthnicities(inputList: string[]): string[] {
       }
     }
 
-    // 3. Try parent group matching as last resort
-    if (!matched) {
-      for (const item of ethnicityData) {
-        if (item.parent === item.value) continue; // Skip root categories
-        
-        const parentNormalized = item.parent.toLowerCase();
-        if (parentNormalized === normalized) {
-          resolved.add(item.value);
-          matched = true;
-        }
-      }
-    }
-
     if (!matched) {
       unresolved.push(rawInput);
     }
@@ -147,13 +244,6 @@ export function resolveEthnicities(inputList: string[]): string[] {
   }
   
   return result;
-}
-
-// Helper function to get ethnicity items by parent code
-function getEthnicityItemsByCode(parentCode: string) {
-  return ethnicityData.filter(item => 
-    item.value === parentCode || item.parent === parentCode
-  );
 }
 
 // Export for debugging/testing
