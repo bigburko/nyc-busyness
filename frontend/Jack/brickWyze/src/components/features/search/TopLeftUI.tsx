@@ -14,7 +14,7 @@ import { useActiveFilters } from '@/hooks/useActiveFilters';
 import { useFilterStore } from '@/stores/filterStore';
 import { useGeminiStore } from '@/stores/geminiStore';
 import ChatInputPanel from './ChatInputPanel';
-import Sidepanel from './SidePanel';
+import TractResultsContainer from './TractResultsContainer'; // ✅ NEW: Import new component
 import MyDrawer from '@/components/features/search/MyDrawer';
 
 const UI_MARGIN = 16;
@@ -25,9 +25,17 @@ const MOBILE_SEARCH_BAR_WIDTH = '90vw';
 
 interface TopLeftUIProps {
   onFilterUpdate: (filters: any) => void;
+  searchResults?: any[]; // ✅ NEW: Add search results prop
+  onMapTractSelect?: (tractId: string | null) => void; // ✅ NEW: Add map highlight callback
+  selectedTract?: any; // ✅ NEW: Selected tract from map clicks
 }
 
-export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
+export default function TopLeftUI({ 
+  onFilterUpdate, 
+  searchResults = [], // ✅ NEW: Default to empty array
+  onMapTractSelect, // ✅ NEW: Map highlighting function
+  selectedTract // ✅ NEW: Selected tract object
+}: TopLeftUIProps) {
   const viewState = useUiStore(s => s.viewState);
   const { isOpen: isFilterDrawerOpen, onOpen: openFilterDrawer, onClose: closeFilterDrawer } = useDisclosure();
   const [isInResultsFlow, setIsInResultsFlow] = useState(false);
@@ -246,7 +254,7 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
       {/* ✅ Search bar always stays in same position */}
       <SearchBar />
 
-      {/* ✅ Results panel - Custom slide animation for better control */}
+      {/* ✅ Results panel with NEW TractResultsContainer */}
       {showResultsPanel && (
         <Box
           position="absolute"
@@ -267,14 +275,23 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
             align="stretch"
             spacing={0}
             h="100%"
-            overflowY="auto"
+            overflowY="hidden" // ✅ CHANGED: Let TractResultsContainer handle scrolling
             pointerEvents="auto"
           >
-            <Flex align="center" px={4} pb={3}>
-              <Text fontSize="lg" fontWeight="semibold">Results</Text>
+            {/* ✅ OPTIONAL: Keep results header or remove it */}
+            <Flex align="center" px={4} pb={3} borderBottom="1px solid" borderColor="gray.200">
+              <Text fontSize="lg" fontWeight="semibold">
+                Results ({searchResults.length})
+              </Text>
             </Flex>
-            <Box flex="1" px={4} pb={4}>
-              <Sidepanel />
+            
+            {/* ✅ NEW: Replace SidePanel with TractResultsContainer */}
+            <Box flex="1" overflow="hidden">
+              <TractResultsContainer 
+                searchResults={searchResults}
+                onMapTractSelect={onMapTractSelect}
+                selectedTract={selectedTract} // ✅ NEW: Pass selected tract
+              />
             </Box>
           </VStack>
         </Box>
