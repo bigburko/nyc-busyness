@@ -33,6 +33,7 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
   const [isInResultsFlow, setIsInResultsFlow] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [lastSearchSummary, setLastSearchSummary] = useState(''); // ✅ Track search summary
   const searchAreaRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   
@@ -69,6 +70,23 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
 
   const handleFilterSearch = (filters: any) => {
     console.log('🔍 [TopLeftUI] Received filters, passing to page:', filters);
+    
+    // ✅ Generate search summary
+    const currentState = useFilterStore.getState();
+    let summary = '';
+    
+    if (currentState.weights && currentState.weights.length > 0) {
+      const topWeight = currentState.weights.reduce((max, w) => w.value > max.value ? w : max);
+      summary = `Prioritizing ${topWeight.label} (${topWeight.value}%)`;
+    } else {
+      summary = 'Searching NYC neighborhoods';
+    }
+    
+    if (currentState.selectedEthnicities && currentState.selectedEthnicities.length > 0) {
+      summary += ` • ${currentState.selectedEthnicities[0]} areas`;
+    }
+    
+    setLastSearchSummary(summary);
     uiStore.setState({ viewState: 'results' });
     onFilterUpdate(filters);
   };
@@ -81,6 +99,7 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
   const handleClose = () => {
     uiStore.setState({ viewState: 'initial' });
     setIsInResultsFlow(false);
+    setLastSearchSummary(''); // ✅ Clear summary when closing
   };
 
   // ✅ Handle reset confirmation
@@ -91,6 +110,7 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
   const handleConfirmReset = () => {
     reset();
     resetChat();
+    setLastSearchSummary(''); // ✅ Clear summary on reset
     const currentState = useFilterStore.getState();
     const formattedFilters = {
       weights: currentState.weights || [],
@@ -165,13 +185,20 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
           )}
         </Box>
         <Input
-          placeholder="Ask Bricky about NYC neighborhoods..."
+          placeholder={
+            lastSearchSummary 
+              ? lastSearchSummary 
+              : "Ask Bricky about NYC neighborhoods..."
+          }
           onClick={handleInputClick}
           cursor="pointer"
           bg="transparent"
           border="none"
           _focus={{ outline: 'none' }}
-          _placeholder={{ color: 'gray.500' }}
+          _placeholder={{ 
+            color: lastSearchSummary ? 'gray.700' : 'gray.500',
+            fontWeight: lastSearchSummary ? 'medium' : 'normal'
+          }}
           flex="1"
           readOnly
         />

@@ -19,16 +19,19 @@ export default function ChatInputPanel({
   // ✅ USE PERSISTENT STORE for messages (survives panel open/close)
   const messages = useGeminiStore((s) => s.messages);
   const setMessages = useGeminiStore((s) => s.setMessages);
-  const input = useGeminiStore((s) => s.input);
-  const setInput = useGeminiStore((s) => s.setInput);
   const sendToGemini = useGeminiStore((s) => s.sendToGemini);
   const resetChat = useGeminiStore((s) => s.resetChat);
 
+  // ✅ OPTIMIZED: Use local state for input to prevent store re-renders on every keystroke
+  const [localInput, setLocalInput] = useState('');
+  
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const { setFilters, reset } = useFilterStore();
 
   // ✅ Track loading state locally (doesn't need to persist)
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const formatFiltersForSubmission = () => {
     const currentState = useFilterStore.getState();
@@ -43,12 +46,15 @@ export default function ChatInputPanel({
   };
 
   const handleSend = async () => {
-    const userMsg = input.trim();
+    const userMsg = localInput.trim();
     if (!userMsg || isLoading) return;
+
+    // ✅ Hide suggestions after first interaction
+    setShowSuggestions(false);
 
     // Add user message to persistent store with correct typing
     setMessages([...messages, { role: 'user' as const, content: userMsg }]);
-    setInput('');
+    setLocalInput(''); // ✅ Clear local input
     setIsLoading(true);
 
     try {
@@ -158,6 +164,15 @@ export default function ChatInputPanel({
     resetChat();
     const formattedFilters = formatFiltersForSubmission();
     onSearchSubmit(formattedFilters);
+    setShowSuggestions(true); // ✅ Show suggestions again after reset
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setLocalInput(suggestion);
+    setShowSuggestions(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   useEffect(() => {
@@ -166,19 +181,80 @@ export default function ChatInputPanel({
     }
   }, [messages, isLoading]);
 
+  // ✅ Simple auto-focus on mount
+  useEffect(() => {
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 150);
+  }, []);
+
   return (
     <Box bg="white" borderRadius="lg" overflow="hidden">
+      {/* ✅ SUGGESTIONS: Above input, only when first opening */}
+      {showSuggestions && messages.length === 0 && (
+        <Box p={4} bg="#FFF5F5" borderBottom="1px solid" borderColor="rgba(255, 73, 44, 0.2)">
+          <VStack spacing={3} align="center">
+            <Text fontSize="sm" color="gray.600" fontWeight="medium">
+              💡 Try asking me about:
+            </Text>
+            <Flex gap={2} wrap="wrap" justify="center">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                borderColor="rgba(255, 73, 44, 0.3)"
+                color="gray.600"
+                bg="white"
+                _hover={{ bg: '#FF492C', color: 'white', borderColor: '#FF492C' }}
+                onClick={() => handleSuggestionClick("Show me safe neighborhoods")}
+                borderRadius="full"
+                px={4}
+              >
+                🛡️ Safe Areas
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                borderColor="rgba(255, 73, 44, 0.3)"
+                color="gray.600"
+                bg="white"
+                _hover={{ bg: '#FF492C', color: 'white', borderColor: '#FF492C' }}
+                onClick={() => handleSuggestionClick("High foot traffic areas")}
+                borderRadius="full"
+                px={4}
+              >
+                🚶 Busy Areas
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                borderColor="rgba(255, 73, 44, 0.3)"
+                color="gray.600"
+                bg="white"
+                _hover={{ bg: '#FF492C', color: 'white', borderColor: '#FF492C' }}
+                onClick={() => handleSuggestionClick("Add Korean ethnicity")}
+                borderRadius="full"
+                px={4}
+              >
+                🌍 Korean Areas
+              </Button>
+            </Flex>
+          </VStack>
+        </Box>
+      )}
+
       {/* ✅ IMPROVED: Chat History with Better Design */}
       <Box 
         ref={chatBodyRef} 
         overflowY="auto" 
         maxH="320px" 
         p={4}
-        bg="gray.50"
+        bg="#FFF5F5"
         css={{
           '&::-webkit-scrollbar': { width: '6px' },
           '&::-webkit-scrollbar-track': { background: 'transparent' },
-          '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '3px' }
+          '&::-webkit-scrollbar-thumb': { background: 'rgba(255, 73, 44, 0.3)', borderRadius: '3px' }
         }}
       >
         {messages.length === 0 ? (
@@ -187,7 +263,7 @@ export default function ChatInputPanel({
               👋 Hi! I'm Bricky
             </Text>
             <Text fontSize="sm" color="gray.500" lineHeight="tall">
-              Your NYC neighborhood assistant. Try asking me about safe areas, busy locations, or specific demographics.
+              Your NYC neighborhood assistant. Use the suggestions above or ask me anything!
             </Text>
           </VStack>
         ) : (
@@ -226,24 +302,30 @@ export default function ChatInputPanel({
         )}
       </Box>
 
-      {/* ✅ IMPROVED: Input Area with Better Styling */}
-      <Box p={4} bg="white" borderTop="1px solid" borderColor="gray.200">
+      {/* ✅ Input Area */}
+      <Box p={4} bg="white" borderTop="1px solid" borderColor="rgba(255, 73, 44, 0.2)">
         <Flex gap={3} align="flex-end">
           <Box flex="1">
             <Input
+              ref={inputRef}
               placeholder="Ask about neighborhoods, filters, or demographics..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              value={localInput} // ✅ Use local state
+              onChange={(e) => setLocalInput(e.target.value)} // ✅ Update local state only
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
               size="md"
               borderRadius="lg"
-              bg="gray.50"
+              bg="#FFF5F5"
               border="2px solid"
-              borderColor="gray.200"
+              borderColor="rgba(255, 73, 44, 0.2)"
               _focus={{ 
                 borderColor: '#FF492C',
                 bg: 'white',
-                boxShadow: '0 0 0 1px #FF492C'
+                boxShadow: '0 0 0 1px rgba(255, 73, 44, 0.3)'
               }}
               _placeholder={{ color: 'gray.500' }}
             />
@@ -252,7 +334,7 @@ export default function ChatInputPanel({
             aria-label="Send"
             icon={<ArrowUpIcon />}
             onClick={handleSend}
-            isDisabled={!input.trim() || isLoading}
+            isDisabled={!localInput.trim() || isLoading} // ✅ Use local input
             bg="#FF492C"
             color="white"
             _hover={{ bg: '#E53E3E' }}
@@ -263,44 +345,7 @@ export default function ChatInputPanel({
           />
         </Flex>
 
-        {/* ✅ IMPROVED: Quick Actions with Better Layout */}
-        <Flex gap={2} mt={3} wrap="wrap">
-          <Button 
-            size="xs" 
-            variant="outline" 
-            borderColor="gray.300"
-            color="gray.600"
-            _hover={{ bg: 'gray.50', borderColor: '#FF492C', color: '#FF492C' }}
-            onClick={() => setInput("Show me safe neighborhoods")}
-            borderRadius="full"
-          >
-            🛡️ Safe Areas
-          </Button>
-          <Button 
-            size="xs" 
-            variant="outline" 
-            borderColor="gray.300"
-            color="gray.600"
-            _hover={{ bg: 'gray.50', borderColor: '#FF492C', color: '#FF492C' }}
-            onClick={() => setInput("High foot traffic areas")}
-            borderRadius="full"
-          >
-            🚶 Busy Areas
-          </Button>
-          <Button 
-            size="xs" 
-            variant="outline" 
-            borderColor="gray.300"
-            color="gray.600"
-            _hover={{ bg: 'gray.50', borderColor: '#FF492C', color: '#FF492C' }}
-            onClick={() => setInput("Add Korean ethnicity")}
-            borderRadius="full"
-          >
-            🌍 Korean Areas
-          </Button>
-        </Flex>
-
-        {/* ✅ IMPROVED: Reset Button - triggers parent confirmation */}
+        {/* ✅ Reset Button */}
         <Button 
           size="sm" 
           mt={3} 
