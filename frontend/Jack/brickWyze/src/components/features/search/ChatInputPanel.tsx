@@ -1,7 +1,9 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { Box, Input, IconButton, Spinner, Text, Flex, Button } from '@chakra-ui/react';
+import { 
+  Box, Input, IconButton, Spinner, Text, Flex, Button, VStack
+} from '@chakra-ui/react';
 import { ArrowUpIcon } from '@chakra-ui/icons';
 import { useFilterStore } from '@/stores/filterStore';
 import { resolveEthnicities } from '@/lib/resolveEthnicities';
@@ -9,8 +11,10 @@ import { useGeminiStore } from '@/stores/geminiStore';
 
 export default function ChatInputPanel({
   onSearchSubmit,
+  onResetRequest,
 }: {
   onSearchSubmit: (filters: any) => void;
+  onResetRequest: () => void;
 }) {
   // ✅ USE PERSISTENT STORE for messages (survives panel open/close)
   const messages = useGeminiStore((s) => s.messages);
@@ -20,11 +24,11 @@ export default function ChatInputPanel({
   const sendToGemini = useGeminiStore((s) => s.sendToGemini);
   const resetChat = useGeminiStore((s) => s.resetChat);
 
-  // ✅ Keep loading state local (doesn't need to persist)
-  const [isLoading, setIsLoading] = useState(false);
-
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const { setFilters, reset } = useFilterStore();
+
+  // ✅ Track loading state locally (doesn't need to persist)
+  const [isLoading, setIsLoading] = useState(false);
 
   const formatFiltersForSubmission = () => {
     const currentState = useFilterStore.getState();
@@ -42,9 +46,8 @@ export default function ChatInputPanel({
     const userMsg = input.trim();
     if (!userMsg || isLoading) return;
 
-    // ✅ Add user message to persistent store with correct type
-    const newUserMessage = { role: 'user' as const, content: userMsg };
-    setMessages([...messages, newUserMessage]);
+    // Add user message to persistent store with correct typing
+    setMessages([...messages, { role: 'user' as const, content: userMsg }]);
     setInput('');
     setIsLoading(true);
 
@@ -62,8 +65,10 @@ export default function ChatInputPanel({
 
       if (parsed.intent === 'reset') {
         reset();
-        const resetMessage = { role: 'assistant' as const, content: '🔄 Reset all filters to defaults. Refreshing results...' };
-        setMessages([...messages, newUserMessage, resetMessage]);
+        setMessages([...messages, 
+          { role: 'user' as const, content: userMsg }, 
+          { role: 'assistant' as const, content: '🔄 Reset all filters to defaults. Refreshing results...' }
+        ]);
         setTimeout(() => {
           const formattedFilters = formatFiltersForSubmission();
           onSearchSubmit(formattedFilters);
@@ -110,12 +115,11 @@ export default function ChatInputPanel({
 
         // ✅ Enhanced message with change description
         const enhancedMessage = `${changeDescription}🔍 Searching neighborhoods...`;
-        const assistantMessage = { 
-          role: 'assistant' as const, 
-          content: parsed.message ? `${parsed.message} ${enhancedMessage}` : enhancedMessage 
-        };
-        const currentMessages = [...messages, newUserMessage, assistantMessage];
-        setMessages(currentMessages);
+        const newMessages = [...messages, 
+          { role: 'user' as const, content: userMsg },
+          { role: 'assistant' as const, content: parsed.message ? `${parsed.message} ${enhancedMessage}` : enhancedMessage }
+        ];
+        setMessages(newMessages);
 
         // Auto-submit with slight delay for better UX
         setTimeout(() => {
@@ -125,28 +129,25 @@ export default function ChatInputPanel({
           
           // Add a follow-up message after search completes
           setTimeout(() => {
-            const followUpMessage = { 
+            setMessages([...newMessages, { 
               role: 'assistant' as const, 
               content: '✅ Results updated! Ask me to adjust any filters or try a different search.'
-            };
-            setMessages([...currentMessages, followUpMessage]);
+            }]);
           }, 1500);
         }, 300);
       } else {
         // Handle general conversation
-        const assistantMessage = { 
-          role: 'assistant' as const, 
-          content: parsed.message || "I'm here to help you find the perfect NYC neighborhood! Try asking me to adjust weights, change rent ranges, or add specific demographics." 
-        };
-        setMessages([...messages, newUserMessage, assistantMessage]);
+        setMessages([...messages, 
+          { role: 'user' as const, content: userMsg },
+          { role: 'assistant' as const, content: parsed.message || "I'm here to help you find the perfect NYC neighborhood! Try asking me to adjust weights, change rent ranges, or add specific demographics." }
+        ]);
       }
     } catch (err: any) {
       console.error('❌ [ChatInputPanel] Error:', err);
-      const errorMessage = { 
-        role: 'assistant' as const, 
-        content: "Sorry, I had trouble with that request. Try asking me something like 'increase foot traffic' or 'add Korean ethnicity'." 
-      };
-      setMessages([...messages, newUserMessage, errorMessage]);
+      setMessages([...messages, 
+        { role: 'user' as const, content: userMsg },
+        { role: 'assistant' as const, content: "Sorry, I had trouble with that request. Try asking me something like 'increase foot traffic' or 'add Korean ethnicity'." }
+      ]);
     }
 
     setIsLoading(false);
@@ -154,7 +155,7 @@ export default function ChatInputPanel({
 
   const handleReset = () => {
     reset();
-    resetChat(); // Clear persistent messages
+    resetChat();
     const formattedFilters = formatFiltersForSubmission();
     onSearchSubmit(formattedFilters);
   };
@@ -166,78 +167,153 @@ export default function ChatInputPanel({
   }, [messages, isLoading]);
 
   return (
-    <Box>
-      {/* Chat History */}
-      <Box ref={chatBodyRef} overflowY="auto" maxH="300px" px={2} py={3}>
+    <Box bg="white" borderRadius="lg" overflow="hidden">
+      {/* ✅ IMPROVED: Chat History with Better Design */}
+      <Box 
+        ref={chatBodyRef} 
+        overflowY="auto" 
+        maxH="320px" 
+        p={4}
+        bg="gray.50"
+        css={{
+          '&::-webkit-scrollbar': { width: '6px' },
+          '&::-webkit-scrollbar-track': { background: 'transparent' },
+          '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '3px' }
+        }}
+      >
         {messages.length === 0 ? (
-          <Box textAlign="center" py={4}>
-            <Text color="gray.400" fontSize="sm" mb={2}>
-              👋 Hi! I'm Bricky, your NYC neighborhood assistant
+          <VStack spacing={3} py={6} textAlign="center">
+            <Text fontSize="md" fontWeight="semibold" color="gray.600">
+              👋 Hi! I'm Bricky
             </Text>
-            <Text color="gray.500" fontSize="xs">
-              Try: "Show me safe areas" or "Add Korean restaurants"
+            <Text fontSize="sm" color="gray.500" lineHeight="tall">
+              Your NYC neighborhood assistant. Try asking me about safe areas, busy locations, or specific demographics.
             </Text>
-          </Box>
+          </VStack>
         ) : (
-          messages.map((msg, i) => (
-            <Box
-              key={i}
-              bg={msg.role === 'user' ? 'orange.100' : 'gray.100'}
-              p={3}
-              mb={2}
-              borderRadius="md"
-              maxW="85%"
-              ml={msg.role === 'user' ? 'auto' : '0'}
-              mr={msg.role === 'assistant' ? 'auto' : '0'}
-            >
-              <Text fontSize="sm">{msg.content}</Text>
-            </Box>
-          ))
-        )}
-        {isLoading && (
-          <Flex align="center" gap={2} justify="center" py={2}>
-            <Spinner color="orange.400" size="sm" />
-            <Text fontSize="sm" color="gray.500">Bricky is thinking...</Text>
-          </Flex>
+          <VStack spacing={3} align="stretch">
+            {messages.map((msg, i) => (
+              <Flex
+                key={i}
+                justify={msg.role === 'user' ? 'flex-end' : 'flex-start'}
+              >
+                <Box
+                  bg={msg.role === 'user' ? '#FF492C' : 'white'}
+                  color={msg.role === 'user' ? 'white' : 'gray.800'}
+                  px={4}
+                  py={3}
+                  borderRadius="lg"
+                  maxW="85%"
+                  boxShadow="sm"
+                  fontSize="sm"
+                  lineHeight="tall"
+                  borderWidth="1px"
+                  borderColor={msg.role === 'user' ? '#FF492C' : 'gray.200'}
+                >
+                  <Text>{msg.content}</Text>
+                </Box>
+              </Flex>
+            ))}
+            {isLoading && (
+              <Flex justify="flex-start">
+                <Flex align="center" gap={3} bg="white" px={4} py={3} borderRadius="lg" boxShadow="sm" borderWidth="1px" borderColor="gray.200">
+                  <Spinner size="sm" color="#FF492C" />
+                  <Text fontSize="sm" color="gray.600">Bricky is thinking...</Text>
+                </Flex>
+              </Flex>
+            )}
+          </VStack>
         )}
       </Box>
 
-      {/* Input */}
-      <Flex mt={3} gap={2}>
-        <Input
-          placeholder="Ask about neighborhoods, filters, or demographics..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          size="sm"
-        />
-        <IconButton
-          aria-label="Send"
-          icon={<ArrowUpIcon />}
-          onClick={handleSend}
-          isDisabled={!input.trim() || isLoading}
-          colorScheme="orange"
-          size="sm"
-        />
-      </Flex>
+      {/* ✅ IMPROVED: Input Area with Better Styling */}
+      <Box p={4} bg="white" borderTop="1px solid" borderColor="gray.200">
+        <Flex gap={3} align="flex-end">
+          <Box flex="1">
+            <Input
+              placeholder="Ask about neighborhoods, filters, or demographics..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              size="md"
+              borderRadius="lg"
+              bg="gray.50"
+              border="2px solid"
+              borderColor="gray.200"
+              _focus={{ 
+                borderColor: '#FF492C',
+                bg: 'white',
+                boxShadow: '0 0 0 1px #FF492C'
+              }}
+              _placeholder={{ color: 'gray.500' }}
+            />
+          </Box>
+          <IconButton
+            aria-label="Send"
+            icon={<ArrowUpIcon />}
+            onClick={handleSend}
+            isDisabled={!input.trim() || isLoading}
+            bg="#FF492C"
+            color="white"
+            _hover={{ bg: '#E53E3E' }}
+            _active={{ bg: '#C53030' }}
+            size="md"
+            borderRadius="lg"
+            boxShadow="md"
+          />
+        </Flex>
 
-      {/* Quick Actions */}
-      <Flex gap={1} mt={2} wrap="wrap">
-        <Button size="xs" variant="ghost" onClick={() => setInput("Show me safe neighborhoods")}>
-          🛡️ Safe Areas
-        </Button>
-        <Button size="xs" variant="ghost" onClick={() => setInput("High foot traffic areas")}>
-          🚶 Busy Areas
-        </Button>
-        <Button size="xs" variant="ghost" onClick={() => setInput("Add Korean ethnicity")}>
-          🌍 Korean Areas
-        </Button>
-      </Flex>
+        {/* ✅ IMPROVED: Quick Actions with Better Layout */}
+        <Flex gap={2} mt={3} wrap="wrap">
+          <Button 
+            size="xs" 
+            variant="outline" 
+            borderColor="gray.300"
+            color="gray.600"
+            _hover={{ bg: 'gray.50', borderColor: '#FF492C', color: '#FF492C' }}
+            onClick={() => setInput("Show me safe neighborhoods")}
+            borderRadius="full"
+          >
+            🛡️ Safe Areas
+          </Button>
+          <Button 
+            size="xs" 
+            variant="outline" 
+            borderColor="gray.300"
+            color="gray.600"
+            _hover={{ bg: 'gray.50', borderColor: '#FF492C', color: '#FF492C' }}
+            onClick={() => setInput("High foot traffic areas")}
+            borderRadius="full"
+          >
+            🚶 Busy Areas
+          </Button>
+          <Button 
+            size="xs" 
+            variant="outline" 
+            borderColor="gray.300"
+            color="gray.600"
+            _hover={{ bg: 'gray.50', borderColor: '#FF492C', color: '#FF492C' }}
+            onClick={() => setInput("Add Korean ethnicity")}
+            borderRadius="full"
+          >
+            🌍 Korean Areas
+          </Button>
+        </Flex>
 
-      {/* Reset Button */}
-      <Button size="xs" mt={2} w="100%" variant="outline" onClick={handleReset}>
-        🔄 Reset All Filters
-      </Button>
+        {/* ✅ IMPROVED: Reset Button - triggers parent confirmation */}
+        <Button 
+          size="sm" 
+          mt={3} 
+          w="full" 
+          variant="ghost" 
+          color="gray.500"
+          _hover={{ bg: 'gray.100', color: 'gray.700' }}
+          onClick={onResetRequest}
+          borderRadius="lg"
+        >
+          🔄 Reset All Filters
+        </Button>
+      </Box>
     </Box>
   );
 }

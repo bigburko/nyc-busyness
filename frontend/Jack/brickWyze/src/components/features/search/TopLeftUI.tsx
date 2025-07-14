@@ -1,20 +1,26 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Box, useDisclosure, Divider, Slide, VStack, Flex, Text, Input, Button, IconButton, Badge } from '@chakra-ui/react';
+import { 
+  Box, useDisclosure, Divider, VStack, Flex, Text, Input, Button, IconButton, Badge,
+  AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader,
+  AlertDialogBody, AlertDialogFooter, Portal
+} from '@chakra-ui/react';
 import { SearchIcon, CloseIcon } from '@chakra-ui/icons';
 import { FiSliders } from 'react-icons/fi';
 import { uiStore, useUiStore } from '@/stores/uiStore';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { useActiveFilters } from '@/hooks/useActiveFilters';
+import { useFilterStore } from '@/stores/filterStore';
+import { useGeminiStore } from '@/stores/geminiStore';
 import ChatInputPanel from './ChatInputPanel';
 import Sidepanel from './SidePanel';
-import MyDrawer from '@/components/features/search/MyDrawer'; // ✅ Full path
+import MyDrawer from '@/components/features/search/MyDrawer';
 
 const UI_MARGIN = 16;
-const SIDE_PANEL_WIDTH = 520; // ✅ Increased from 420 to 520
+const SIDE_PANEL_WIDTH = 485;
 const MOBILE_SIDE_PANEL_WIDTH = '95vw';
-const SEARCH_BAR_WIDTH = 520; // ✅ Match sidepanel width
+const SEARCH_BAR_WIDTH = 450;
 const MOBILE_SEARCH_BAR_WIDTH = '90vw';
 
 interface TopLeftUIProps {
@@ -26,10 +32,16 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
   const { isOpen: isFilterDrawerOpen, onOpen: openFilterDrawer, onClose: closeFilterDrawer } = useDisclosure();
   const [isInResultsFlow, setIsInResultsFlow] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const searchAreaRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   
   // ✅ Get active filter count
   const activeFilterCount = useActiveFilters();
+  
+  // ✅ Get store methods for reset
+  const { reset } = useFilterStore();
+  const { resetChat } = useGeminiStore();
 
   // ✅ Mobile detection
   useEffect(() => {
@@ -45,6 +57,9 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
   }, [viewState]);
 
   const handleOutsideClick = () => {
+    // ✅ Don't close if reset dialog is open
+    if (isResetDialogOpen) return;
+    
     if (viewState === 'typing' && !isFilterDrawerOpen) {
       uiStore.setState({ viewState: isInResultsFlow ? 'results' : 'initial' });
     }
@@ -68,20 +83,42 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
     setIsInResultsFlow(false);
   };
 
+  // ✅ Handle reset confirmation
+  const handleResetRequest = () => {
+    setIsResetDialogOpen(true);
+  };
+
+  const handleConfirmReset = () => {
+    reset();
+    resetChat();
+    const currentState = useFilterStore.getState();
+    const formattedFilters = {
+      weights: currentState.weights || [],
+      rentRange: currentState.rentRange || [26, 160],
+      selectedEthnicities: currentState.selectedEthnicities || [],
+      selectedGenders: currentState.selectedGenders || ['male', 'female'],
+      ageRange: currentState.ageRange || [0, 100],
+      incomeRange: currentState.incomeRange || [0, 250000],
+    };
+    onFilterUpdate(formattedFilters);
+    setIsResetDialogOpen(false);
+  };
+
   // ✅ Search bar component - stays in same position always
   const SearchBar = () => (
     <Box
       position="absolute"
       top={`${UI_MARGIN}px`}
       left={`${UI_MARGIN}px`}
-      zIndex={1000} // ✅ LOWERED: Below drawer (drawer overlay is 1999, content is 2000)
-      bg="white"
+      zIndex={1300} // ✅ Higher than results panel (1200)
+      bg="#FFF5F5"
       boxShadow="lg"
       borderRadius="xl"
       overflow="hidden"
-      width={{ base: MOBILE_SEARCH_BAR_WIDTH, md: `${SEARCH_BAR_WIDTH}px` }} // ✅ Increased width
+      width={{ base: MOBILE_SEARCH_BAR_WIDTH, md: `${SEARCH_BAR_WIDTH}px` }}
       maxWidth="95vw"
       ref={searchAreaRef}
+      border="1px solid rgba(255, 73, 44, 0.2)"
     >
       <Flex align="center" px={3} py={2} gap={2} width="100%">
         <Box position="relative">
@@ -92,16 +129,16 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
             size="sm"
             borderRadius="full"
             fontWeight="medium"
-            bg={activeFilterCount > 0 ? "#FF492C" : "gray.100"}
-            color={activeFilterCount > 0 ? "white" : "gray.600"}
+            bg={activeFilterCount > 0 ? "#FF492C" : "gray.600"}
+            color={activeFilterCount > 0 ? "white" : "white"}
             _hover={{ 
-              bg: activeFilterCount > 0 ? "#E53E3E" : "gray.200" 
+              bg: activeFilterCount > 0 ? "#E53E3E" : "gray.700" 
             }}
             _active={{
-              bg: activeFilterCount > 0 ? "#C53030" : "gray.300"
+              bg: activeFilterCount > 0 ? "#C53030" : "gray.800"
             }}
             border={activeFilterCount > 0 ? "2px solid #FF492C" : "2px solid transparent"}
-            boxShadow={activeFilterCount > 0 ? "0 0 0 1px rgba(255, 73, 44, 0.3)" : "none"}
+            boxShadow={activeFilterCount > 0 ? "0 0 0 1px rgba(255, 73, 44, 0.3)" : "md"}
           >
             Filters
           </Button>
@@ -160,7 +197,10 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
           transform={viewState === 'typing' ? 'translateY(0)' : 'translateY(-5px)'}
           transition="transform 150ms ease-out"
         >
-          <ChatInputPanel onSearchSubmit={handleFilterSearch} />
+          <ChatInputPanel 
+            onSearchSubmit={handleFilterSearch}
+            onResetRequest={handleResetRequest}
+          />
         </Box>
       </Box>
     </Box>
@@ -173,38 +213,38 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
       {/* ✅ Search bar always stays in same position */}
       <SearchBar />
 
-      {/* ✅ Results panel slides in from left, below search bar */}
+      {/* ✅ Results panel - Custom slide animation for better control */}
       {showResultsPanel && (
-        <Slide in={true} direction="left">
-          <Box
-            position="absolute"
-            top="0"
-            left="0"
-            h="100vh"
-            width={isMobile ? MOBILE_SIDE_PANEL_WIDTH : `${SIDE_PANEL_WIDTH}px`} // ✅ Reduced width
-            bg="white"
-            boxShadow="xl"
-            pt="120px" // Space for search bar
-            zIndex={1200} // ✅ Lower than search bar, allows map clicks outside
+        <Box
+          position="absolute"
+          top="0"
+          left="0"
+          h="100vh"
+          width={isMobile ? MOBILE_SIDE_PANEL_WIDTH : `${SIDE_PANEL_WIDTH}px`}
+          bg="white"
+          boxShadow="xl"
+          pt="120px"
+          zIndex={1200}
+          pointerEvents="auto" // ✅ Panel itself captures clicks
+          borderRight="1px solid rgba(0,0,0,0.1)"
+          transform={showResultsPanel ? "translateX(0)" : "translateX(-100%)"}
+          transition="transform 300ms ease-out"
+        >
+          <VStack
+            align="stretch"
+            spacing={0}
+            h="100%"
+            overflowY="auto"
             pointerEvents="auto"
-            borderRight="1px solid rgba(0,0,0,0.1)"
           >
-            <VStack
-              align="stretch"
-              spacing={0}
-              h="100%"
-              overflowY="auto"
-              pointerEvents="auto"
-            >
-              <Flex align="center" px={4} pb={3}>
-                <Text fontSize="lg" fontWeight="semibold">Results</Text>
-              </Flex>
-              <Box flex="1" px={4} pb={4}>
-                <Sidepanel />
-              </Box>
-            </VStack>
-          </Box>
-        </Slide>
+            <Flex align="center" px={4} pb={3}>
+              <Text fontSize="lg" fontWeight="semibold">Results</Text>
+            </Flex>
+            <Box flex="1" px={4} pb={4}>
+              <Sidepanel />
+            </Box>
+          </VStack>
+        </Box>
       )}
 
       {/* ✅ Drawer - Chakra handles overlay automatically */}
@@ -213,6 +253,60 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
         onClose={closeFilterDrawer}
         onSearchSubmit={handleFilterSearch}
       />
+
+      {/* ✅ Reset Confirmation Dialog - In Portal to avoid click conflicts */}
+      <Portal>
+        <AlertDialog
+          isOpen={isResetDialogOpen}
+          leastDestructiveRef={cancelRef}
+          onClose={() => setIsResetDialogOpen(false)}
+          closeOnOverlayClick={false}
+        >
+          <AlertDialogOverlay
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <AlertDialogContent
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <AlertDialogHeader fontSize="lg" fontWeight="bold">
+                Reset All Filters & Chat
+              </AlertDialogHeader>
+              <AlertDialogBody>
+                Are you sure you want to reset all filters to their default values and clear the chat history? This action cannot be undone.
+              </AlertDialogBody>
+              <AlertDialogFooter>
+                <Button 
+                  ref={cancelRef} 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsResetDialogOpen(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  colorScheme="red" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleConfirmReset();
+                  }} 
+                  ml={3}
+                >
+                  Reset Everything
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogOverlay>
+        </AlertDialog>
+      </Portal>
     </>
   );
 }
