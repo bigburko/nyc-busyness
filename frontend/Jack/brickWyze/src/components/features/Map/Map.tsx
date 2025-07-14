@@ -43,6 +43,7 @@ interface MapProps {
   selectedGenders?: string[];
   ageRange?: [number, number];
   incomeRange?: [number, number];
+  topN?: number; // ✅ Add topN prop
 }
 
 export default function Map({
@@ -52,6 +53,7 @@ export default function Map({
   selectedGenders,
   ageRange,
   incomeRange,
+  topN = 10, // ✅ Default to 10% if not provided
 }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -73,6 +75,7 @@ export default function Map({
         genders: selectedGenders,
         ageRange,
         incomeRange,
+        topN // ✅ Include topN in debug log
       });
     }
 
@@ -91,6 +94,7 @@ export default function Map({
           genders: selectedGenders,
           ageRange,
           incomeRange,
+          topN // ✅ Include topN in API call
         }),
       });
 
@@ -112,8 +116,19 @@ export default function Map({
         console.log('[✅ DEBUG] Data received by edge function:', debug);
       }
 
-      const scoreMap: Record<string, ResilienceScore> = {};
-      zones.forEach((score: ResilienceScore) => {
+      // ✅ NEW: Add rankings to zones (1st, 2nd, 3rd, etc.)
+      // Zones are already sorted by score from edge function, so ranking is just index + 1
+      const zonesWithRankings = zones.map((zone, index) => ({
+        ...zone,
+        ranking: index + 1 // 1st place = index 0 + 1, 2nd place = index 1 + 1, etc.
+      }));
+
+      if (DEBUG_MODE) {
+        console.log('🏆 Added rankings to zones:', zonesWithRankings.slice(0, 5)); // Log first 5 for debugging
+      }
+
+      const scoreMap: Record<string, any> = {};
+      zonesWithRankings.forEach((score) => {
         if (score?.geoid) {
           scoreMap[score.geoid.toString().padStart(11, '0')] = score;
         }
@@ -129,7 +144,7 @@ export default function Map({
             ...feat,
             properties: {
               ...feat.properties,
-              ...(match || { custom_score: 0 }),
+              ...(match || { custom_score: 0, ranking: null }),
               ...match,
               hasScore: !!match,
             },
@@ -137,14 +152,20 @@ export default function Map({
         }),
       };
 
-      if (DEBUG_MODE) console.log('🧠 Updated GeoJSON with scores applied.');
+      if (DEBUG_MODE) {
+        console.log('🧠 Updated GeoJSON with scores and rankings applied.');
+        // Log a few features to see if ranking is there
+        const featuresWithRankings = updated.features.filter(f => f.properties.ranking);
+        console.log('🏆 Features with rankings:', featuresWithRankings.length);
+        console.log('🏆 Sample feature with ranking:', featuresWithRankings[0]?.properties);
+      }
 
       updateTractData(mapRef.current, updated);
       showLegend();
     } catch (err) {
       console.error('[Error fetching and applying scores]', err);
     }
-  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange]);
+  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN]); // ✅ Include topN in dependency array
 
   // ✅ FIX: Map initialization only happens ONCE
   useEffect(() => {
@@ -214,7 +235,7 @@ export default function Map({
     if (isMapLoaded) {
       fetchAndApplyScores();
     }
-  }, [isMapLoaded, fetchAndApplyScores]);
+  }, [isMapLoaded, fetchAndApplyScores, topN]); // ✅ Include topN in dependency array
 
   return (
     <div

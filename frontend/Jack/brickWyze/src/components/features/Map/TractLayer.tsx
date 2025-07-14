@@ -61,6 +61,61 @@ export const addTractLayers = (map: mapboxgl.Map) => {
       },
     });
   }
+
+  // ✅ BACK TO BASICS: Simple score numbers for all tracts
+  // Shows actual resilience scores (84, 91, 77, etc.) - much clearer for users
+  if (!map.getLayer('tracts-labels')) {
+    map.addLayer({
+      id: 'tracts-labels',
+      type: 'symbol',
+      source: 'tracts',
+      layout: {
+        'text-field': [
+          'case',
+          // Only show labels for tracts that have scores
+          ['all', 
+            ['==', ['typeof', ['get', 'hasScore']], 'boolean'],
+            ['get', 'hasScore']
+          ],
+          // ✅ Show actual resilience score as whole number out of 100 (e.g., "84", "91")
+          [
+            'to-string',
+            ['round', ['*', ['get', 'custom_score'], 100]]
+          ],
+          '' // Empty string for tracts without scores
+        ],
+        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          10, 8,   // Small text at low zoom
+          12, 12,  // Medium text at medium zoom  
+          14, 16,  // Larger text when zoomed in
+          16, 20   // Large text when very close
+        ],
+        'text-anchor': 'center',
+        'text-allow-overlap': false,
+        'text-ignore-placement': false,
+        'symbol-placement': 'point'
+      },
+      paint: {
+        // ✅ CONSISTENT STYLING: All numbers get same white text with black outline
+        'text-color': '#ffffff', // Clean white text for all scores
+        'text-halo-color': '#000000', // Black outline for readability
+        'text-halo-width': 1.5, // Good outline thickness
+        'text-opacity': [
+          'case',
+          ['all', 
+            ['==', ['typeof', ['get', 'hasScore']], 'boolean'],
+            ['get', 'hasScore']
+          ],
+          0.9, // Good visibility
+          0    // Invisible for tracts without scores
+        ]
+      }
+    });
+  }
 };
 
 /**
@@ -75,6 +130,20 @@ export const updateTractData = (
   if (source && 'setData' in source) {
     (source as mapboxgl.GeoJSONSource).setData(geojson);
     map.setPaintProperty('tracts-fill', 'fill-opacity', 0.7);
+    
+    // ✅ Ensure labels are visible when data updates
+    if (map.getLayer('tracts-labels')) {
+      map.setPaintProperty('tracts-labels', 'text-opacity', [
+        'case',
+        ['all', 
+          ['==', ['typeof', ['get', 'hasScore']], 'boolean'],
+          ['get', 'hasScore']
+        ],
+        0.9,
+        0
+      ]);
+    }
+    
     map.triggerRepaint();
   }
 };

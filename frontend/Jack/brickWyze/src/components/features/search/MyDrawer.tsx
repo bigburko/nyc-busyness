@@ -5,7 +5,7 @@
 import {
   Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent, DrawerCloseButton,
   Flex, Box, Button, AlertDialog, AlertDialogOverlay, AlertDialogContent,
-  AlertDialogHeader, AlertDialogBody, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogBody, AlertDialogFooter
 } from '@chakra-ui/react';
 import { useRef, useState, useCallback } from 'react';
 import { SearchIcon } from '@chakra-ui/icons';
@@ -23,6 +23,7 @@ import { ethnicityData } from '../filters/DemographicGroup/RaceDropDownGroup/eth
 import CancelResetButton from '../filters/ScoreWeightingGroup/CancelResetButton';
 import GenderSelect from '../filters/DemographicGroup/GenderSelect';
 import CollapsibleSection from '../../ui/CollapsibleSection';
+import TopNSelector from '../filters/ScoreWeightingGroup/TopNSelector'; // ✅ Import TopNSelector component
 
 interface MyDrawerProps {
   isOpen: boolean;
@@ -57,6 +58,9 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
   const setFilters = useFilterStore((state: FilterState) => state.setFilters);
   const updateWeight = useFilterStore((state: FilterState) => state.updateWeight);
 
+  // ✅ NEW: Local state for topN (can be moved to store later)
+  const [topN, setTopN] = useState(10);
+
 
   const [_menuIsOpen, setMenuIsOpen] = useState(false);
   const [dropdownInput, setDropdownInput] = useState('');
@@ -90,8 +94,21 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
       alert('Please select at least one gender.');
       return;
     }
+    
+    // ✅ FIXED: Properly include topN in submission
     const currentState = useFilterStore.getState();
-    onSearchSubmit(currentState);
+    const submissionData = {
+      weights: currentState.weights,
+      rentRange: currentState.rentRange,
+      selectedEthnicities: currentState.selectedEthnicities,
+      selectedGenders: currentState.selectedGenders,
+      ageRange: currentState.ageRange,
+      incomeRange: currentState.incomeRange,
+      topN: topN // ✅ Include topN parameter
+    };
+    
+    console.log('🔍 [MyDrawer] Submitting with topN:', topN, submissionData);
+    onSearchSubmit(submissionData);
     onClose();
   };
 
@@ -115,6 +132,13 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
           <DrawerHeader>Priorities</DrawerHeader>
           <DrawerBody ref={drawerBodyRef} overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '8px' }, '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#888', borderRadius: '4px', '&:hover': { background: '#555' } } }}>
             <Flex direction="column" gap={4} pb={8}>
+              {/* ✅ NEW: Top N% Selector Component */}
+              <TopNSelector
+                value={topN}
+                onChange={setTopN}
+                estimatedTotalTracts={310}
+              />
+
               <Box bg="white" borderRadius="lg" p={4} boxShadow="sm">
                 <MyRangeSlider heading="Rent (PSF)" toolTipText="Target Average Rent cost per Square foot in $USD" defaultRange={rentRange} onChangeEnd={handleRentRangeChange}/>
               </Box>

@@ -71,7 +71,7 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
   const handleFilterSearch = (filters: any) => {
     console.log('🔍 [TopLeftUI] Received filters, passing to page:', filters);
     
-    // ✅ Generate search summary
+    // ✅ Generate search summary including topN info
     const currentState = useFilterStore.getState();
     let summary = '';
     
@@ -84,6 +84,12 @@ export default function TopLeftUI({ onFilterUpdate }: TopLeftUIProps) {
     
     if (currentState.selectedEthnicities && currentState.selectedEthnicities.length > 0) {
       summary += ` • ${currentState.selectedEthnicities[0]} areas`;
+    }
+    
+    // ✅ NEW: Add topN info to summary
+    if (filters.topN) {
+      const tractCount = Math.ceil(310 * (filters.topN / 100));
+      summary += ` • Top ${filters.topN}% (${tractCount} tracts)`;
     }
     
     setLastSearchSummary(summary);
