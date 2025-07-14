@@ -1,3 +1,5 @@
+// src/stores/geminiStore.ts
+
 import { create } from 'zustand';
 
 /**
@@ -14,27 +16,35 @@ interface FilterContext {
   incomeRange?: [number, number];
 }
 
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 /**
  * Defines the state and actions for interacting with the Gemini AI.
  */
 interface GeminiStore {
-  /** The last text response received from the Gemini API. */
   lastMessage: string;
-  /**
-   * Sends a message to the Gemini API, optionally with filter context.
-   * @param message The user's text query.
-   * @param context (Optional) The current state of the filters in the UI.
-   * @returns A promise that resolves with the AI's text reply.
-   */
   sendToGemini: (message: string, context?: FilterContext) => Promise<string>;
+
+  messages: Message[];               // 🟢 All chat history
+  setMessages: (msgs: Message[]) => void;
+
+  input: string;                     // 🟢 Current input value
+  setInput: (val: string) => void;
+
+  resetChat: () => void;             // 🟢 Clear chat (when user requests it)
 }
 
 export const useGeminiStore = create<GeminiStore>((set) => ({
   lastMessage: '',
-  
-  /**
-   * The core function to interact with the backend Gemini API route.
-   */
+  messages: [],
+  setMessages: (msgs) => set({ messages: msgs }),
+  input: '',
+  setInput: (val) => set({ input: val }),
+  resetChat: () => set({ messages: [], input: '' }),
+
   sendToGemini: async (message: string, context: FilterContext = {}) => {
     try {
       // Log the payload being sent for easier debugging

@@ -1,118 +1,56 @@
 'use client';
 
-import {
-  Button,
-  Flex,
-  IconButton,
-  Input,
-  useDisclosure,
-} from '@chakra-ui/react';
-import { FiSliders } from 'react-icons/fi';
+import { Flex, Input, Button, IconButton } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
-import { useRef } from 'react';
-import MyDrawer from './MyDrawer';
-import ChatbotDrawer from './ChatbotDrawer';
-import { Weighting } from '../filters/ScoreWeightingGroup/WeightingPanel';
+import { FiSliders } from 'react-icons/fi';
+import { uiStore } from '@/stores/uiStore';
 
-interface SearchFilters {
-  weights: Weighting[];
-  rentRange: [number, number];
-  selectedEthnicities: string[];
-  selectedGenders: string[];
-  ageRange: [number, number];
-  incomeRange: [number, number];
+interface TopSearchBarProps {
+  onFilterClick: () => void;
+  isResultsViewActive: boolean;
 }
 
-export default function TopSearchBar({
-  onSearchSubmit,
-}: {
-  onSearchSubmit: (filters: SearchFilters) => void;
-}) {
-  const {
-    isOpen: isDrawerOpen,
-    onOpen: openDrawer,
-    onClose: closeDrawer,
-  } = useDisclosure();
-
-  const {
-    isOpen: isChatbotOpen,
-    onOpen: openChatbot,
-    onClose: closeChatbot,
-  } = useDisclosure();
-
-  const filterButtonRef = useRef<HTMLButtonElement>(null);
+export default function TopSearchBar({ onFilterClick, isResultsViewActive }: TopSearchBarProps) {
+  const handleInputClick = () => {
+    uiStore.setState({ viewState: 'typing' });
+  };
 
   return (
-    <>
-      <Flex
-        position="absolute"
-        top="16px"
-        left="16px"
-        zIndex="overlay"
-        bg="white"
+    <Flex align="center" px={3} py={2} gap={2}>
+      {/* Filter Button */}
+      <Button
+        leftIcon={<FiSliders />}
+        onClick={onFilterClick}
+        variant="ghost"
+        size="sm"
         borderRadius="full"
-        boxShadow="md"
-        align="center"
-        px={3}
-        py={1}
-        w="600px"
-        maxW="95%"
+        fontWeight="medium"
       >
-        {/* Filters Button */}
-        <Button
-          ref={filterButtonRef}
-          onClick={openDrawer}
-          leftIcon={<FiSliders />}
-          borderRadius="full"
-          variant="ghost"
-          fontWeight="medium"
-          px={4}
-          mr={2}
-        >
-          Filters
-        </Button>
+        Filters
+      </Button>
 
-        {/* Search Input */}
-        <Input
-          placeholder="Search BrickWyze..."
-          border="none"
-          _focus={{ outline: 'none' }}
-          _placeholder={{ color: 'gray.500' }}
-          onClick={openChatbot}
-          cursor="pointer"
-          bg="transparent"
-          flex="1"
-        />
-
-        {/* Search Icon (optional trigger) */}
-        <IconButton
-          aria-label="Search"
-          icon={<SearchIcon />}
-          variant="ghost"
-          borderRadius="full"
-          ml={2}
-        />
-      </Flex>
-
-      {/* Filters Drawer */}
-      <MyDrawer
-        isOpen={isDrawerOpen}
-        onClose={closeDrawer}
-        onSearchSubmit={(filters) => {
-          console.log('🔍 Submitted filters:', filters);
-          onSearchSubmit(filters);
-        }}
+      {/* Search Input */}
+      <Input
+        placeholder="Ask Bricky about NYC neighborhoods..."
+        onClick={handleInputClick}
+        cursor="pointer"
+        bg="transparent"
+        border="none"
+        _focus={{ outline: 'none' }}
+        _placeholder={{ color: 'gray.500' }}
+        flex="1"
+        readOnly
       />
 
-      {/* Chatbot Drawer - FIX: Added missing isOpen and onClose props */}
-      <ChatbotDrawer 
-        isOpen={isChatbotOpen}
-        onClose={closeChatbot}
-        onSearchSubmit={(filters) => {
-          console.log('🤖 Bricky submitted filters:', filters);
-          onSearchSubmit(filters);
-        }}
+      {/* Search Icon */}
+      <IconButton
+        aria-label="Search"
+        icon={<SearchIcon />}
+        variant="ghost"
+        size="sm"
+        borderRadius="full"
+        onClick={handleInputClick}
       />
-    </>
+    </Flex>
   );
 }

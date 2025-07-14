@@ -13,6 +13,13 @@ import { addTractLayers, updateTractData } from './TractLayer';
 import { renderPopup } from './PopupHandler';
 import { createLegend, showLegend } from './Legend';
 
+// ✅ Add global type declaration
+declare global {
+  interface Window {
+    _brickwyzeMapRef?: mapboxgl.Map;
+  }
+}
+
 const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831];
 const INITIAL_ZOOM = 12;
 
@@ -152,6 +159,9 @@ export default function Map({
       style: 'mapbox://styles/mapbox/light-v11',
     });
     mapRef.current = map;
+    
+    // ✅ CRITICAL: Add this line to expose map globally
+    window._brickwyzeMapRef = map;
 
     map.on('load', () => {
       addTractLayers(map);
@@ -178,6 +188,8 @@ export default function Map({
       map.off('click', 'tracts-fill', handleClick);
       map.remove();
       mapRef.current = null;
+      // ✅ Clean up global reference
+      window._brickwyzeMapRef = undefined;
     };
   }, [weights, selectedEthnicities, selectedGenders]);
 

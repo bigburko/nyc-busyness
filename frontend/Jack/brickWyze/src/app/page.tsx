@@ -1,45 +1,69 @@
 'use client';
 
-import { Box } from '@chakra-ui/react';
 import { useState } from 'react';
+import { Box } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
-import { Weighting } from '@/components/features/filters/ScoreWeightingGroup/WeightingPanel';
 
-// ✅ Dynamically import components
-const Map = dynamic(() => import('../components/features/Map/Map'), { ssr: false });
-const TopSearchBar = dynamic(() => import('@/components/features/search/TopSearchBar'), { ssr: false });
+// ✅ Use your existing Map component
+const Map = dynamic(() => import('@/components/features/Map/Map'), { 
+  ssr: false 
+});
 
-interface SearchFilters {
-  weights: Weighting[];
-  rentRange: [number, number];
-  selectedEthnicities: string[];
-  selectedGenders: string[];
-  ageRange: [number, number];
-  incomeRange: [number, number];
+const TopLeftUI = dynamic(() => import('@/components/features/search/TopLeftUI'), { 
+  ssr: false 
+});
+
+// ✅ Define the filter interface your Map expects
+interface Weighting {
+  id: string;
+  label: string;
+  value: number;
+}
+
+interface MapFilters {
+  weights?: Weighting[];
+  rentRange?: [number, number];
+  selectedEthnicities?: string[];
+  selectedGenders?: string[];
+  ageRange?: [number, number];
+  incomeRange?: [number, number];
 }
 
 export default function Page() {
-  const [searchFilters, setSearchFilters] = useState<SearchFilters | null>(null);
+  // ✅ State to hold current filters that get passed to Map
+  const [currentFilters, setCurrentFilters] = useState<MapFilters>({});
 
-  const handleSearchSubmit = (filters: SearchFilters) => {
-    console.log('[Page.tsx] 🔎 Received filters:', filters);
-    setSearchFilters(filters);
+  // ✅ This function gets called by TopLeftUI and updates Map props
+  const handleFilterUpdate = (filters: any) => {
+    console.log('🔄 [Page] Updating map filters:', filters);
+    
+    // Convert from filter store format to Map component format
+    const mapFilters: MapFilters = {
+      weights: filters.weights || [],
+      rentRange: filters.rentRange || [26, 160],
+      selectedEthnicities: filters.selectedEthnicities || [],
+      selectedGenders: filters.selectedGenders || ['male', 'female'],
+      ageRange: filters.ageRange || [0, 100],
+      incomeRange: filters.incomeRange || [0, 250000],
+    };
+
+    setCurrentFilters(mapFilters);
   };
 
   return (
     <Box position="relative" height="100vh" width="100vw" overflow="hidden">
-      {/* Top floating search bar */}
-      <TopSearchBar onSearchSubmit={handleSearchSubmit} />
-
-      {/* Map receives the current filters */}
-      <Map
-        weights={searchFilters?.weights}
-        rentRange={searchFilters?.rentRange}
-        selectedEthnicities={searchFilters?.selectedEthnicities}
-        selectedGenders={searchFilters?.selectedGenders}
-        ageRange={searchFilters?.ageRange}
-        incomeRange={searchFilters?.incomeRange}
+      {/* ✅ Map receives filter props and automatically updates */}
+      <Map 
+        weights={currentFilters.weights}
+        rentRange={currentFilters.rentRange}
+        selectedEthnicities={currentFilters.selectedEthnicities}
+        selectedGenders={currentFilters.selectedGenders}
+        ageRange={currentFilters.ageRange}
+        incomeRange={currentFilters.incomeRange}
       />
+      
+      {/* ✅ TopLeftUI calls handleFilterUpdate */}
+      <TopLeftUI onFilterUpdate={handleFilterUpdate} />
     </Box>
   );
 }
