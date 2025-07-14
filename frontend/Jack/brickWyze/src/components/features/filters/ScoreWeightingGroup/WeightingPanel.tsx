@@ -1,8 +1,6 @@
-// src/components/WeightingPanel.tsx  (OR WHATEVER PATH YOURS HAS)
+// src/components/WeightingPanel.tsx
 
 import { Box, Text, VStack, IconButton, HStack } from '@chakra-ui/react';
-// This import path may need to be adjusted if your files are in different folders.
-// Example: './MySlider' or '../MySlider'
 import MySlider from './MySlider'; 
 import { AddIcon } from '@chakra-ui/icons';
 
@@ -20,8 +18,6 @@ export interface Weighting extends Layer {
 export interface Props {
   activeWeights: Weighting[];
   inactiveLayers: Layer[];
-  // ** THIS IS THE KEY CHANGE **
-  // The prop from your drawer should be named 'onSliderChangeEnd'
   onSliderChangeEnd: (id: string, newValue: number) => void; 
   onRemove: (id: string) => void;
   onAdd: (layer: Layer) => void;
@@ -30,26 +26,28 @@ export interface Props {
 export default function WeightingPanel({
   activeWeights = [],
   inactiveLayers = [],
-  onSliderChangeEnd, // Use the new prop name
+  onSliderChangeEnd,
   onRemove,
   onAdd,
 }: Props) {
   return (
     <Box>
-      <Text fontWeight="bold" mb={2}>Adjust Priorities</Text>
       <VStack spacing={4}>
         {activeWeights.map((weight) => (
           <MySlider
-            key={weight.id}
+            key={`${weight.id}-${weight.value}`} // ✅ Add value to key to force re-render
             label={weight.label}
             icon={weight.icon}
             filledTrack={weight.color}
-            // ----- FIXES ARE HERE ------
-            value={weight.value} // 1. Use `value` instead of `defaultValue`
-            onChangeEnd={(val: number) => onSliderChangeEnd(weight.id, val)} // 2. Use `onChangeEnd` instead of `onChange`
-            canBeRemoved={activeWeights.length > 1} // 3. Add this required prop for MySlider
-            // ---------------------------
-            onRemove={() => onRemove(weight.id)}
+            value={weight.value} // ✅ This should update when reset happens
+            onChangeEnd={(val: number) => {
+              onSliderChangeEnd(weight.id, val);
+            }}
+            canBeRemoved={activeWeights.length > 1}
+            onRemove={() => {
+              onRemove(weight.id);
+            }}
+            // ✅ Tooltips are now automatically generated in MySlider based on label
           />
         ))}
         {inactiveLayers.length > 0 && (
@@ -75,7 +73,7 @@ export default function WeightingPanel({
                       alignItems="center"
                       justifyContent="center"
                       fontSize="sm"
-                      color="white" // Added for better icon visibility
+                      color="white"
                     >
                       {layer.icon}
                     </Box>
@@ -85,7 +83,9 @@ export default function WeightingPanel({
                     icon={<AddIcon />}
                     size="sm"
                     aria-label="Add layer"
-                    onClick={() => onAdd(layer)}
+                    onClick={() => {
+                      onAdd(layer);
+                    }}
                     variant="ghost"
                   />
                 </HStack>

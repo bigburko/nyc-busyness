@@ -24,12 +24,6 @@ export default function TopNSelector({
 
   return (
     <Box>
-      <HStack spacing={3} mb={3}>
-        <Text fontSize="lg" fontWeight="bold" color="gray.800">
-          📊 Results Display
-        </Text>
-      </HStack>
-      
       <Text fontSize="sm" color="gray.600" mb={3}>
         Show top {value}% of census tracts ({estimatedCount} tracts)
       </Text>
