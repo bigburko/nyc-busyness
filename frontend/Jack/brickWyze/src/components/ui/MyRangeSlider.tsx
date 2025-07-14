@@ -27,7 +27,7 @@ interface Props {
   max?: number;
   step?: number;
   onChange?: (range: [number, number]) => void;
-  onChangeEnd?: (range: [number, number]) => void; // ✅ 1. Add onChangeEnd here
+  onChangeEnd?: (range: [number, number]) => void;
   showSymbol?: boolean;
   symbol?: string;
 }
@@ -43,7 +43,7 @@ function formatCompactNumber(value: number): string {
 
 export default function MyRangeSlider({
   heading = 'Range Slider',
-  unFilledTrack = 'black',
+  unFilledTrack = 'gray.200',
   filledTrack = '#FE4A2C',
   boxSize = 6,
   defaultRange = [26, 160],
@@ -52,17 +52,12 @@ export default function MyRangeSlider({
   step = 1,
   toolTipText,
   onChange,
-  onChangeEnd, // ✅ 2. Destructure the new prop
+  onChangeEnd,
   showSymbol = true,
   symbol = '$',
 }: Props) {
   const MIN_GAP = 5;
   const [range, setRange] = useState<[number, number]>(defaultRange);
-
-  // ❌ 3. REMOVE the problematic useEffect. It caused excessive updates.
-  // useEffect(() => {
-  //   onChange?.(range);
-  // }, [range, onChange]);
 
   const clamp = (val: [number, number]): [number, number] => {
     let [minVal, maxVal] = val;
@@ -76,10 +71,8 @@ export default function MyRangeSlider({
     return [Math.max(min, minVal), Math.min(max, maxVal)];
   };
 
-  // This function now only updates the local state for instant UI feedback
   const handleChange = (val: [number, number]) => {
     setRange(clamp(val));
-    // We can still call the original onChange if provided, for live updates
     if (onChange) {
       onChange(clamp(val));
     }
@@ -92,7 +85,6 @@ export default function MyRangeSlider({
       updated[index] = num;
       const clamped = clamp(updated);
       setRange(clamped);
-      // Also trigger onChangeEnd when an input is manually changed
       if (onChangeEnd) {
         onChangeEnd(clamped);
       }
@@ -100,41 +92,48 @@ export default function MyRangeSlider({
   };
 
   return (
-    <Box bg="#FFDED8" p={4} borderRadius="md" mb={6} w="100%">
-      <Flex align="center" gap={2} mb={3}>
-        <Heading as="h4" size="md" color="black">
-          {heading}
-        </Heading>
-        <MyToolTip>{toolTipText}</MyToolTip>
-      </Flex>
+    <Box w="100%">
+      {/* Show heading and tooltip only if heading is provided */}
+      {heading && (
+        <Flex align="center" gap={2} mb={3}>
+          <Heading as="h4" size="md" color="gray.800">
+            {heading}
+          </Heading>
+          {toolTipText && <MyToolTip>{toolTipText}</MyToolTip>}
+        </Flex>
+      )}
 
-      <RangeSlider
-        min={min}
-        max={max}
-        step={step}
-        value={range}
-        onChange={handleChange} // Updates local UI instantly
-        onChangeEnd={onChangeEnd} // ✅ 4. Pass onChangeEnd to the Chakra component to update global state
-      >
-        <RangeSliderTrack bg={unFilledTrack} h="4px">
-          <RangeSliderFilledTrack bg={filledTrack} />
-        </RangeSliderTrack>
+      {/* Add padding around the slider */}
+      <Box px={4} py={2}>
+        <RangeSlider
+          min={min}
+          max={max}
+          step={step}
+          value={range}
+          onChange={handleChange}
+          onChangeEnd={onChangeEnd}
+          mb={4}
+        >
+          <RangeSliderTrack bg={unFilledTrack} h="4px">
+            <RangeSliderFilledTrack bg={filledTrack} />
+          </RangeSliderTrack>
 
-        {[0, 1].map((index) => (
-          <RangeSliderThumb
-            key={index}
-            index={index}
-            boxSize={boxSize}
-            bg="white"
-            border={`2px solid ${filledTrack}`}
-          />
-        ))}
-      </RangeSlider>
+          {[0, 1].map((index) => (
+            <RangeSliderThumb
+              key={index}
+              index={index}
+              boxSize={boxSize}
+              bg="white"
+              border={`2px solid ${filledTrack}`}
+            />
+          ))}
+        </RangeSlider>
+      </Box>
 
       <Flex justify="space-between" mt={4}>
         {['Min', 'Max'].map((label, idx) => (
           <Box textAlign="center" key={label}>
-            <Text fontSize="xs" mb={1} color="black">
+            <Text fontSize="xs" mb={1} color="gray.600">
               {label}
             </Text>
             <Input
@@ -154,9 +153,14 @@ export default function MyRangeSlider({
               textAlign="center"
               borderRadius="full"
               bg="white"
-              color="black"
+              color="gray.800"
               w="80px"
               size="sm"
+              border="1px solid rgba(255, 73, 44, 0.2)"
+              _focus={{
+                borderColor: "#FF492C",
+                boxShadow: "0 0 0 1px #FF492C"
+              }}
             />
           </Box>
         ))}
