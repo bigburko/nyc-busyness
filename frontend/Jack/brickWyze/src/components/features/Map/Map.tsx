@@ -146,6 +146,7 @@ export default function Map({
     }
   }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange]);
 
+  // ✅ FIX: Map initialization only happens ONCE
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -172,26 +173,42 @@ export default function Map({
       setIsMapLoaded(true);
     });
 
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      window._brickwyzeMapRef = undefined;
+    };
+  }, []); // ✅ EMPTY DEPENDENCY ARRAY - map only initializes once!
+
+  // ✅ Separate useEffect for click handlers (runs when deps change but doesn't recreate map)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapLoaded) return;
+
     const handleClick = (e: MapLayerMouseEvent) => {
       renderPopup(e, weights, selectedEthnicities, selectedGenders);
     };
 
-    map.on('click', 'tracts-fill', handleClick);
-    map.on('mouseenter', 'tracts-fill', () => {
+    const handleMouseEnter = () => {
       if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', 'tracts-fill', () => {
+    };
+
+    const handleMouseLeave = () => {
       if (map.getCanvas()) map.getCanvas().style.cursor = '';
-    });
+    };
+
+    // Add event listeners
+    map.on('click', 'tracts-fill', handleClick);
+    map.on('mouseenter', 'tracts-fill', handleMouseEnter);
+    map.on('mouseleave', 'tracts-fill', handleMouseLeave);
 
     return () => {
+      // Remove event listeners with same function references
       map.off('click', 'tracts-fill', handleClick);
-      map.remove();
-      mapRef.current = null;
-      // ✅ Clean up global reference
-      window._brickwyzeMapRef = undefined;
+      map.off('mouseenter', 'tracts-fill', handleMouseEnter);
+      map.off('mouseleave', 'tracts-fill', handleMouseLeave);
     };
-  }, [weights, selectedEthnicities, selectedGenders]);
+  }, [weights, selectedEthnicities, selectedGenders, isMapLoaded]);
 
   useEffect(() => {
     if (isMapLoaded) {

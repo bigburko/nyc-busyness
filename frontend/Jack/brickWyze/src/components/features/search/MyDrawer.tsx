@@ -1,4 +1,4 @@
-// src/components/DrawerGroup/MyDrawer.tsx
+// src/components/features/search/MyDrawer.tsx
 
 'use client';
 
@@ -97,9 +97,20 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
 
   return (
     <main>
-       <Drawer isOpen={isOpen} onClose={onClose} finalFocusRef={btnRef as unknown as React.RefObject<FocusableElement>} placement="left" size="sm">
-        <DrawerOverlay />
-        <DrawerContent bg="#FFDED8" display="flex" flexDirection="column" h="100%">
+       <Drawer 
+         isOpen={isOpen} 
+         onClose={onClose} 
+         finalFocusRef={btnRef as unknown as React.RefObject<FocusableElement>} 
+         placement="left" 
+         size="sm"
+       >
+        <DrawerOverlay /> {/* ✅ Chakra's built-in overlay - handles everything automatically */}
+        <DrawerContent 
+          bg="#FFDED8" 
+          display="flex" 
+          flexDirection="column" 
+          h="100%"
+        >
           <DrawerCloseButton />
           <DrawerHeader>Priorities</DrawerHeader>
           <DrawerBody ref={drawerBodyRef} overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '8px' }, '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#888', borderRadius: '4px', '&:hover': { background: '#555' } } }}>

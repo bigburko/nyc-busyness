@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Box } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
 
-// ✅ Use your existing Map component
+// ✅ Use your existing Map component with memo
 const Map = dynamic(() => import('@/components/features/Map/Map'), { 
   ssr: false 
 });
@@ -33,8 +33,8 @@ export default function Page() {
   // ✅ State to hold current filters that get passed to Map
   const [currentFilters, setCurrentFilters] = useState<MapFilters>({});
 
-  // ✅ This function gets called by TopLeftUI and updates Map props
-  const handleFilterUpdate = (filters: any) => {
+  // ✅ Memoized callback to prevent unnecessary re-renders
+  const handleFilterUpdate = useCallback((filters: any) => {
     console.log('🔄 [Page] Updating map filters:', filters);
     
     // Convert from filter store format to Map component format
@@ -47,22 +47,32 @@ export default function Page() {
       incomeRange: filters.incomeRange || [0, 250000],
     };
 
-    setCurrentFilters(mapFilters);
-  };
+    // ✅ Only update if filters actually changed
+    setCurrentFilters(prevFilters => {
+      if (JSON.stringify(prevFilters) === JSON.stringify(mapFilters)) {
+        console.log('🔄 [Page] Filters unchanged, skipping update');
+        return prevFilters;
+      }
+      return mapFilters;
+    });
+  }, []);
+
+  // ✅ Memoize map props to prevent unnecessary re-renders
+  const mapProps = useMemo(() => ({
+    weights: currentFilters.weights,
+    rentRange: currentFilters.rentRange,
+    selectedEthnicities: currentFilters.selectedEthnicities,
+    selectedGenders: currentFilters.selectedGenders,
+    ageRange: currentFilters.ageRange,
+    incomeRange: currentFilters.incomeRange,
+  }), [currentFilters]);
 
   return (
     <Box position="relative" height="100vh" width="100vw" overflow="hidden">
-      {/* ✅ Map receives filter props and automatically updates */}
-      <Map 
-        weights={currentFilters.weights}
-        rentRange={currentFilters.rentRange}
-        selectedEthnicities={currentFilters.selectedEthnicities}
-        selectedGenders={currentFilters.selectedGenders}
-        ageRange={currentFilters.ageRange}
-        incomeRange={currentFilters.incomeRange}
-      />
+      {/* ✅ Map receives memoized props - won't re-render unless filters change */}
+      <Map {...mapProps} />
       
-      {/* ✅ TopLeftUI calls handleFilterUpdate */}
+      {/* ✅ TopLeftUI with memoized callback */}
       <TopLeftUI onFilterUpdate={handleFilterUpdate} />
     </Box>
   );
