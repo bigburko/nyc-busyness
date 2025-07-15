@@ -15,9 +15,9 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score?: number; // ✅ FIXED: Made optional to match TopLeftUI
-  rent_score?: number; // ✅ Make optional
-  poi_score?: number; // ✅ Make optional
+  flood_risk_score: number; // ✅ FIXED: Made required to match other components
+  rent_score?: number;
+  poi_score?: number;
   main_crime_score?: number;
   crime_trend_direction?: string;
   crime_trend_change?: string;
@@ -173,7 +173,7 @@ export default function TractResultsList({
           '&::-webkit-scrollbar-thumb': { background: '#FF492C', borderRadius: '3px' }
         }}
       >
-        {sortedResults.map((tract) => ( // ✅ FIXED: Removed unused 'index' parameter
+        {sortedResults.map((tract) => (
           <TractResultCard
             key={tract.geoid}
             tract={tract}

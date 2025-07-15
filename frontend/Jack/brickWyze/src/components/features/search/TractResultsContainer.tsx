@@ -17,7 +17,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score?: number; // ✅ FIXED: Made optional to match TopLeftUI
+  flood_risk_score: number;
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -32,13 +32,19 @@ interface TractResult {
 interface TractResultsContainerProps {
   searchResults: TractResult[];
   onMapTractSelect?: (tractId: string | null) => void;
-  selectedTract?: TractResult; // ✅ Selected tract from map clicks
+  selectedTract?: TractResult;
+}
+
+declare global {
+  interface Window {
+    openTractDetailPanel?: (tract: TractResult) => void;
+  }
 }
 
 export default function TractResultsContainer({ 
   searchResults, 
   onMapTractSelect,
-  selectedTract: mapSelectedTract // ✅ Rename to avoid confusion
+  selectedTract: mapSelectedTract
 }: TractResultsContainerProps) {
   const [selectedTract, setSelectedTract] = useState<TractResult | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -51,11 +57,18 @@ export default function TractResultsContainer({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Handle tract selection from results list
+  // ✅ FIXED: Handle tract selection WITHOUT duplicate centering
   const handleTractSelect = (tract: TractResult) => {
+    console.log('📍 [TractResultsContainer] User selected tract from results:', tract.display_name);
+    
     setSelectedTract(tract);
-    // Notify parent to highlight tract on map
+    
+    // ✅ ONLY notify parent - let the parent handle centering
+    // This will trigger the centering in Map.tsx via selectedTractId prop
     onMapTractSelect?.(tract.geoid);
+    
+    // ✅ REMOVED: No more duplicate centering call here
+    // The Map.tsx component will handle centering via the selectedTractId prop
   };
 
   // ✅ Effect to handle tract selection from map clicks
@@ -66,18 +79,16 @@ export default function TractResultsContainer({
     }
   }, [mapSelectedTract]);
 
-  // ✅ Global function for legacy support (optional)
+  // ✅ FIXED: Global function for legacy support WITHOUT centering
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).openTractDetailPanel = (tract: TractResult) => {
+    window.openTractDetailPanel = (tract: TractResult) => {
       console.log('📋 [TractResultsContainer] Opening detail panel for tract:', tract.display_name);
       setSelectedTract(tract);
-      onMapTractSelect?.(tract.geoid);
+      onMapTractSelect?.(tract.geoid); // This will trigger centering via Map.tsx
     };
     
     return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (window as any).openTractDetailPanel;
+      delete window.openTractDetailPanel;
     };
   }, [onMapTractSelect]);
 
@@ -113,7 +124,7 @@ export default function TractResultsContainer({
         <Box
           position="fixed"
           top="120px"
-          left={isMobile ? "0" : "520px"} // ✅ Increased gap: 485px + 35px = 520px
+          left={isMobile ? "0" : "520px"}
           h="calc(100vh - 120px)"
           w={isMobile ? "100vw" : "400px"}
           bg="white"
@@ -127,10 +138,7 @@ export default function TractResultsContainer({
           borderColor="gray.200"
         >
           <TractDetailPanel 
-            tract={{
-              ...selectedTract,
-              flood_risk_score: selectedTract.flood_risk_score ?? 0 // Provide default value if undefined
-            }}
+            tract={selectedTract}
             onClose={handleCloseDetail}
           />
         </Box>
