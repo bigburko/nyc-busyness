@@ -1,0 +1,6 @@
+# Create .dockerignore (this is what actually helps)
+echo node_modules > .dockerignore
+echo .next >> .dockerignore
+
+# Now Docker won't copy node_modules at all
+docker build -t brickwyze . --progress=plain
