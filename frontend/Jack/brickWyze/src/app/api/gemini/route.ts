@@ -2,8 +2,37 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+// ✅ Type definitions for better type safety
+interface RequestBody {
+  message: string;
+  systemPrompt?: string;
+  currentState?: {
+    weights?: Array<{ id: string; value: number }>;
+    rentRange?: [number, number];
+    selectedEthnicities?: string[];
+    selectedGenders?: string[];
+    ageRange?: [number, number];
+    incomeRange?: [number, number];
+    [key: string]: unknown;
+  };
+}
+
+interface OpenRouterMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface OpenRouterResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+  [key: string]: unknown;
+}
+
 export async function POST(req: NextRequest) {
-  const { message, systemPrompt, currentState } = await req.json();
+  const { message, systemPrompt, currentState }: RequestBody = await req.json();
 
   console.log('✅ Gemini API route hit with message:', message);
   console.log('🧠 Current State Received:', currentState);
@@ -37,6 +66,11 @@ ${JSON.stringify(currentState, null, 2)}
 `;
 
   try {
+    const messages: OpenRouterMessage[] = [
+      { role: 'system', content: systemPrompt || improvedPrompt },
+      { role: 'user', content: message },
+    ];
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -45,10 +79,7 @@ ${JSON.stringify(currentState, null, 2)}
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt || improvedPrompt },
-          { role: 'user', content: message },
-        ],
+        messages,
         response_format: { type: 'json_object' },
       }),
     });
@@ -59,12 +90,21 @@ ${JSON.stringify(currentState, null, 2)}
         return NextResponse.json({ reply: null, error: errText }, { status: 500 });
     }
 
-    const data = await response.json();
+    const data: OpenRouterResponse = await response.json();
     const reply = data.choices?.[0]?.message?.content ?? null;
     return NextResponse.json({ reply });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // ✅ FIXED: Changed 'any' to 'unknown' and proper error handling
     console.error('❌ Gemini fetch failed:', error);
-    return NextResponse.json({ reply: null, error: error.message || 'Gemini fetch failed' }, { status: 500 });
+    
+    let errorMessage = 'Gemini fetch failed';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    
+    return NextResponse.json({ reply: null, error: errorMessage }, { status: 500 });
   }
 }

@@ -27,7 +27,6 @@ export default function SearchUIContainer() {
           onFilterClick={() => {
             console.log('Open filter drawer here');
           }}
-          isResultsViewActive={isResultsPanelOpen}
         />
         <SidePanel />
       </VStack>

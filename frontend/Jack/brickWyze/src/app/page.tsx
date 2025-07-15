@@ -21,15 +21,103 @@ interface MapFilters {
   topN?: number;
 }
 
+// ✅ Type definitions for search results and tract data - FIXED to match TopLeftUI
+interface TractResult {
+  geoid: string;
+  tract_name: string; // ✅ FIXED: Required, not optional
+  display_name: string; // ✅ FIXED: Required, not optional
+  nta_name: string; // ✅ FIXED: Required, not optional
+  custom_score: number;
+  resilience_score: number; // ✅ FIXED: Required, not optional
+  avg_rent: number; // ✅ FIXED: Required, not optional
+  demographic_score: number; // ✅ FIXED: Required, not optional
+  foot_traffic_score: number; // ✅ FIXED: Required, not optional
+  crime_score: number; // ✅ FIXED: Required, not optional
+  flood_risk_score?: number;
+  rent_score?: number;
+  poi_score?: number;
+  main_crime_score?: number;
+  crime_trend_direction?: string;
+  crime_trend_change?: string;
+  demographic_match_pct?: number;
+  gender_match_pct?: number;
+  age_match_pct?: number;
+  income_match_pct?: number;
+  crime_timeline?: {
+    year_2020?: number;
+    year_2021?: number;
+    year_2022?: number;
+    year_2023?: number;
+    year_2024?: number;
+    pred_2025?: number;
+    pred_2026?: number;
+    pred_2027?: number;
+  };
+  [key: string]: unknown;
+}
+
+// ✅ Type for results from Map component (ResilienceScore)
+interface MapSearchResult {
+  geoid: string;
+  tract_name?: string;
+  display_name?: string;
+  nta_name?: string;
+  custom_score: number;
+  resilience_score?: number;
+  avg_rent?: number;
+  demographic_score?: number;
+  foot_traffic_score?: number;
+  crime_score?: number;
+  flood_risk_score?: number;
+  rent_score?: number;
+  poi_score?: number;
+  main_crime_score?: number;
+  crime_trend_direction?: string;
+  crime_trend_change?: string;
+  demographic_match_pct?: number;
+  gender_match_pct?: number;
+  age_match_pct?: number;
+  income_match_pct?: number;
+  crime_timeline?: {
+    year_2020?: number;
+    year_2021?: number;
+    year_2022?: number;
+    year_2023?: number;
+    year_2024?: number;
+    pred_2025?: number;
+    pred_2026?: number;
+    pred_2027?: number;
+  };
+  [key: string]: unknown;
+}
+
+interface FilterUpdate {
+  weights?: Weighting[];
+  rentRange?: [number, number];
+  selectedEthnicities?: string[];
+  selectedGenders?: string[];
+  ageRange?: [number, number];
+  incomeRange?: [number, number];
+  topN?: number;
+}
+
+// ✅ Global window interface for type safety
+declare global {
+  interface Window {
+    selectTractFromResultsPanel?: (tractId: string) => void;
+    openResultsPanel?: () => void;
+  }
+}
+
 export default function Page() {
   // ✅ State to hold current filters that get passed to Map
   const [currentFilters, setCurrentFilters] = useState<MapFilters>({});
-  const [searchResults, setSearchResults] = useState<any[]>([]); // ✅ NEW: Store search results
+  const [searchResults, setSearchResults] = useState<TractResult[]>([]); // ✅ FIXED: Proper type
   const [selectedTractId, setSelectedTractId] = useState<string | null>(null); // ✅ NEW: Track selected tract
-  const [selectedTract, setSelectedTract] = useState<any>(null); // ✅ NEW: Store the actual selected tract object
+  const [selectedTract, setSelectedTract] = useState<TractResult | undefined>(undefined); // ✅ FIXED: Use undefined instead of null
 
   // ✅ CLEAN: Simple filter update handler - no comparison logic
-  const handleFilterUpdate = useCallback((filters: any) => {
+  const handleFilterUpdate = useCallback((filters: FilterUpdate) => { // ✅ FIXED: Proper type
     console.log('🔄 [Page] Updating map filters - topN:', filters.topN);
     
     // Convert from filter store format to Map component format
@@ -48,9 +136,35 @@ export default function Page() {
   }, []);
 
   // ✅ NEW: Handle search results from Map
-  const handleSearchResults = useCallback((results: any[]) => {
+  const handleSearchResults = useCallback((results: MapSearchResult[]) => { // ✅ FIXED: Use proper type instead of any
     console.log('📊 [Page] Received search results:', results.length, 'tracts');
-    setSearchResults(results);
+    
+    // ✅ Transform MapSearchResult[] to TractResult[] with default values for required fields
+    const transformedResults: TractResult[] = results.map(r => ({
+      geoid: r.geoid || '',
+      tract_name: r.tract_name || `Tract ${r.geoid || ''}`,
+      display_name: r.display_name || r.tract_name || `Tract ${r.geoid || ''}`,
+      nta_name: r.nta_name || 'Unknown Neighborhood',
+      custom_score: r.custom_score || 0,
+      resilience_score: r.resilience_score || r.custom_score || 0,
+      avg_rent: r.avg_rent || 0,
+      demographic_score: r.demographic_score || 0,
+      foot_traffic_score: r.foot_traffic_score || 0,
+      crime_score: r.crime_score || 0,
+      flood_risk_score: r.flood_risk_score,
+      rent_score: r.rent_score,
+      poi_score: r.poi_score,
+      main_crime_score: r.main_crime_score,
+      crime_trend_direction: r.crime_trend_direction,
+      crime_trend_change: r.crime_trend_change,
+      demographic_match_pct: r.demographic_match_pct,
+      gender_match_pct: r.gender_match_pct,
+      age_match_pct: r.age_match_pct,
+      income_match_pct: r.income_match_pct,
+      crime_timeline: r.crime_timeline
+    }));
+    
+    setSearchResults(transformedResults);
   }, []);
 
   // ✅ NEW: Handle tract selection from results panel
@@ -66,7 +180,7 @@ export default function Page() {
   useEffect(() => {
     console.log('🔧 [Page] Setting up global functions for map communication');
     
-    (window as any).selectTractFromResultsPanel = (tractIdParam: string) => {
+    window.selectTractFromResultsPanel = (tractIdParam: string) => { // ✅ FIXED: Proper window typing
       console.log('🗺️ [Page] Map clicked tract with score:', tractIdParam);
       
       // ✅ Convert to string first in case it's a number
@@ -101,18 +215,19 @@ export default function Page() {
       } else {
         console.warn('⚠️ [Page] Tract still not found in search results. Available tract IDs:');
         console.warn(searchResults.map(t => String(t.geoid)).slice(0, 10)); // Show first 10 for debugging
+        setSelectedTract(undefined); // ✅ FIXED: Reset to undefined if not found
       }
     };
     
-    (window as any).openResultsPanel = () => {
+    window.openResultsPanel = () => { // ✅ FIXED: Proper window typing
       console.log('🔄 [Page] Opening results panel from map click');
       uiStore.setState({ viewState: 'results' });
     };
     
     return () => {
       console.log('🧹 [Page] Cleaning up global functions');
-      delete (window as any).selectTractFromResultsPanel;
-      delete (window as any).openResultsPanel;
+      delete window.selectTractFromResultsPanel;
+      delete window.openResultsPanel;
     };
   }, [searchResults]); // ✅ Include searchResults to update the function when results change
 
@@ -148,7 +263,7 @@ export default function Page() {
             onFilterUpdate={handleFilterUpdate}
             searchResults={searchResults} // ✅ NEW: Pass search results
             onMapTractSelect={handleMapTractSelect} // ✅ NEW: Pass tract selection handler
-            selectedTract={selectedTract} // ✅ NEW: Pass the selected tract object directly
+            selectedTract={selectedTract} // ✅ FIXED: Now properly typed as TractResult | undefined
           />
         </div>
       </div>

@@ -12,35 +12,29 @@ import { useGeminiStore } from '../../../stores/geminiStore';
 import { useFilterStore, FilterState } from '../../../stores/filterStore';
 import { resolveEthnicities } from '../../../lib/resolveEthnicities';
 
-const WEIGHT_KEY_MAP: Record<string, string> = {
-  'foot_traffic': 'foot_traffic', 'crime': 'crime', 'crime_score': 'crime',
-  'rent': 'rent_score', 'rent_score': 'rent_score', 'demographic': 'demographic',
-  'demographics': 'demographic', 'flood': 'flood_risk', 'flood_risk': 'flood_risk',
-  'poi': 'poi', 'points_of_interest': 'poi',
-};
-
-function normalizeWeight(weight: number): number {
-  if (weight <= 1 && weight > 0) { return Math.round(weight * 100); }
-  return Math.round(Math.min(100, Math.max(0, weight)));
+// ✅ FIXED: Use FilterState directly instead of creating incompatible type
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 interface ChatbotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSearchSubmit: (filters: any) => void;
+  onSearchSubmit: (filters: FilterState) => void; // ✅ FIXED: Use FilterState type
 }
 
 export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: ChatbotDrawerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const { sendToGemini } = useGeminiStore();
   const { setFilters, ...currentState } = useFilterStore();
-  const resetFilters = useFilterStore(state => state.reset); // Get the reset function from the store
+  const resetFilters = useFilterStore(state => state.reset);
 
   // This is the reset logic triggered by the button
   const handleReset = () => {
@@ -48,7 +42,7 @@ export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: Chatb
     setTimeout(() => {
       const resetState = useFilterStore.getState();
       console.log('🔄 [Bricky Reset] Submitting:', resetState);
-      onSearchSubmit(resetState);
+      onSearchSubmit(resetState); // ✅ FIXED: Now compatible
     }, 300);
     setMessages((prev) => [...prev, {
       role: 'assistant',
@@ -69,7 +63,8 @@ export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: Chatb
       const reply = await sendToGemini(userMsg, currentState);
       console.log('[Gemini Raw Reply]', reply);
 
-      let parsed;
+      // ✅ FIXED: Use proper typing for parsed response
+      let parsed: Partial<FilterState> & { intent?: string; message?: string };
       try {
         const match = reply.match(/```json\s*([\s\S]*?)\s*```/);
         if (match && match[1]) {
@@ -83,23 +78,19 @@ export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: Chatb
       }
       console.log('[AI Parsed]', parsed);
       
-      // --- 🎯 THE FIX IS HERE ---
       // Check for the special reset intent from the AI
       if (parsed.intent === 'reset') {
         console.log('🤖 AI triggered reset intent.');
-        // Use our reliable, hard-coded reset function
         resetFilters(); 
         setTimeout(() => {
           const finalState = useFilterStore.getState();
-          onSearchSubmit(finalState);
+          onSearchSubmit(finalState); // ✅ FIXED: Now compatible
         }, 300);
-        // Use the AI's friendly message
-        setMessages((prev) => [...prev, { role: 'assistant', content: parsed.message }]);
+        setMessages((prev) => [...prev, { role: 'assistant', content: parsed.message || 'Reset complete!' }]);
         setIsLoading(false);
-        return; // Stop processing here
+        return;
       }
       
-      // (This is the existing logic from the previous step)
       if (parsed.weights || parsed.selectedEthnicities) {
         const aiFilters = parsed;
         const updates: Partial<FilterState> = {};
@@ -121,7 +112,7 @@ export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: Chatb
         if (hasChanged) {
             setTimeout(() => {
                 const finalState = useFilterStore.getState();
-                onSearchSubmit(finalState);
+                onSearchSubmit(finalState); // ✅ FIXED: Now compatible
             }, 300);
         }
         
@@ -137,11 +128,17 @@ export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: Chatb
             content: parsed.message || "I'm not sure how to help with that.",
         }]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Bricky Drawer Error]', err);
+      
+      let errorMessage = 'Bricky had trouble understanding. Try rephrasing your request.';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
       setMessages((prev) => [...prev, {
         role: 'assistant',
-        content: err.message || 'Bricky had trouble understanding. Try rephrasing your request.',
+        content: errorMessage,
       }]);
     }
 

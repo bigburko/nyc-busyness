@@ -64,7 +64,8 @@ const createFilterSlice: StateCreator<FilterState> = (set, get) => ({
     let otherTotal = 100 - oldValue;
     if (otherTotal <= 0) otherTotal = 1;
 
-    let updatedWeights = currentWeights.map(w => {
+    // ✅ FIXED: Changed 'let' to 'const' since updatedWeights is never reassigned
+    const updatedWeights = currentWeights.map(w => {
       if (w.id === id) return { ...w, value };
       const share = w.value / otherTotal;
       return { ...w, value: w.value - (delta * share) };

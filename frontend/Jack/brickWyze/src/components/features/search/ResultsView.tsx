@@ -4,8 +4,21 @@ import { Box, Flex, Heading, Text, VStack, IconButton } from '@chakra-ui/react';
 import { ArrowBackIcon } from '@chakra-ui/icons';
 import { useUiStore, uiStore } from '@/stores/uiStore';
 
+// Define proper types for resultsData
+interface AreaResult {
+  NAMELSAD?: string;
+  resilience_score?: number;
+  total_population_2020?: number;
+  [key: string]: string | number | undefined;
+}
+
+interface SearchResultItem {
+  title?: string;
+  [key: string]: string | number | undefined;
+}
+
 export default function ResultsView() {
-  const resultsData = useUiStore((s) => s.resultsData);
+  const resultsData = useUiStore((s) => s.resultsData) as AreaResult | SearchResultItem[] | null;
 
   const closeResultsPanel = () => {
     uiStore.getState().closeResultsPanel();
@@ -17,7 +30,11 @@ export default function ResultsView() {
     if (Array.isArray(resultsData)) {
       return "Search Results";
     }
-    return resultsData?.NAMELSAD || "Area Details";
+    // Check if resultsData is an empty object or has properties
+    if (resultsData && typeof resultsData === 'object' && Object.keys(resultsData).length > 0) {
+      return resultsData.NAMELSAD || "Area Details";
+    }
+    return "Area Details";
   };
 
   const renderContent = () => {
@@ -41,6 +58,9 @@ export default function ResultsView() {
       );
     }
 
+    // Handle non-array resultsData
+    const data = resultsData as AreaResult;
+    
     return (
       <VStack spacing={3} align="stretch" p={4} flex="1" overflowY="auto">
         <Flex align="center" gap={2}>
@@ -55,11 +75,11 @@ export default function ResultsView() {
         </Flex>
         <Flex justify="space-between">
           <Text fontWeight="bold">Resilience Score:</Text>
-          <Text>{resultsData.resilience_score?.toFixed(2) || 'N/A'}</Text>
+          <Text>{data.resilience_score?.toFixed(2) || 'N/A'}</Text>
         </Flex>
         <Flex justify="space-between">
           <Text fontWeight="bold">Population:</Text>
-          <Text>{resultsData.total_population_2020?.toLocaleString() || 'N/A'}</Text>
+          <Text>{data.total_population_2020?.toLocaleString() || 'N/A'}</Text>
         </Flex>
       </VStack>
     );

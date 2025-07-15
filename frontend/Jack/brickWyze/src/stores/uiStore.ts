@@ -1,13 +1,26 @@
-import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 
 export type ViewState = 'initial' | 'typing' | 'results';
 
+interface SearchResults {
+  zones: Array<{
+    geoid: string;
+    tract_name: string;
+    display_name: string;
+    nta_name: string;
+    custom_score: number;
+    [key: string]: unknown;
+  }>;
+  total_zones_found?: number;
+  top_zones_returned?: number;
+  [key: string]: unknown;
+}
+
 interface UiState {
   viewState: ViewState;
   searchQuery: string;
-  resultsData: any | null;
+  resultsData: SearchResults | null;
 
   focusSearch: () => void;
   performSearch: (query: string) => void;

@@ -8,7 +8,7 @@ import { create } from 'zustand';
  * All properties are optional.
  */
 interface FilterContext {
-  weights?: { id: string, value: number }[];
+  weights?: { id: string; value: number }[];
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
@@ -19,6 +19,22 @@ interface FilterContext {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+}
+
+/**
+ * API response structure from the Gemini endpoint
+ */
+interface GeminiApiResponse {
+  reply: string;
+  [key: string]: unknown; // Allow additional properties
+}
+
+/**
+ * Error response structure
+ */
+interface GeminiErrorResponse {
+  error: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -60,13 +76,19 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
 
       // Handle non-successful HTTP responses (e.g., 400, 500 errors)
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response.' }));
+        let errorData: GeminiErrorResponse;
+        try {
+          errorData = await response.json() as GeminiErrorResponse;
+        } catch {
+          errorData = { error: 'Failed to parse error response.' };
+        }
+        
         console.error('[❌ Gemini API Error]', response.status, errorData);
         // Provide a user-friendly error message
         return `Sorry, Bricky encountered an error (Code: ${response.status}). Please try again.`;
       }
 
-      const data = await response.json();
+      const data = await response.json() as GeminiApiResponse;
       const reply = data.reply ?? 'No reply received.'; // Gracefully handle missing reply
 
       console.log('[📥 Gemini API Response]', data);

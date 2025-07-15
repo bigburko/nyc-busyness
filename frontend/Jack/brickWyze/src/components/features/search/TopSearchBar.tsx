@@ -7,10 +7,9 @@ import { uiStore } from '@/stores/uiStore';
 
 interface TopSearchBarProps {
   onFilterClick: () => void;
-  isResultsViewActive: boolean;
 }
 
-export default function TopSearchBar({ onFilterClick, isResultsViewActive }: TopSearchBarProps) {
+export default function TopSearchBar({ onFilterClick }: TopSearchBarProps) {
   const handleInputClick = () => {
     uiStore.setState({ viewState: 'typing' });
   };

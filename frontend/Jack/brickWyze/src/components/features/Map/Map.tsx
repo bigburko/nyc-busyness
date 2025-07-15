@@ -18,6 +18,7 @@ declare global {
   interface Window {
     _brickwyzeMapRef?: mapboxgl.Map;
     selectTractFromResultsPanel?: (tractId: string) => void; // ✅ NEW: For map -> results communication
+    openResultsPanel?: () => void; // ✅ Added proper typing
   }
 }
 
@@ -37,6 +38,11 @@ interface Weighting {
   value: number;
 }
 
+// ✅ Extended ResilienceScore type for the enhanced zones
+interface ResilienceScoreWithRanking extends ResilienceScore {
+  ranking: number;
+}
+
 interface MapProps {
   weights?: Weighting[];
   rentRange?: [number, number];
@@ -45,7 +51,7 @@ interface MapProps {
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number; // ✅ Add topN prop
-  onSearchResults?: (results: any[]) => void; // ✅ NEW: Callback for search results
+  onSearchResults?: (results: ResilienceScore[]) => void; // ✅ FIXED: Proper type instead of any[]
   selectedTractId?: string | null; // ✅ NEW: Which tract is selected
 }
 
@@ -139,7 +145,7 @@ export default function Map({
 
       // ✅ NEW: Add rankings to zones (1st, 2nd, 3rd, etc.)
       // Zones are already sorted by score from edge function, so ranking is just index + 1
-      const zonesWithRankings = zones.map((zone, index) => ({
+      const zonesWithRankings: ResilienceScoreWithRanking[] = zones.map((zone, index) => ({
         ...zone,
         ranking: index + 1 // 1st place = index 0 + 1, 2nd place = index 1 + 1, etc.
       }));
@@ -148,7 +154,7 @@ export default function Map({
         console.log('🏆 Added rankings to zones:', zonesWithRankings.slice(0, 5)); // Log first 5 for debugging
       }
 
-      const scoreMap: Record<string, any> = {};
+      const scoreMap: Record<string, ResilienceScoreWithRanking> = {}; // ✅ FIXED: Proper type instead of any
       zonesWithRankings.forEach((score) => {
         if (score?.geoid) {
           scoreMap[score.geoid.toString().padStart(11, '0')] = score;
@@ -242,17 +248,17 @@ export default function Map({
           console.log('✅ [Map] Tract has resilience score, proceeding...');
           
           // ✅ NEW: Open results panel if it's closed (with proper typing and debug)
-          if ((window as any).openResultsPanel) {
+          if (window.openResultsPanel) { // ✅ FIXED: Proper window typing
             console.log('🔄 [Map] Calling openResultsPanel function');
-            (window as any).openResultsPanel();
+            window.openResultsPanel();
           } else {
             console.warn('⚠️ [Map] openResultsPanel function not found on window');
           }
           
           // ✅ NEW: Notify results panel about tract click and open detail panel
-          if ((window as any).selectTractFromResultsPanel) {
+          if (window.selectTractFromResultsPanel) { // ✅ FIXED: Proper window typing
             console.log('🔄 [Map] Calling selectTractFromResultsPanel function');
-            (window as any).selectTractFromResultsPanel(tractId);
+            window.selectTractFromResultsPanel(tractId);
           } else {
             console.warn('⚠️ [Map] selectTractFromResultsPanel function not found on window');
           }

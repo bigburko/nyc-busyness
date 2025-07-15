@@ -2,10 +2,7 @@
 
 import { 
   Box, 
-  Text, 
-  Flex, 
-  Button,
-  HStack
+  Text
 } from '@chakra-ui/react';
 import MySlider from './MySlider';
 

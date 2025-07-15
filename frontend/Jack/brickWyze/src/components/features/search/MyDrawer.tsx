@@ -23,10 +23,15 @@ import GenderSelect from '../filters/DemographicGroup/GenderSelect';
 import TopNSelector from '../filters/ScoreWeightingGroup/TopNSelector';
 import MyToolTip from '../../ui/MyToolTip';
 
+// ✅ Extended FilterState interface for submission data with topN
+interface SubmissionData extends FilterState {
+  topN: number;
+}
+
 interface MyDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSearchSubmit: (filters: any) => void;
+  onSearchSubmit: (filters: SubmissionData) => void; // ✅ FIXED: Proper type instead of any
 }
 
 const ALL_AVAILABLE_LAYERS: Layer[] = [
@@ -92,7 +97,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
       return;
     }
     const currentState = useFilterStore.getState();
-    const submissionData = {
+    const submissionData: SubmissionData = { // ✅ FIXED: Proper typing
       ...currentState,
       topN: topN
     };

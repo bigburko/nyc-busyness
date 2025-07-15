@@ -17,7 +17,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score: number;
+  flood_risk_score?: number; // ✅ FIXED: Made optional to match TopLeftUI
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -68,6 +68,7 @@ export default function TractResultsContainer({
 
   // ✅ Global function for legacy support (optional)
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).openTractDetailPanel = (tract: TractResult) => {
       console.log('📋 [TractResultsContainer] Opening detail panel for tract:', tract.display_name);
       setSelectedTract(tract);
@@ -75,6 +76,7 @@ export default function TractResultsContainer({
     };
     
     return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).openTractDetailPanel;
     };
   }, [onMapTractSelect]);
@@ -125,7 +127,10 @@ export default function TractResultsContainer({
           borderColor="gray.200"
         >
           <TractDetailPanel 
-            tract={selectedTract}
+            tract={{
+              ...selectedTract,
+              flood_risk_score: selectedTract.flood_risk_score ?? 0 // Provide default value if undefined
+            }}
             onClose={handleCloseDetail}
           />
         </Box>

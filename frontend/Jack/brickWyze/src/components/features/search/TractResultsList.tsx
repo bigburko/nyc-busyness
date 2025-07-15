@@ -1,7 +1,7 @@
 // src/components/features/search/TractResultsList.tsx
 'use client';
 
-import { Box, Text, VStack, HStack, Badge, Flex } from '@chakra-ui/react';
+import { Box, Text, VStack, HStack, Badge } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 
 interface TractResult {
@@ -15,7 +15,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score: number;
+  flood_risk_score?: number; // ✅ FIXED: Made optional to match TopLeftUI
   rent_score?: number; // ✅ Make optional
   poi_score?: number; // ✅ Make optional
   main_crime_score?: number;
@@ -173,7 +173,7 @@ export default function TractResultsList({
           '&::-webkit-scrollbar-thumb': { background: '#FF492C', borderRadius: '3px' }
         }}
       >
-        {sortedResults.map((tract, index) => (
+        {sortedResults.map((tract) => ( // ✅ FIXED: Removed unused 'index' parameter
           <TractResultCard
             key={tract.geoid}
             tract={tract}

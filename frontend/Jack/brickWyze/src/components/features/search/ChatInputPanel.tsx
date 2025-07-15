@@ -5,22 +5,43 @@ import {
   Box, Input, IconButton, Spinner, Text, Flex, Button, VStack
 } from '@chakra-ui/react';
 import { ArrowUpIcon } from '@chakra-ui/icons';
-import { useFilterStore } from '@/stores/filterStore';
+import { useFilterStore, FilterState } from '@/stores/filterStore';
 import { resolveEthnicities } from '@/lib/resolveEthnicities';
 import { useGeminiStore } from '@/stores/geminiStore';
+
+// ✅ Type definitions for better type safety
+interface ParsedResponse {
+  intent?: string;
+  message?: string;
+  weights?: Array<{ id: string; label: string; value: number; icon: string; color: string }>;
+  selectedEthnicities?: string[];
+  rentRange?: [number, number];
+  ageRange?: [number, number];
+  incomeRange?: [number, number];
+  selectedGenders?: string[];
+}
+
+interface FilterUpdates {
+  weights?: Array<{ id: string; label: string; value: number; icon: string; color: string }>;
+  selectedEthnicities?: string[];
+  rentRange?: [number, number];
+  ageRange?: [number, number];
+  incomeRange?: [number, number];
+  selectedGenders?: string[];
+}
 
 export default function ChatInputPanel({
   onSearchSubmit,
   onResetRequest,
 }: {
-  onSearchSubmit: (filters: any) => void;
+  onSearchSubmit: (filters: FilterState) => void; // ✅ FIXED: Proper type instead of any
   onResetRequest: () => void;
 }) {
   // ✅ USE PERSISTENT STORE for messages (survives panel open/close)
   const messages = useGeminiStore((s) => s.messages);
   const setMessages = useGeminiStore((s) => s.setMessages);
   const sendToGemini = useGeminiStore((s) => s.sendToGemini);
-  const resetChat = useGeminiStore((s) => s.resetChat);
+  // ✅ REMOVED: resetChat is never used in this component
 
   // ✅ OPTIMIZED: Use local state for input to prevent store re-renders on every keystroke
   const [localInput, setLocalInput] = useState('');
@@ -33,16 +54,8 @@ export default function ChatInputPanel({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const formatFiltersForSubmission = () => {
-    const currentState = useFilterStore.getState();
-    return {
-      weights: currentState.weights || [],
-      rentRange: currentState.rentRange || [26, 160],
-      selectedEthnicities: currentState.selectedEthnicities || [],
-      selectedGenders: currentState.selectedGenders || ['male', 'female'],
-      ageRange: currentState.ageRange || [0, 100],
-      incomeRange: currentState.incomeRange || [0, 250000],
-    };
+  const formatFiltersForSubmission = (): FilterState => {
+    return useFilterStore.getState();
   };
 
   const handleSend = async () => {
@@ -62,10 +75,11 @@ export default function ChatInputPanel({
       const reply = await sendToGemini(userMsg, currentState);
       
       const match = reply.match(/```json\s*([\s\S]*?)\s*```/);
-      let parsed: any = {};
+      let parsed: ParsedResponse = {}; // ✅ FIXED: Proper type instead of any
       try {
         parsed = JSON.parse(match ? match[1] : reply);
-      } catch (e) {
+      } catch {
+        // ✅ FIXED: Removed unused 'e' parameter
         parsed = { intent: 'none', message: reply };
       }
 
@@ -81,12 +95,12 @@ export default function ChatInputPanel({
         }, 300);
       } else if (parsed.weights || parsed.selectedEthnicities || parsed.rentRange || parsed.ageRange || parsed.incomeRange || parsed.selectedGenders) {
         // Handle filter updates with better messaging
-        const updates: any = {};
+        const updates: FilterUpdates = {}; // ✅ FIXED: Proper type instead of any
         let changeDescription = '';
         
         if (parsed.weights) {
           updates.weights = parsed.weights;
-          const topWeight = parsed.weights.reduce((max: any, w: any) => w.value > max.value ? w : max, parsed.weights[0]);
+          const topWeight = parsed.weights.reduce((max, w) => w.value > max.value ? w : max, parsed.weights[0]); // ✅ FIXED: Proper typing
           changeDescription += `Prioritizing ${topWeight.label.toLowerCase()} (${topWeight.value}%). `;
         }
         
@@ -129,7 +143,7 @@ export default function ChatInputPanel({
 
         // Auto-submit with slight delay for better UX
         setTimeout(() => {
-          const finalState = useFilterStore.getState();
+          // ✅ FIXED: Removed unused finalState variable
           const formattedFilters = formatFiltersForSubmission();
           onSearchSubmit(formattedFilters);
           
@@ -148,24 +162,24 @@ export default function ChatInputPanel({
           { role: 'assistant' as const, content: parsed.message || "I'm here to help you find the perfect NYC neighborhood! Try asking me to adjust weights, change rent ranges, or add specific demographics." }
         ]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) { // ✅ FIXED: Changed from any to unknown
       console.error('❌ [ChatInputPanel] Error:', err);
+      
+      let errorMessage = "Sorry, I had trouble with that request. Try asking me something like 'increase foot traffic' or 'add Korean ethnicity'.";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
       setMessages([...messages, 
         { role: 'user' as const, content: userMsg },
-        { role: 'assistant' as const, content: "Sorry, I had trouble with that request. Try asking me something like 'increase foot traffic' or 'add Korean ethnicity'." }
+        { role: 'assistant' as const, content: errorMessage }
       ]);
     }
 
     setIsLoading(false);
   };
 
-  const handleReset = () => {
-    reset();
-    resetChat();
-    const formattedFilters = formatFiltersForSubmission();
-    onSearchSubmit(formattedFilters);
-    setShowSuggestions(true); // ✅ Show suggestions again after reset
-  };
+  // ✅ FIXED: Removed unused handleReset function (onResetRequest is used instead)
 
   const handleSuggestionClick = (suggestion: string) => {
     setLocalInput(suggestion);
@@ -260,7 +274,7 @@ export default function ChatInputPanel({
         {messages.length === 0 ? (
           <VStack spacing={3} py={6} textAlign="center">
             <Text fontSize="md" fontWeight="semibold" color="gray.600">
-              👋 Hi! I'm Bricky
+              👋 Hi! I&apos;m Bricky
             </Text>
             <Text fontSize="sm" color="gray.500" lineHeight="tall">
               Your NYC neighborhood assistant. Use the suggestions above or ask me anything!
