@@ -106,22 +106,23 @@ export default function TractResultsContainer({
         />
       </Box>
 
-      {/* ✅ Detail panel - Google Maps style */}
+      {/* ✅ Detail panel - Google Maps style with increased gap */}
       {selectedTract && (
         <Box
           position="fixed"
           top="120px"
-          left={isMobile ? "0" : "485px"}
+          left={isMobile ? "0" : "520px"} // ✅ Increased gap: 485px + 35px = 520px
           h="calc(100vh - 120px)"
           w={isMobile ? "100vw" : "400px"}
           bg="white"
-          boxShadow="2xl"
+          boxShadow="xl"
           zIndex={1201}
           transform="translateX(0)"
           transition="transform 0.3s ease"
-          borderLeft="2px solid"
+          borderRadius="xl"
+          overflow="hidden"
+          border="1px solid"
           borderColor="gray.200"
-          borderRight="1px solid"
         >
           <TractDetailPanel 
             tract={selectedTract}

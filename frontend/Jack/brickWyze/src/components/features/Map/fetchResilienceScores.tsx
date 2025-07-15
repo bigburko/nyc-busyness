@@ -10,7 +10,33 @@ export type ResilienceScore = {
   age_match_pct?: number;
   income_match_pct?: number;
   combined_match_pct?: number;
-  [key: string]: number | string | undefined;
+  // ✅ NEW: Crime timeline data that your API already provides
+  crime_timeline?: {
+    year_2020?: number;
+    year_2021?: number;
+    year_2022?: number;
+    year_2023?: number;
+    year_2024?: number;
+    pred_2025?: number;
+    pred_2026?: number;
+    pred_2027?: number;
+  };
+  // ✅ NEW: Crime trend analysis data from your API
+  main_crime_score?: number;
+  crime_trend_direction?: string;
+  crime_trend_change?: string;
+  // ✅ NEW: Individual score components your API provides
+  foot_traffic_score?: number;
+  crime_score?: number;
+  flood_risk_score?: number;
+  rent_score?: number;
+  poi_score?: number;
+  avg_rent?: number;
+  // ✅ NEW: Better naming fields from your API
+  tract_name?: string;
+  display_name?: string;
+  nta_name?: string;
+  [key: string]: number | string | undefined | object;
 };
 
 interface FetchParams {
@@ -49,6 +75,16 @@ export async function fetchResilienceScores({
         genders: selectedGenders,
         ageRange,
         incomeRange,
+        // ✅ NEW: Add crime years to include 2027 predictions
+        crimeYears: [
+          'year_2021',
+          'year_2022', 
+          'year_2023',
+          'year_2024',
+          'pred_2025',
+          'pred_2026',
+          'pred_2027'  // ✅ This was missing!
+        ]
       }),
     }
   );

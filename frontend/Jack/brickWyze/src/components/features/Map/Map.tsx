@@ -99,7 +99,17 @@ export default function Map({
           genders: selectedGenders,
           ageRange,
           incomeRange,
-          topN // ✅ Include topN in API call
+          topN, // ✅ Include topN in API call
+          // ✅ NEW: Add crimeYears to get 2027 predictions
+          crimeYears: [
+            'year_2021',
+            'year_2022', 
+            'year_2023',
+            'year_2024',
+            'pred_2025',
+            'pred_2026',
+            'pred_2027'  // ✅ This will enable 2027 data!
+          ]
         }),
       });
 
