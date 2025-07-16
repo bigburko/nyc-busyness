@@ -15,7 +15,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score: number; // ✅ FIXED: Made required to match other components
+  flood_risk_score?: number; // ✅ FIXED: Made optional to match other components
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -81,11 +81,11 @@ function TractResultCard({
       {/* Main content */}
       <VStack align="start" spacing={1} pr={12}>
         <Text fontWeight="bold" fontSize="md" noOfLines={1} color="gray.800">
-          🏘️ {tract.display_name}
+          🏘️ {tract.nta_name}
         </Text>
         
         <Text fontSize="sm" color="gray.600" noOfLines={1}>
-          {tract.nta_name}
+          {tract.display_name}
         </Text>
         
         <HStack spacing={3} mt={1}>

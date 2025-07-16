@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { MapLayerMouseEvent } from 'mapbox-gl';
+import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 // ✅ FIXED: Correct relative imports for Map.tsx location
@@ -69,7 +70,7 @@ export default function Map({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [currentGeoJson, setCurrentGeoJson] = useState<any>(null);
+  const [currentGeoJson, setCurrentGeoJson] = useState<FeatureCollection<Geometry, GeoJsonProperties> | null>(null);
 
   // ✅ Function to gently center map on a specific tract (with proper validation)
   const centerOnTract = useCallback((tractId: string) => {
@@ -91,8 +92,9 @@ export default function Map({
     
     let tract = null;
     for (const searchId of searchIds) {
-      tract = currentGeoJson.features.find((feature: any) => {
-        const featureId = feature.properties?.GEOID?.toString();
+      tract = currentGeoJson.features.find((feature: unknown) => {
+        const typedFeature = feature as { properties?: { GEOID?: string | number } };
+        const featureId = typedFeature.properties?.GEOID?.toString();
         return featureId === searchId || featureId?.padStart(11, '0') === searchId;
       });
       if (tract) {
@@ -101,20 +103,21 @@ export default function Map({
       }
     }
 
-    if (tract && tract.geometry && tract.geometry.coordinates) {
+    const typedTract = tract as { geometry?: { coordinates?: number[][][] } };
+    if (typedTract && typedTract.geometry && typedTract.geometry.coordinates) {
       console.log('🎯 [Map] Gently centering on tract:', tractId);
       
       try {
         // Calculate the center point of the tract
-        const coords = tract.geometry.coordinates[0]; // Assuming polygon
+        const coords = typedTract.geometry.coordinates[0]; // Assuming polygon
         if (coords && coords.length > 0) {
           // ✅ VALIDATE COORDINATES - Check if they're valid numbers
           let totalLng = 0;
           let totalLat = 0;
           let validCoords = 0;
           
-          coords.forEach((coord: [number, number]) => {
-            if (coord && coord.length === 2 && 
+          coords.forEach((coord: number[]) => {
+            if (coord && coord.length >= 2 && 
                 typeof coord[0] === 'number' && typeof coord[1] === 'number' &&
                 !isNaN(coord[0]) && !isNaN(coord[1])) {
               totalLng += coord[0];
@@ -153,7 +156,10 @@ export default function Map({
     } else {
       console.error('❌ [Map] Tract not found or invalid geometry:', tractId);
       console.log('📋 [Map] Available tract IDs (first 10):', 
-        currentGeoJson.features.slice(0, 10).map((f: any) => f.properties?.GEOID)
+        currentGeoJson.features.slice(0, 10).map((f: unknown) => {
+          const typedF = f as { properties?: { GEOID?: string | number } };
+          return typedF.properties?.GEOID;
+        })
       );
     }
   }, [currentGeoJson]);
@@ -168,15 +174,19 @@ export default function Map({
     let foundTracts = 0;
 
     topTracts.forEach(zone => {
-      const tract = currentGeoJson.features.find((feature: any) => 
-        feature.properties?.GEOID?.toString().padStart(11, '0') === zone.geoid?.toString().padStart(11, '0')
-      );
+      const tract = currentGeoJson.features.find((feature: unknown) => {
+        const typedFeature = feature as { properties?: { GEOID?: string | number } };
+        return typedFeature.properties?.GEOID?.toString().padStart(11, '0') === zone.geoid?.toString().padStart(11, '0');
+      });
 
-      if (tract && tract.geometry) {
-        const coords = tract.geometry.coordinates[0];
+      const typedTract = tract as { geometry?: { coordinates?: number[][][] } };
+      if (typedTract && typedTract.geometry) {
+        const coords = typedTract.geometry.coordinates?.[0];
         if (coords && coords.length > 0) {
-          coords.forEach((coord: [number, number]) => {
-            bounds.extend(coord);
+          coords.forEach((coord: number[]) => {
+            if (coord && coord.length >= 2) {
+              bounds.extend([coord[0], coord[1]] as [number, number]);
+            }
           });
           foundTracts++;
         }
@@ -195,6 +205,12 @@ export default function Map({
     }
   }, [currentGeoJson]);
 
+  // ✅ Store onSearchResults in a ref to avoid dependency issues
+  const onSearchResultsRef = useRef(onSearchResults);
+  useEffect(() => {
+    onSearchResultsRef.current = onSearchResults;
+  }, [onSearchResults]);
+
   const fetchAndApplyScores = useCallback(async () => {
     const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
@@ -205,7 +221,9 @@ export default function Map({
       
       // ✅ Just load the base map without scores
       setCurrentGeoJson(processed);
-      updateTractData(mapRef.current, processed);
+      if (mapRef.current) {
+        updateTractData(mapRef.current, processed);
+      }
       return;
     }
 
@@ -287,10 +305,10 @@ export default function Map({
       const updated = {
         ...processed,
         features: processed.features.map((feat) => {
-          const rawGEOID = feat.properties?.GEOID;
+          const rawGEOID = (feat.properties as { GEOID?: string | number })?.GEOID;
           const geoid = rawGEOID?.toString().padStart(11, '0');
-          const match = scoreMap[geoid];
-          const featProps = feat.properties as any; // Type assertion for GeoJSON properties
+          const match = scoreMap[geoid || ''];
+          const featProps = feat.properties as Record<string, unknown>;
           
           return {
             ...feat,
@@ -315,25 +333,28 @@ export default function Map({
         console.log('🧠 Updated GeoJSON with scores and rankings applied.');
       }
 
-      updateTractData(mapRef.current, updated);
-      showLegend();
+      if (mapRef.current) {
+        updateTractData(mapRef.current, updated);
+        showLegend();
+      }
 
-      // ✅ Pass enhanced search results to parent (AFTER everything is created)
-      if (onSearchResults) {
+      // ✅ Pass enhanced search results to parent using ref to avoid dependency loop
+      if (onSearchResultsRef.current) {
         console.log('📊 [Map] Passing search results to parent:', zones.length, 'tracts');
         
         // ✅ FIX: Enhance zones with proper NTA names from GeoJSON before passing to parent
         const enhancedZones = zones.map(zone => {
-          const tract = updated.features.find((feature: any) => 
-            feature.properties?.GEOID?.toString().padStart(11, '0') === zone.geoid?.toString().padStart(11, '0')
-          );
+          const tract = updated.features.find((feature: unknown) => {
+            const typedFeature = feature as { properties?: { GEOID?: string | number } };
+            return typedFeature.properties?.GEOID?.toString().padStart(11, '0') === zone.geoid?.toString().padStart(11, '0');
+          });
           
           // ✅ Get the actual NTAName from the GeoJSON (with proper typing)
-          const tractProps = tract?.properties as any;
-          const neighborhoodName = tractProps?.NTAName || 
+          const tractProps = (tract as { properties?: Record<string, unknown> })?.properties;
+          const neighborhoodName = String(tractProps?.NTAName || 
                                   tractProps?.nta_name || 
                                   zone.nta_name || 
-                                  'Unknown Neighborhood';
+                                  'Unknown Neighborhood');
           
           return {
             ...zone,
@@ -348,7 +369,7 @@ export default function Map({
           console.log('🏘️ [Map] Enhanced', enhancedZones.length, 'zones with neighborhood names');
         }
         
-        onSearchResults(enhancedZones);
+        onSearchResultsRef.current(enhancedZones);
       }
 
       setTimeout(() => {
@@ -358,7 +379,7 @@ export default function Map({
     } catch (err) {
       console.error('[Error fetching and applying scores]', err);
     }
-  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, onSearchResults, zoomToTopTracts]);
+  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, zoomToTopTracts]); // ✅ REMOVED onSearchResults dependency
 
   // ✅ Map initialization
   useEffect(() => {
@@ -406,7 +427,7 @@ export default function Map({
       
       console.log('🌍 [Map] Global centerMapOnTract function set up');
     }
-  }, [isMapLoaded]); // ✅ ONLY depend on isMapLoaded, not centerOnTract
+  }, [isMapLoaded, centerOnTract]); // ✅ INCLUDE centerOnTract dependency, not centerOnTract
 
   // ✅ NO POPUP - Click handlers WITHOUT popup, just opens results panel
   useEffect(() => {
@@ -453,79 +474,11 @@ export default function Map({
     };
   }, [weights, selectedEthnicities, selectedGenders, isMapLoaded]);
 
-  // ✅ Effect to handle tract centering from results panel clicks (simplified)
+  // ✅ Effect to handle tract centering from results panel clicks (DISABLED AUTO-CENTERING)
   useEffect(() => {
-    if (selectedTractId && isMapLoaded) {
-      console.log('🗺️ [Map] Centering on selected tract via prop change:', selectedTractId);
-      
-      const timeoutId = setTimeout(() => {
-        const map = mapRef.current;
-        if (!map || !currentGeoJson) return;
-
-        // Find the tract
-        const tract = currentGeoJson.features.find((feature: any) => {
-          const featureId = feature.properties?.GEOID?.toString();
-          return featureId === selectedTractId || featureId?.padStart(11, '0') === selectedTractId;
-        });
-
-        if (tract && tract.geometry && tract.geometry.coordinates) {
-          const coords = tract.geometry.coordinates[0];
-          if (coords && coords.length > 0) {
-            // Calculate center with validation
-            let totalLng = 0;
-            let totalLat = 0;
-            let validCoords = 0;
-            
-            coords.forEach((coord: [number, number]) => {
-              if (coord && Array.isArray(coord) && coord.length >= 2) {
-                const lng = coord[0];
-                const lat = coord[1];
-                
-                // ✅ VALIDATE COORDINATES - Check if they're valid numbers
-                if (!isNaN(lng) && !isNaN(lat) && isFinite(lng) && isFinite(lat)) {
-                  totalLng += lng;
-                  totalLat += lat;
-                  validCoords++;
-                }
-              }
-            });
-            
-            if (validCoords > 0) {
-              const centerLng = totalLng / validCoords;
-              const centerLat = totalLat / validCoords;
-              
-              // ✅ FINAL VALIDATION - Ensure coordinates are valid and in reasonable range
-              if (!isNaN(centerLng) && !isNaN(centerLat) && 
-                  isFinite(centerLng) && isFinite(centerLat) &&
-                  centerLng >= -180 && centerLng <= 180 && 
-                  centerLat >= -90 && centerLat <= 90) {
-                
-                // ✅ SIMPLE OFFSET - Just shift east to account for side panel
-                const offsetLng = centerLng + 0.01; // Simple eastward offset
-                
-                // ✅ VALIDATE OFFSET TOO
-                if (!isNaN(offsetLng) && isFinite(offsetLng) && offsetLng >= -180 && offsetLng <= 180) {
-                  map.panTo([offsetLng, centerLat], { duration: 600 });
-                  console.log('✅ [Map] Panned to tract with side panel offset:', [offsetLng, centerLat]);
-                } else {
-                  console.warn('❌ [Map] Invalid offset coordinates:', [offsetLng, centerLat]);
-                }
-              } else {
-                console.warn('❌ [Map] Invalid calculated center coordinates:', [centerLng, centerLat]);
-              }
-            } else {
-              console.warn('❌ [Map] No valid coordinates found in tract geometry');
-            }
-          } else {
-            console.warn('❌ [Map] Tract geometry has no coordinate array');
-          }
-        } else {
-          console.warn('❌ [Map] Tract not found or has invalid geometry for ID:', selectedTractId);
-        }
-      }, 300);
-      
-      return () => clearTimeout(timeoutId);
-    }
+    // ✅ DISABLED: No automatic centering to prevent snapping back
+    // Only center when user explicitly clicks a result, not on every prop change
+    console.log('🗺️ [Map] Selected tract changed:', selectedTractId, '- Auto-centering DISABLED');
   }, [selectedTractId, isMapLoaded]);
 
   useEffect(() => {
@@ -541,10 +494,12 @@ export default function Map({
         const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
         const processed = ProcessGeojson(cleaned, { precision: 6 });
         setCurrentGeoJson(processed);
-        updateTractData(mapRef.current, processed);
+        if (mapRef.current) {
+          updateTractData(mapRef.current, processed);
+        }
       }
     }
-  }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN]); // ✅ EXPLICIT DEPS instead of function reference
+  }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN]); // ✅ REMOVED fetchAndApplyScores to break the cycle
 
   return (
     <div

@@ -17,7 +17,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score: number;
+  flood_risk_score?: number; // ✅ FIXED: Made optional to match other components
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;

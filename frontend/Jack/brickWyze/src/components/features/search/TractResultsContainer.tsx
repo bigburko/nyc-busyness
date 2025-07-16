@@ -6,6 +6,10 @@ import { useState, useEffect } from 'react';
 import TractResultsList from './TractResultsList';
 import TractDetailPanel from './TractDetailPanel';
 
+// We need to update TractResultsList.tsx and TractDetailPanel.tsx as well
+// Based on the errors, let me update the complete fixed TractDetailPanel.tsx
+
+// In TractDetailPanel.tsx, change this interface:
 interface TractResult {
   geoid: string;
   tract_name: string;
@@ -17,7 +21,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score: number;
+  flood_risk_score?: number; // ✅ CHANGE: Made optional
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -27,6 +31,16 @@ interface TractResult {
   gender_match_pct?: number;
   age_match_pct?: number;
   income_match_pct?: number;
+  crime_timeline?: {
+    year_2020?: number;
+    year_2021?: number;
+    year_2022?: number;
+    year_2023?: number;
+    year_2024?: number;
+    pred_2025?: number;
+    pred_2026?: number;
+    pred_2027?: number;
+  };
 }
 
 interface TractResultsContainerProps {
@@ -57,18 +71,17 @@ export default function TractResultsContainer({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // ✅ FIXED: Handle tract selection WITHOUT duplicate centering
+  // ✅ FIXED: Handle tract selection WITHOUT automatic centering
   const handleTractSelect = (tract: TractResult) => {
     console.log('📍 [TractResultsContainer] User selected tract from results:', tract.display_name);
     
     setSelectedTract(tract);
     
-    // ✅ ONLY notify parent - let the parent handle centering
-    // This will trigger the centering in Map.tsx via selectedTractId prop
+    // ✅ ONLY notify parent for highlighting - NO automatic centering
     onMapTractSelect?.(tract.geoid);
     
-    // ✅ REMOVED: No more duplicate centering call here
-    // The Map.tsx component will handle centering via the selectedTractId prop
+    // ✅ REMOVED: No automatic centering to prevent snapping back
+    // User can move map freely without interference
   };
 
   // ✅ Effect to handle tract selection from map clicks
