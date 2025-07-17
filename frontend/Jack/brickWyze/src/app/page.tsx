@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import mapboxgl from 'mapbox-gl';
 import Map from '../components/features/Map/Map';
 import TopLeftUI from '../components/features/search/TopLeftUI';
 import { uiStore } from '@/stores/uiStore';
@@ -21,18 +22,17 @@ interface MapFilters {
   topN?: number;
 }
 
-// ✅ Type definitions for search results and tract data - FIXED to match TopLeftUI
 interface TractResult {
   geoid: string;
-  tract_name: string; // ✅ FIXED: Required, not optional
-  display_name: string; // ✅ FIXED: Required, not optional
-  nta_name: string; // ✅ FIXED: Required, not optional
+  tract_name: string;
+  display_name: string;
+  nta_name: string;
   custom_score: number;
-  resilience_score: number; // ✅ FIXED: Required, not optional
-  avg_rent: number; // ✅ FIXED: Required, not optional
-  demographic_score: number; // ✅ FIXED: Required, not optional
-  foot_traffic_score: number; // ✅ FIXED: Required, not optional
-  crime_score: number; // ✅ FIXED: Required, not optional
+  resilience_score: number;
+  avg_rent: number;
+  demographic_score: number;
+  foot_traffic_score: number;
+  crime_score: number;
   flood_risk_score?: number;
   rent_score?: number;
   poi_score?: number;
@@ -56,7 +56,6 @@ interface TractResult {
   [key: string]: unknown;
 }
 
-// ✅ Type for results from Map component (ResilienceScore)
 interface MapSearchResult {
   geoid: string;
   tract_name?: string;
@@ -101,26 +100,23 @@ interface FilterUpdate {
   topN?: number;
 }
 
-// ✅ Global window interface for type safety
 declare global {
   interface Window {
     selectTractFromResultsPanel?: (tractId: string) => void;
     openResultsPanel?: () => void;
+    _brickwyzeMapRef?: mapboxgl.Map;
   }
 }
 
 export default function Page() {
-  // ✅ State to hold current filters that get passed to Map
   const [currentFilters, setCurrentFilters] = useState<MapFilters>({});
-  const [searchResults, setSearchResults] = useState<TractResult[]>([]); // ✅ FIXED: Proper type
-  const [selectedTractId, setSelectedTractId] = useState<string | null>(null); // ✅ NEW: Track selected tract
-  const [selectedTract, setSelectedTract] = useState<TractResult | undefined>(undefined); // ✅ FIXED: Use undefined instead of null
+  const [searchResults, setSearchResults] = useState<TractResult[]>([]);
+  const [selectedTractId, setSelectedTractId] = useState<string | null>(null);
+  const [selectedTract, setSelectedTract] = useState<TractResult | undefined>(undefined);
 
-  // ✅ CLEAN: Simple filter update handler - no comparison logic
-  const handleFilterUpdate = useCallback((filters: FilterUpdate) => { // ✅ FIXED: Proper type
+  const handleFilterUpdate = useCallback((filters: FilterUpdate) => {
     console.log('🔄 [Page] Updating map filters - topN:', filters.topN);
     
-    // Convert from filter store format to Map component format
     const mapFilters: MapFilters = {
       weights: filters.weights || [],
       rentRange: filters.rentRange || [26, 160],
@@ -135,11 +131,9 @@ export default function Page() {
     setCurrentFilters(mapFilters);
   }, []);
 
-  // ✅ NEW: Handle search results from Map
-  const handleSearchResults = useCallback((results: MapSearchResult[]) => { // ✅ FIXED: Use proper type instead of any
+  const handleSearchResults = useCallback((results: MapSearchResult[]) => {
     console.log('📊 [Page] Received search results:', results.length, 'tracts');
     
-    // ✅ Transform MapSearchResult[] to TractResult[] with default values for required fields
     const transformedResults: TractResult[] = results.map(r => ({
       geoid: r.geoid || '',
       tract_name: r.tract_name || `Tract ${r.geoid || ''}`,
@@ -167,59 +161,42 @@ export default function Page() {
     setSearchResults(transformedResults);
   }, []);
 
-  // ✅ NEW: Handle tract selection from results panel
   const handleMapTractSelect = useCallback((tractId: string | null) => {
     console.log('🗺️ [Page] Highlighting tract on map:', tractId);
     setSelectedTractId(tractId);
-    
-    // ✅ Optional: You can add map highlighting logic here
-    // For example, calling a map method to highlight the selected tract
   }, []);
 
-  // ✅ NEW: Set up global functions for map communication (moved from TopLeftUI)
   useEffect(() => {
     console.log('🔧 [Page] Setting up global functions for map communication');
     
-    window.selectTractFromResultsPanel = (tractIdParam: string) => { // ✅ FIXED: Proper window typing
+    window.selectTractFromResultsPanel = (tractIdParam: string) => {
       console.log('🗺️ [Page] Map clicked tract with score:', tractIdParam);
       
-      // ✅ Convert to string first in case it's a number
       const tractIdStr = String(tractIdParam);
       
-      // ✅ First, let's debug what's in our search results
-      console.log('🔍 [Page] Current search results count:', searchResults.length);
-      console.log('🔍 [Page] Sample tract IDs:', searchResults.slice(0, 3).map(t => t.geoid));
-      console.log('🔍 [Page] Looking for tract ID (as string):', tractIdStr);
-      
-      // ✅ Try different ways to find the tract (in case of ID format differences)
       let tract = searchResults.find(t => String(t.geoid) === tractIdStr);
       
       if (!tract) {
-        // Try with padded zeros
         const paddedId = tractIdStr.padStart(11, '0');
         tract = searchResults.find(t => String(t.geoid) === paddedId);
-        console.log('🔍 [Page] Trying padded ID:', paddedId);
       }
       
       if (!tract) {
-        // Try without padding (remove leading zeros from both)
         const trimmedId = tractIdStr.replace(/^0+/, '');
         tract = searchResults.find(t => String(t.geoid).replace(/^0+/, '') === trimmedId);
-        console.log('🔍 [Page] Trying trimmed ID:', trimmedId);
       }
       
       if (tract) {
         console.log('✅ [Page] Found tract in results, setting both ID and tract object:', tract.display_name || tract.tract_name);
         setSelectedTractId(tractIdStr);
-        setSelectedTract(tract); // ✅ NEW: Store the actual tract object directly
+        setSelectedTract(tract);
       } else {
-        console.warn('⚠️ [Page] Tract still not found in search results. Available tract IDs:');
-        console.warn(searchResults.map(t => String(t.geoid)).slice(0, 10)); // Show first 10 for debugging
-        setSelectedTract(undefined); // ✅ FIXED: Reset to undefined if not found
+        console.warn('⚠️ [Page] Tract not found in search results');
+        setSelectedTract(undefined);
       }
     };
     
-    window.openResultsPanel = () => { // ✅ FIXED: Proper window typing
+    window.openResultsPanel = () => {
       console.log('🔄 [Page] Opening results panel from map click');
       uiStore.setState({ viewState: 'results' });
     };
@@ -229,19 +206,18 @@ export default function Page() {
       delete window.selectTractFromResultsPanel;
       delete window.openResultsPanel;
     };
-  }, [searchResults]); // ✅ Include searchResults to update the function when results change
+  }, [searchResults]);
 
-  // ✅ Memoize map props to prevent unnecessary re-renders
   const mapProps = useMemo(() => ({
-    weights: currentFilters.weights,
-    rentRange: currentFilters.rentRange,
-    selectedEthnicities: currentFilters.selectedEthnicities,
-    selectedGenders: currentFilters.selectedGenders,
-    ageRange: currentFilters.ageRange,
-    incomeRange: currentFilters.incomeRange,
-    topN: currentFilters.topN,
-    onSearchResults: handleSearchResults, // ✅ NEW: Pass callback to Map
-    selectedTractId: selectedTractId, // ✅ NEW: Pass selected tract to Map
+    weights: currentFilters.weights || [],
+    rentRange: currentFilters.rentRange || [26, 160] as [number, number],
+    selectedEthnicities: currentFilters.selectedEthnicities || [],
+    selectedGenders: currentFilters.selectedGenders || [],
+    ageRange: currentFilters.ageRange || [0, 100] as [number, number],
+    incomeRange: currentFilters.incomeRange || [0, 250000] as [number, number],
+    topN: currentFilters.topN || 10,
+    onSearchResults: handleSearchResults,
+    selectedTractId: selectedTractId,
   }), [currentFilters, handleSearchResults, selectedTractId]);
 
   return (
@@ -261,9 +237,9 @@ export default function Page() {
         <div style={{ pointerEvents: 'auto' }}>
           <TopLeftUI 
             onFilterUpdate={handleFilterUpdate}
-            searchResults={searchResults} // ✅ NEW: Pass search results
-            onMapTractSelect={handleMapTractSelect} // ✅ NEW: Pass tract selection handler
-            selectedTract={selectedTract} // ✅ FIXED: Now properly typed as TractResult | undefined
+            searchResults={searchResults}
+            onMapTractSelect={handleMapTractSelect}
+            selectedTract={selectedTract}
           />
         </div>
       </div>

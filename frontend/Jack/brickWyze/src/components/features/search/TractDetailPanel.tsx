@@ -17,7 +17,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score: number;
+  flood_risk_score?: number; // ✅ FIXED: Made optional to match other components
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -333,10 +333,27 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             
             <VStack spacing={2}>
               <Text fontSize="2xl" fontWeight="bold" color="gray.600">
-                👥 {tract.demographic_match_pct ? `${Math.round(tract.demographic_match_pct * 100)}%` : 'N/A'}
+                👥 {(() => {
+                  // ✅ FIX: Check if value is already a percentage (>1) or decimal (0-1)
+                  const rawValue = tract.demographic_match_pct || 0;
+                  let displayValue;
+                  
+                  if (rawValue > 1) {
+                    // Already a percentage, just round it
+                    displayValue = Math.round(rawValue);
+                  } else {
+                    // It's a decimal, convert to percentage
+                    displayValue = Math.round(rawValue * 100);
+                  }
+                  
+                  // Cap at 100% maximum
+                  displayValue = Math.min(displayValue, 100);
+                  
+                  return `${displayValue}%`;
+                })()}
               </Text>
               <Text fontSize="sm" color="gray.600" textAlign="center">
-                Demo Fit
+                Ethnicity Fit
               </Text>
               <Text fontSize="xs" color="gray.500">
                 match rate
@@ -467,7 +484,10 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             {tract.age_match_pct && (
               <ScoreMeter
                 label="Age Match"
-                score={Math.round(tract.age_match_pct * 100)}
+                score={(() => {
+                  const raw = tract.age_match_pct || 0;
+                  return raw > 1 ? Math.min(raw, 100) : Math.min(raw * 100, 100);
+                })()}
                 color="#4299E1"
                 icon="🎂"
               />
@@ -475,7 +495,10 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             {tract.income_match_pct && (
               <ScoreMeter
                 label="Income Match"
-                score={Math.round(tract.income_match_pct * 100)}
+                score={(() => {
+                  const raw = tract.income_match_pct || 0;
+                  return raw > 1 ? Math.min(raw, 100) : Math.min(raw * 100, 100);
+                })()}
                 color="#48BB78"
                 icon="💵"
               />
@@ -483,7 +506,10 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             {tract.gender_match_pct && (
               <ScoreMeter
                 label="Gender Match"
-                score={Math.round(tract.gender_match_pct * 100)}
+                score={(() => {
+                  const raw = tract.gender_match_pct || 0;
+                  return raw > 1 ? Math.min(raw, 100) : Math.min(raw * 100, 100);
+                })()}
                 color="#ED8936"
                 icon="⚖️"
               />
