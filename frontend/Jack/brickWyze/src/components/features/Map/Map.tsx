@@ -280,13 +280,31 @@ export default function Map({
 
       const { zones, debug } = (await response.json()) as ApiResponse;
 
+      // ✅ SAFETY FIX: Cap all scores at 100 to prevent frontend multiplication issues
+      const cappedZones = zones.map(zone => ({
+        ...zone,
+        custom_score: Math.min(Math.max(zone.custom_score || 0, 0), 100),
+        // Also cap other scores if needed
+        foot_traffic_score: Math.min(Math.max(zone.foot_traffic_score || 0, 0), 100),
+        crime_score: Math.min(Math.max(zone.crime_score || 0, 0), 100),
+        flood_risk_score: Math.min(Math.max(zone.flood_risk_score || 0, 0), 100),
+        rent_score: Math.min(Math.max(zone.rent_score || 0, 0), 100),
+        poi_score: Math.min(Math.max(zone.poi_score || 0, 0), 100),
+      }));
+
+      // ✅ Log any scores that were over 100
+      const overScores = zones.filter(zone => (zone.custom_score || 0) > 100);
+      if (overScores.length > 0) {
+        console.warn('⚠️ [Map] Found scores over 100, capping them:', overScores.map(z => `${z.geoid}: ${z.custom_score}`));
+      }
+
       if (DEBUG_MODE) {
-        console.log('📥 Edge function returned zones:', zones.length);
+        console.log('📥 Edge function returned zones:', cappedZones.length);
         console.log('[✅ DEBUG] Data received by edge function:', debug);
       }
 
-      // ✅ Add rankings to zones
-      const zonesWithRankings: ResilienceScoreWithRanking[] = zones.map((zone, index) => ({
+      // ✅ Continue with cappedZones instead of zones
+      const zonesWithRankings: ResilienceScoreWithRanking[] = cappedZones.map((zone, index) => ({
         ...zone,
         ranking: index + 1
       }));
@@ -340,10 +358,10 @@ export default function Map({
 
       // ✅ Pass enhanced search results to parent using ref to avoid dependency loop
       if (onSearchResultsRef.current) {
-        console.log('📊 [Map] Passing search results to parent:', zones.length, 'tracts');
+        console.log('📊 [Map] Passing search results to parent:', cappedZones.length, 'tracts');
         
         // ✅ FIX: Enhance zones with proper NTA names from GeoJSON before passing to parent
-        const enhancedZones = zones.map(zone => {
+        const enhancedZones = cappedZones.map(zone => {
           const tract = updated.features.find((feature: unknown) => {
             const typedFeature = feature as { properties?: { GEOID?: string | number } };
             return typedFeature.properties?.GEOID?.toString().padStart(11, '0') === zone.geoid?.toString().padStart(11, '0');
@@ -373,7 +391,7 @@ export default function Map({
       }
 
       setTimeout(() => {
-        zoomToTopTracts(zones);
+        zoomToTopTracts(cappedZones);
       }, 800);
 
     } catch (err) {
@@ -499,8 +517,8 @@ export default function Map({
         }
       }
     }
-  }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN]); // ✅ REMOVED fetchAndApplyScores to break the cycle
-
+ }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN]); // eslint-disable-line react-hooks/exhaustive-deps
+ 
   return (
     <div
       ref={containerRef}

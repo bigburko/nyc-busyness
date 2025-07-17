@@ -15,7 +15,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score?: number; // ✅ FIXED: Made optional to match other components
+  flood_risk_score?: number;
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -43,7 +43,9 @@ function TractResultCard({
   isSelected: boolean; 
   onClick: () => void; 
 }) {
-  const resilienceScore = Math.round(tract.custom_score * 100);
+  // ✅ FIXED: Scores are now 0-100, no need to multiply
+  const resilienceScore = Math.round(tract.custom_score);
+  
   const rentText = tract.avg_rent ? `$${tract.avg_rent}/sqft` : 'Rent: N/A';
   
   return (
@@ -100,10 +102,10 @@ function TractResultCard({
         {/* Mini metrics row */}
         <HStack spacing={2} mt={1}>
           <Badge size="sm" bg="blue.100" color="blue.800">
-            🚶 {Math.round(tract.foot_traffic_score * 10)}/100
+            🚶 {Math.round(tract.foot_traffic_score || 0)}/100
           </Badge>
           <Badge size="sm" bg="green.100" color="green.800">
-            👥 {Math.round(tract.demographic_score * 100)}/100
+            👥 {Math.round(tract.demographic_score || 0)}/100
           </Badge>
         </HStack>
       </VStack>
@@ -137,6 +139,11 @@ export default function TractResultsList({
     );
   }
 
+  // ✅ FIXED: Scores are now 0-100, no need to multiply
+  const getDisplayScore = (score: number) => {
+    return Math.round(score);
+  };
+
   return (
     <VStack align="stretch" spacing={0} h="100%">
       {/* Header - like Google Maps */}
@@ -154,7 +161,7 @@ export default function TractResultsList({
           {/* Top score highlight */}
           {sortedResults[0] && (
             <Badge bg="#FF492C" color="white" px={3} py={1} borderRadius="full">
-              Best: {Math.round(sortedResults[0].custom_score * 100)}
+              Best: {getDisplayScore(sortedResults[0].custom_score)}
             </Badge>
           )}
         </HStack>
@@ -187,10 +194,10 @@ export default function TractResultsList({
       <Box p={3} borderTop="1px solid" borderColor="gray.200" bg="gray.50">
         <HStack justify="space-between" fontSize="xs" color="gray.600">
           <Text>
-            Avg Score: {Math.round(sortedResults.reduce((sum, t) => sum + t.custom_score * 100, 0) / sortedResults.length)}
+            Avg Score: {Math.round(sortedResults.reduce((sum, t) => sum + getDisplayScore(t.custom_score), 0) / sortedResults.length)}
           </Text>
           <Text>
-            Range: {Math.round(sortedResults[sortedResults.length - 1]?.custom_score * 100)}-{Math.round(sortedResults[0]?.custom_score * 100)}
+            Range: {getDisplayScore(sortedResults[sortedResults.length - 1]?.custom_score)}-{getDisplayScore(sortedResults[0]?.custom_score)}
           </Text>
         </HStack>
       </Box>

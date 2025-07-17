@@ -17,7 +17,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score?: number; // ✅ FIXED: Made optional to match other components
+  flood_risk_score?: number;
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -82,10 +82,10 @@ function ScoreMeter({
   );
 }
 
-// ✅ SIMPLE Crime trend chart - timeline data is already 0-100, other scores are 0-1
+// ✅ FIXED: Crime trend chart - scores are now 0-100 scale
 function CrimeTrendChart({ tract }: { tract: TractResult }) {
-  // ✅ FIX: Current score needs * 100, but timeline data is already 0-100
-  const currentScore = Math.round((tract.crime_score || 0.1) * 100);
+  // ✅ FIX: Scores are now 0-100, no need to multiply
+  const currentScore = Math.round(tract.crime_score || 10);
   
   // Check if we have real crime timeline data
   const hasRealData = tract.crime_timeline && Object.keys(tract.crime_timeline).length > 0;
@@ -93,7 +93,7 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
   let chartData = [];
   
   if (hasRealData && tract.crime_timeline) {
-    // ✅ FIX: Timeline data might be 0-10 scale, divide by 10 to get 0-100
+    // ✅ FIX: Timeline data is 0-10 scale, convert to 0-100
     chartData = [
       { year: '2021', value: Math.round((tract.crime_timeline.year_2021 || 0) / 10 * 100) },
       { year: '2022', value: Math.round((tract.crime_timeline.year_2022 || 0) / 10 * 100) },
@@ -102,7 +102,7 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
       { year: '2025', value: Math.round((tract.crime_timeline.pred_2025 || 0) / 10 * 100) },
       { year: '2026', value: Math.round((tract.crime_timeline.pred_2026 || 0) / 10 * 100) },
       { year: '2027', value: Math.round((tract.crime_timeline.pred_2027 || 0) / 10 * 100) },
-    ]; // ✅ FIX: Don't filter out zero values - keep all 7 years
+    ];
   } else {
     // Fallback to calculated data
     chartData = [
@@ -128,7 +128,7 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
   if (!hasVariation) {
     // For identical/similar values, use log scaling around the average
     const avgValue = (maxValue + minValue) / 2;
-    effectiveMin = Math.max(1, avgValue - 8); // Wider range for log scale
+    effectiveMin = Math.max(1, avgValue - 8);
     effectiveMax = avgValue + 8;
   } else {
     // Use actual range with padding
@@ -138,21 +138,18 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
   
   // ✅ Logarithmic height calculation function
   const getLogHeight = (value: number) => {
-    // Ensure value is at least 1 for log calculation
     const safeValue = Math.max(1, value);
     const safeMin = Math.max(1, effectiveMin);
     const safeMax = Math.max(2, effectiveMax);
     
-    // Use natural log for scaling
     const logValue = Math.log(safeValue);
     const logMin = Math.log(safeMin);
     const logMax = Math.log(safeMax);
     
-    // Scale to 60-180px range (much taller bars)
     const logRange = logMax - logMin;
     const normalizedLog = logRange > 0 ? (logValue - logMin) / logRange : 0.5;
     
-    return Math.max(60, 60 + (normalizedLog * 120)); // 60px minimum, up to 180px
+    return Math.max(60, 60 + (normalizedLog * 120));
   };
 
   return (
@@ -162,17 +159,14 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
       </Text>
 
       <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
-        {/* ✅ FIX: Much taller container for bigger bars */}
         <Flex justify="space-between" align="end" h="220px" mb={3} px={1}>
           {chartData.map((item, index) => {
             const isPast = index < 4;
             const isCurrent = index === 4;
-            // ✅ FIX: Use logarithmic height calculation
             const height = getLogHeight(item.value);
             
             return (
               <VStack key={`chart-${item.year}`} spacing={1} flex="1" align="center">
-                {/* ✅ FIX: Smaller font and better spacing */}
                 <Text fontSize="10px" fontWeight="bold" color="gray.700" lineHeight="1">
                   {item.value}
                 </Text>
@@ -232,8 +226,8 @@ function getResilienceLabel(score: number): string {
 }
 
 export default function TractDetailPanel({ tract, onClose }: TractDetailPanelProps) {
-  // ✅ FIX: Scores are 0-1 decimals, need to multiply by 100
-  const resilienceScore = Math.round((tract.custom_score || 0) * 100);
+  // ✅ FIX: Scores are now 0-100, no need to multiply
+  const resilienceScore = Math.round(tract.custom_score || 0);
   const rentText = tract.avg_rent ? `${tract.avg_rent.toFixed(2)}` : 'N/A';
   const resilienceColor = getResilienceColor(resilienceScore);
   const resilienceLabel = getResilienceLabel(resilienceScore);
@@ -321,7 +315,7 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             
             <VStack spacing={2}>
               <Text fontSize="2xl" fontWeight="bold" color="#4299E1">
-                🚶 {Math.round((tract.foot_traffic_score || 0) * 100)}
+                🚶 {Math.round(tract.foot_traffic_score || 0)}
               </Text>
               <Text fontSize="sm" color="gray.600" textAlign="center">
                 Foot Traffic
@@ -334,19 +328,15 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             <VStack spacing={2}>
               <Text fontSize="2xl" fontWeight="bold" color="gray.600">
                 👥 {(() => {
-                  // ✅ FIX: Check if value is already a percentage (>1) or decimal (0-1)
                   const rawValue = tract.demographic_match_pct || 0;
                   let displayValue;
                   
                   if (rawValue > 1) {
-                    // Already a percentage, just round it
                     displayValue = Math.round(rawValue);
                   } else {
-                    // It's a decimal, convert to percentage
                     displayValue = Math.round(rawValue * 100);
                   }
                   
-                  // Cap at 100% maximum
                   displayValue = Math.min(displayValue, 100);
                   
                   return `${displayValue}%`;
@@ -362,42 +352,30 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             
             <VStack spacing={2}>
               {(() => {
-                const safetyScore = Math.round((tract.crime_score || 0) * 100);
+                // ✅ FIX: Crime score is now 0-100
+                const safetyScore = Math.round(tract.crime_score || 0);
                 
-                // ✅ FIXED: Simpler trend detection
                 let trendStatus = "Stable";
-                let trendColor = "#6B7280"; // Gray for stable
+                let trendColor = "#6B7280";
                 
                 if (tract.crime_timeline) {
-                  // Get the raw values and convert them properly
+                  // ✅ FIXED: Remove unused variables and simplify logic
                   const raw2025 = tract.crime_timeline.pred_2025 || 0;
-                  const raw2026 = tract.crime_timeline.pred_2026 || 0;
                   const raw2027 = tract.crime_timeline.pred_2027 || 0;
                   
-                  // Convert to display values (same as chart)
                   const val2025 = Math.round((raw2025 / 10) * 100);
-                  const val2026 = Math.round((raw2026 / 10) * 100);
                   const val2027 = Math.round((raw2027 / 10) * 100);
                   
-                  // Compare 2025 to 2027 (2-year trend)
                   const trendChange = val2027 - val2025;
                   
-                  console.log('🔍 Safety Trend Debug:', {
-                    raw: { 2025: raw2025, 2026: raw2026, 2027: raw2027 },
-                    converted: { 2025: val2025, 2026: val2026, 2027: val2027 },
-                    change: trendChange
-                  });
-                  
-                  // More sensitive thresholds
                   if (trendChange > 0.5) {
                     trendStatus = "Increasing";
-                    trendColor = "#10B981"; // Green for improving
+                    trendColor = "#10B981";
                   } else if (trendChange < -0.5) {
                     trendStatus = "Declining";
-                    trendColor = "#E53E3E"; // Red for declining
+                    trendColor = "#E53E3E";
                   }
                 } else {
-                  // Fallback to simple score-based check if no timeline
                   if (safetyScore > 85) {
                     trendStatus = "Increasing";
                     trendColor = "#10B981";
@@ -433,37 +411,37 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
           <VStack spacing={6}>
             <ScoreMeter
               label="Foot Traffic"
-              score={Math.round((tract.foot_traffic_score || 0) * 100)}
+              score={Math.round(tract.foot_traffic_score || 0)}
               color="#4299E1"
               icon="🚶"
             />
             <ScoreMeter
               label="Demographics"
-              score={Math.round((tract.demographic_score || 0) * 100)}
+              score={Math.round(tract.demographic_score || 0)}
               color="#48BB78"
               icon="👥"
             />
             <ScoreMeter
               label="Safety Score"
-              score={Math.round((tract.crime_score || 0) * 100)}
+              score={Math.round(tract.crime_score || 0)}
               color="#10B981"
               icon="🛡️"
             />
             <ScoreMeter
               label="Flood Risk"
-              score={Math.round((tract.flood_risk_score || 0) * 100)}
+              score={Math.round(tract.flood_risk_score || 0)}
               color="#38B2AC"
               icon="🌊"
             />
             <ScoreMeter
               label="Rent Score"
-              score={Math.round((tract.rent_score || 0) * 100)}
+              score={Math.round(tract.rent_score || 0)}
               color="#ED8936"
               icon="💰"
             />
             <ScoreMeter
               label="Points of Interest"
-              score={Math.round((tract.poi_score || 0) * 100)}
+              score={Math.round(tract.poi_score || 0)}
               color="#9F7AEA"
               icon="📍"
             />

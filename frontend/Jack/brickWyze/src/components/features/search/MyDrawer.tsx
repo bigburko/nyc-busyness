@@ -11,7 +11,8 @@ import { useRef, useState, useCallback } from 'react';
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
-import { useFilterStore, INITIAL_WEIGHTS, Weighting, Layer, FilterState } from '../../../stores/filterStore';
+// ✅ FIXED: Removed unused INITIAL_WEIGHTS import
+import { useFilterStore, Weighting, Layer, FilterState } from '../../../stores/filterStore';
 import WeightingPanel from '../filters/ScoreWeightingGroup/WeightingPanel';
 import MyRangeSlider from '../../ui/MyRangeSlider';
 import MyAgeSlider from '../filters/DemographicGroup/MyAgeSlider';
@@ -31,7 +32,7 @@ interface SubmissionData extends FilterState {
 interface MyDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSearchSubmit: (filters: SubmissionData) => void; // ✅ FIXED: Proper type instead of any
+  onSearchSubmit: (filters: SubmissionData) => void;
 }
 
 const ALL_AVAILABLE_LAYERS: Layer[] = [
@@ -49,7 +50,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
   const drawerBodyRef = useRef<HTMLDivElement>(null);
   const selectWrapperRef = useRef<HTMLDivElement>(null);
   
-  // ✅ Get filter state using individual selectors (WORKING LOGIC)
+  // ✅ Get filter state using individual selectors
   const activeWeights = useFilterStore((state: FilterState) => state.weights);
   const rentRange = useFilterStore((state: FilterState) => state.rentRange);
   const ageRange = useFilterStore((state: FilterState) => state.ageRange);
@@ -58,8 +59,11 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
   const selectedGenders = useFilterStore((state: FilterState) => state.selectedGenders);
   const setFilters = useFilterStore((state: FilterState) => state.setFilters);
   const updateWeight = useFilterStore((state: FilterState) => state.updateWeight);
+  const addWeight = useFilterStore((state: FilterState) => state.addWeight);
+  const removeWeight = useFilterStore((state: FilterState) => state.removeWeight);
+  const reset = useFilterStore((state: FilterState) => state.reset);
 
-  // ✅ Local state for HierarchicalMultiSelect and UI (WORKING LOGIC)
+  // ✅ Local state for UI
   const [topN, setTopN] = useState(10);
   const [isDemographicOpen, setIsDemographicOpen] = useState(false);
   const [isWeightingOpen, setIsWeightingOpen] = useState(false);
@@ -69,21 +73,18 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
   
-  // ✅ Handler functions (WORKING LOGIC)
+  // ✅ Handler functions - now using store methods
   const handleWeightChangeEnd = useCallback((id: string, value: number) => {
     updateWeight(id, value);
   }, [updateWeight]);
 
   const handleAddWeight = useCallback((layer: Layer) => {
-    const newWeight: Weighting = { ...layer, value: 15 };
-    const updatedWeights = [...activeWeights, newWeight];
-    setFilters({ weights: updatedWeights });
-  }, [activeWeights, setFilters]);
+    addWeight(layer);
+  }, [addWeight]);
 
   const handleRemoveWeight = useCallback((id: string) => {
-    const updatedWeights = activeWeights.filter((w: Weighting) => w.id !== id);
-    setFilters({ weights: updatedWeights });
-  }, [activeWeights, setFilters]);
+    removeWeight(id);
+  }, [removeWeight]);
 
   const handleRentRangeChange = useCallback((newVal: [number, number]) => setFilters({ rentRange: newVal }), [setFilters]);
   const handleAgeRangeChange = useCallback((newVal: [number, number]) => setFilters({ ageRange: newVal }), [setFilters]);
@@ -97,13 +98,16 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
       return;
     }
     const currentState = useFilterStore.getState();
-    const submissionData: SubmissionData = { // ✅ FIXED: Proper typing
+    const submissionData: SubmissionData = {
       ...currentState,
       topN: topN
     };
     onSearchSubmit(submissionData);
     onClose();
   };
+
+  // ✅ Calculate total weight for debugging
+  const totalWeight = activeWeights.reduce((sum, w) => sum + w.value, 0);
 
   return (
     <main>
@@ -206,7 +210,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                 />
               </Box>
               
-              {/* Demographics - COLLAPSIBLE with WORKING STRUCTURE */}
+              {/* Demographics - COLLAPSIBLE */}
               <Box 
                 bg="rgba(255, 255, 255, 0.8)" 
                 borderRadius="2xl" 
@@ -282,7 +286,6 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                         </MyToolTip>
                       </HStack>
                       
-                      {/* CRITICAL: Use EXACT working structure */}
                       <Box mt={2} ref={ethnicityRef} borderRadius="md" minHeight="60px">
                         <HierarchicalMultiSelect 
                           data={ethnicityData} 
@@ -345,6 +348,23 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                 {/* Content - Only show when expanded */}
                 {isWeightingOpen && (
                   <VStack spacing={3} p={3} pt={0}>
+                    {/* ✅ NEW: Total weight indicator for debugging */}
+                    <Box w="full" bg="gray.50" p={3} borderRadius="lg">
+                      <Text fontSize="sm" color="gray.600" textAlign="center" fontWeight="medium">
+                        Total Weight: {totalWeight}%
+                        {totalWeight !== 100 && (
+                          <Text as="span" color="red.500" ml={2} fontWeight="bold">
+                            ⚠️ Should be 100%
+                          </Text>
+                        )}
+                        {totalWeight === 100 && (
+                          <Text as="span" color="green.500" ml={2}>
+                            ✅
+                          </Text>
+                        )}
+                      </Text>
+                    </Box>
+                    
                     <Box 
                       bg="white" 
                       borderRadius="xl" 
@@ -438,7 +458,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
               <Button 
                 colorScheme="red" 
                 onClick={() => { 
-                  setFilters({ weights: INITIAL_WEIGHTS }); 
+                  reset(); 
                   setIsResetDialogOpen(false); 
                 }} 
                 ml={3}
