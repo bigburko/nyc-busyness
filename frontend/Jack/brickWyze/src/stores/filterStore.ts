@@ -1,4 +1,4 @@
-// Clean filterStore.ts - keeping essential logs, removing verbose ones
+// Clean filterStore.ts - Enhanced with demographic sub-weighting + COMPREHENSIVE CLAMPING
 import { create, StateCreator } from 'zustand';
 
 // --- TYPE DEFINITIONS ---
@@ -17,6 +17,33 @@ export interface Layer {
   color: string;
 }
 
+// NEW: Demographic sub-weighting types
+export interface DemographicWeights {
+  ethnicity: number;
+  gender: number;
+  age: number;
+  income: number;
+}
+
+export interface ThresholdBonus {
+  condition: string;
+  bonus: number;
+  description: string;
+}
+
+export interface DemographicPenalty {
+  condition: string;
+  penalty: number;
+  description: string;
+}
+
+export interface DemographicScoring {
+  weights: DemographicWeights;
+  thresholdBonuses: ThresholdBonus[];
+  penalties: DemographicPenalty[];
+  reasoning?: string;
+}
+
 export interface FilterState {
   weights: Weighting[];
   rentRange: [number, number];
@@ -24,22 +51,135 @@ export interface FilterState {
   incomeRange: [number, number];
   selectedEthnicities: string[];
   selectedGenders: string[];
+  
+  // NEW: Demographic sub-weighting
+  demographicScoring: DemographicScoring;
+  lastDemographicReasoning: string;
+  
   setFilters: (newFilters: Partial<FilterState>) => void;
   updateWeight: (id: string, value: number) => void;
   addWeight: (layer: Layer) => void;
   removeWeight: (id: string) => void;
   reset: () => void;
+  
+  // NEW: Demographic sub-weighting actions
+  setDemographicScoring: (scoring: DemographicScoring) => void;
+  resetDemographicScoring: () => void;
+  updateDemographicWeights: (weights: Partial<DemographicWeights>) => void;
 }
 
-// --- INITIAL STATE ---
+// --- VALIDATION & CLAMPING CONSTANTS ---
+const VALIDATION_BOUNDS = {
+  RENT_MIN: 0,
+  RENT_MAX: 500,      // $500/sqft max reasonable
+  AGE_MIN: 0,
+  AGE_MAX: 100,
+  INCOME_MIN: 0,
+  INCOME_MAX: 1000000, // $1M max reasonable
+  WEIGHT_MIN: 0,
+  WEIGHT_MAX: 100,
+  DEMO_WEIGHT_MIN: 0.0,
+  DEMO_WEIGHT_MAX: 1.0,
+  DEMO_WEIGHT_TOLERANCE: 0.001, // Allow small floating point errors
+};
+
+// --- VALIDATION HELPERS ---
+const clampValue = (value: number, min: number, max: number): number => {
+  return Math.max(min, Math.min(max, value));
+};
+
+const clampRange = (range: [number, number], min: number, max: number): [number, number] => {
+  const [start, end] = range;
+  const clampedStart = clampValue(start, min, max);
+  const clampedEnd = clampValue(end, min, max);
+  
+  // Ensure start <= end
+  return [
+    Math.min(clampedStart, clampedEnd),
+    Math.max(clampedStart, clampedEnd)
+  ];
+};
+
+const validateGenderArray = (genders: string[]): string[] => {
+  if (!Array.isArray(genders) || genders.length === 0) {
+    console.warn('🛡️ [FilterStore] Invalid gender array, defaulting to both');
+    return ['male', 'female'];
+  }
+  
+  // Filter valid genders only
+  const validGenders = genders.filter(g => ['male', 'female'].includes(g));
+  
+  if (validGenders.length === 0) {
+    console.warn('🛡️ [FilterStore] No valid genders found, defaulting to both');
+    return ['male', 'female'];
+  }
+  
+  return validGenders;
+};
+
+const validateEthnicityArray = (ethnicities: string[]): string[] => {
+  if (!Array.isArray(ethnicities)) {
+    console.warn('🛡️ [FilterStore] Invalid ethnicity array, defaulting to empty');
+    return [];
+  }
+  return ethnicities;
+};
+
+const normalizeDemographicWeights = (weights: DemographicWeights): DemographicWeights => {
+  // Clamp individual weights
+  const clampedWeights = {
+    ethnicity: clampValue(weights.ethnicity, VALIDATION_BOUNDS.DEMO_WEIGHT_MIN, VALIDATION_BOUNDS.DEMO_WEIGHT_MAX),
+    gender: clampValue(weights.gender, VALIDATION_BOUNDS.DEMO_WEIGHT_MIN, VALIDATION_BOUNDS.DEMO_WEIGHT_MAX),
+    age: clampValue(weights.age, VALIDATION_BOUNDS.DEMO_WEIGHT_MIN, VALIDATION_BOUNDS.DEMO_WEIGHT_MAX),
+    income: clampValue(weights.income, VALIDATION_BOUNDS.DEMO_WEIGHT_MIN, VALIDATION_BOUNDS.DEMO_WEIGHT_MAX)
+  };
+  
+  // Calculate total
+  const total = clampedWeights.ethnicity + clampedWeights.gender + clampedWeights.age + clampedWeights.income;
+  
+  // If total is 0 or very close to 0, return default balanced weights
+  if (total < VALIDATION_BOUNDS.DEMO_WEIGHT_TOLERANCE) {
+    console.warn('🛡️ [FilterStore] Demographic weights sum to ~0, using balanced defaults');
+    return { ethnicity: 0.25, gender: 0.25, age: 0.25, income: 0.25 };
+  }
+  
+  // If total is close to 1.0, return as-is
+  if (Math.abs(total - 1.0) < VALIDATION_BOUNDS.DEMO_WEIGHT_TOLERANCE) {
+    return clampedWeights;
+  }
+  
+  // Normalize to sum to 1.0
+  console.log(`🛡️ [FilterStore] Normalizing demographic weights (total: ${total})`);
+  return {
+    ethnicity: clampedWeights.ethnicity / total,
+    gender: clampedWeights.gender / total,
+    age: clampedWeights.age / total,
+    income: clampedWeights.income / total
+  };
+};
+
+// --- UPDATED INITIAL STATE ---
 export const INITIAL_WEIGHTS: Weighting[] = [
-  { id: 'foot_traffic', label: 'Foot Traffic', value: 35, icon: '🚶', color: '#4299E1' },
-  { id: 'demographic', label: 'Demographics', value: 25, icon: '👥', color: '#48BB78' },
-  { id: 'crime', label: 'Crime Score', value: 15, icon: '🚨', color: '#E53E3E' },
-  { id: 'flood_risk', label: 'Flood Risk', value: 10, icon: '🌊', color: '#3182CE' },
+  { id: 'foot_traffic', label: 'Foot Traffic', value: 45, icon: '🚶', color: '#4299E1' },
+  { id: 'demographic', label: 'Demographics', value: 0, icon: '👥', color: '#48BB78' },
+  { id: 'crime', label: 'Crime Score', value: 25, icon: '🚨', color: '#E53E3E' },
+  { id: 'flood_risk', label: 'Flood Risk', value: 15, icon: '🌊', color: '#3182CE' },
   { id: 'rent_score', label: 'Rent Score', value: 10, icon: '💰', color: '#ED8936' },
   { id: 'poi', label: 'Points of Interest', value: 5, icon: '📍', color: '#805AD5' },
 ];
+
+// NEW: Default demographic scoring (balanced approach)
+const defaultDemographicScoring: DemographicScoring = {
+  weights: {
+    ethnicity: 0.25,
+    gender: 0.25,
+    age: 0.25,
+    income: 0.25
+  },
+  thresholdBonuses: [],
+  penalties: [],
+  reasoning: "Default balanced weighting - all demographic factors equally important."
+};
 
 const INITIAL_STATE = {
   weights: INITIAL_WEIGHTS,
@@ -48,17 +188,21 @@ const INITIAL_STATE = {
   incomeRange: [0, 250000] as [number, number],
   selectedEthnicities: [] as string[],
   selectedGenders: ['male', 'female'] as string[],
+  
+  // NEW: Demographic sub-weighting initial state
+  demographicScoring: defaultDemographicScoring,
+  lastDemographicReasoning: "",
 };
 
-// ✅ REDISTRIBUTION LOGIC
+// ✅ REDISTRIBUTION LOGIC (enhanced with clamping)
 const redistributeWeights = (weights: Weighting[], changedId: string, newValue: number): Weighting[] => {
   const updatedWeights = [...weights];
   const changedIndex = updatedWeights.findIndex(w => w.id === changedId);
   
   if (changedIndex === -1) return weights;
   
-  // Clamp the new value to valid range
-  const clampedValue = Math.max(0, Math.min(100, newValue));
+  // 🛡️ ENHANCED: Clamp the new value to valid range
+  const clampedValue = clampValue(newValue, VALIDATION_BOUNDS.WEIGHT_MIN, VALIDATION_BOUNDS.WEIGHT_MAX);
   const oldValue = updatedWeights[changedIndex].value;
   
   // If no change, return early
@@ -137,13 +281,59 @@ const createFilterSlice: StateCreator<FilterState> = (set, get) => ({
   ...INITIAL_STATE,
 
   setFilters: (newFilters) => {
-    // ✅ Normalize weights if they're being set externally
-    if (newFilters.weights) {
-      const totalWeight = newFilters.weights.reduce((sum, w) => sum + w.value, 0);
+    // 🛡️ ENHANCED: Validate and clamp all incoming values
+    const validatedFilters = { ...newFilters };
+    
+    // Validate ranges
+    if (newFilters.rentRange) {
+      validatedFilters.rentRange = clampRange(
+        newFilters.rentRange, 
+        VALIDATION_BOUNDS.RENT_MIN, 
+        VALIDATION_BOUNDS.RENT_MAX
+      );
+      if (newFilters.rentRange !== validatedFilters.rentRange) {
+        console.log('🛡️ [FilterStore] Clamped rent range:', validatedFilters.rentRange);
+      }
+    }
+    
+    if (newFilters.ageRange) {
+      validatedFilters.ageRange = clampRange(
+        newFilters.ageRange, 
+        VALIDATION_BOUNDS.AGE_MIN, 
+        VALIDATION_BOUNDS.AGE_MAX
+      );
+      if (newFilters.ageRange !== validatedFilters.ageRange) {
+        console.log('🛡️ [FilterStore] Clamped age range:', validatedFilters.ageRange);
+      }
+    }
+    
+    if (newFilters.incomeRange) {
+      validatedFilters.incomeRange = clampRange(
+        newFilters.incomeRange, 
+        VALIDATION_BOUNDS.INCOME_MIN, 
+        VALIDATION_BOUNDS.INCOME_MAX
+      );
+      if (newFilters.incomeRange !== validatedFilters.incomeRange) {
+        console.log('🛡️ [FilterStore] Clamped income range:', validatedFilters.incomeRange);
+      }
+    }
+    
+    // Validate arrays
+    if (newFilters.selectedGenders) {
+      validatedFilters.selectedGenders = validateGenderArray(newFilters.selectedGenders);
+    }
+    
+    if (newFilters.selectedEthnicities) {
+      validatedFilters.selectedEthnicities = validateEthnicityArray(newFilters.selectedEthnicities);
+    }
+    
+    // ✅ Normalize weights if they're being set externally (keeping your existing logic)
+    if (validatedFilters.weights) {
+      const totalWeight = validatedFilters.weights.reduce((sum, w) => sum + w.value, 0);
       
       if (totalWeight !== 100) {
         // Normalize the weights to sum to 100%
-        const normalizedWeights = newFilters.weights.map(weight => ({
+        const normalizedWeights = validatedFilters.weights.map(weight => ({
           ...weight,
           value: Math.round((weight.value / totalWeight) * 100)
         }));
@@ -155,16 +345,19 @@ const createFilterSlice: StateCreator<FilterState> = (set, get) => ({
           normalizedWeights[0].value += adjustment;
         }
         
-        newFilters = { ...newFilters, weights: normalizedWeights };
+        validatedFilters.weights = normalizedWeights;
+        console.log('🛡️ [FilterStore] Normalized weights to 100%');
       }
     }
     
-    set((state) => ({ ...state, ...newFilters }));
+    set((state) => ({ ...state, ...validatedFilters }));
   },
 
   updateWeight: (id, value) => {
+    // 🛡️ ENHANCED: Pre-clamp the value before redistribution
+    const clampedValue = clampValue(value, VALIDATION_BOUNDS.WEIGHT_MIN, VALIDATION_BOUNDS.WEIGHT_MAX);
     const currentWeights = get().weights;
-    const redistributedWeights = redistributeWeights(currentWeights, id, value);
+    const redistributedWeights = redistributeWeights(currentWeights, id, clampedValue);
     set({ weights: redistributedWeights });
   },
 
@@ -204,7 +397,63 @@ const createFilterSlice: StateCreator<FilterState> = (set, get) => ({
   },
 
   reset: () => {
+    console.log('🔄 [FilterStore] Resetting to initial state');
     set(INITIAL_STATE);
+  },
+
+  // 🛡️ ENHANCED: Demographic sub-weighting actions with validation
+  setDemographicScoring: (scoring) => {
+    // Validate and normalize demographic weights
+    const normalizedWeights = normalizeDemographicWeights(scoring.weights);
+    
+    // Validate threshold bonuses and penalties
+    const validatedBonuses = Array.isArray(scoring.thresholdBonuses) ? scoring.thresholdBonuses : [];
+    const validatedPenalties = Array.isArray(scoring.penalties) ? scoring.penalties : [];
+    
+    const validatedScoring: DemographicScoring = {
+      weights: normalizedWeights,
+      thresholdBonuses: validatedBonuses,
+      penalties: validatedPenalties,
+      reasoning: typeof scoring.reasoning === 'string' ? scoring.reasoning : ""
+    };
+    
+    set((state) => ({
+      ...state,
+      demographicScoring: validatedScoring,
+      lastDemographicReasoning: validatedScoring.reasoning || ""
+    }));
+    
+    console.log('🛡️ [FilterStore] Set demographic scoring with validated weights:', normalizedWeights);
+  },
+
+  resetDemographicScoring: () => {
+    console.log('🔄 [FilterStore] Resetting demographic scoring to defaults');
+    set((state) => ({
+      ...state,
+      demographicScoring: defaultDemographicScoring,
+      lastDemographicReasoning: ""
+    }));
+  },
+
+  updateDemographicWeights: (weights) => {
+    const currentState = get();
+    const updatedWeights = {
+      ...currentState.demographicScoring.weights,
+      ...weights
+    };
+    
+    // Normalize the updated weights
+    const normalizedWeights = normalizeDemographicWeights(updatedWeights);
+    
+    set((state) => ({
+      ...state,
+      demographicScoring: {
+        ...state.demographicScoring,
+        weights: normalizedWeights
+      }
+    }));
+    
+    console.log('🛡️ [FilterStore] Updated demographic weights:', normalizedWeights);
   },
 });
 

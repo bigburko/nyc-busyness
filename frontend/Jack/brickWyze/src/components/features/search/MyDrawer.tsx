@@ -1,4 +1,4 @@
-// src/components/features/search/MyDrawer.tsx
+// src/components/features/search/MyDrawer.tsx - Enhanced with demographic reasoning
 
 'use client';
 
@@ -11,7 +11,7 @@ import { useRef, useState, useCallback } from 'react';
 import { SearchIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
-// ✅ FIXED: Removed unused INITIAL_WEIGHTS import
+// ✅ Enhanced imports for demographic sub-weighting
 import { useFilterStore, Weighting, Layer, FilterState } from '../../../stores/filterStore';
 import WeightingPanel from '../filters/ScoreWeightingGroup/WeightingPanel';
 import MyRangeSlider from '../../ui/MyRangeSlider';
@@ -23,8 +23,10 @@ import CancelResetButton from '../filters/ScoreWeightingGroup/CancelResetButton'
 import GenderSelect from '../filters/DemographicGroup/GenderSelect';
 import TopNSelector from '../filters/ScoreWeightingGroup/TopNSelector';
 import MyToolTip from '../../ui/MyToolTip';
+// NEW: Import demographic reasoning display
+import DemographicReasoningDisplay from '../../ui/DemographicReasoningDisplay';
 
-// ✅ Extended FilterState interface for submission data with topN
+// ✅ Extended FilterState interface for submission data with topN and demographic scoring
 interface SubmissionData extends FilterState {
   topN: number;
 }
@@ -50,13 +52,18 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
   const drawerBodyRef = useRef<HTMLDivElement>(null);
   const selectWrapperRef = useRef<HTMLDivElement>(null);
   
-  // ✅ Get filter state using individual selectors
+  // ✅ Get filter state using individual selectors (including new demographic scoring)
   const activeWeights = useFilterStore((state: FilterState) => state.weights);
   const rentRange = useFilterStore((state: FilterState) => state.rentRange);
   const ageRange = useFilterStore((state: FilterState) => state.ageRange);
   const incomeRange = useFilterStore((state: FilterState) => state.incomeRange);
   const selectedEthnicities = useFilterStore((state: FilterState) => state.selectedEthnicities);
   const selectedGenders = useFilterStore((state: FilterState) => state.selectedGenders);
+  // NEW: Get demographic scoring state
+  const demographicScoring = useFilterStore((state: FilterState) => state.demographicScoring);
+  const lastDemographicReasoning = useFilterStore((state: FilterState) => state.lastDemographicReasoning);
+  
+  // Get filter store actions
   const setFilters = useFilterStore((state: FilterState) => state.setFilters);
   const updateWeight = useFilterStore((state: FilterState) => state.updateWeight);
   const addWeight = useFilterStore((state: FilterState) => state.addWeight);
@@ -210,7 +217,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                 />
               </Box>
               
-              {/* Demographics - COLLAPSIBLE */}
+              {/* Demographics - COLLAPSIBLE with NEW reasoning display */}
               <Box 
                 bg="rgba(255, 255, 255, 0.8)" 
                 borderRadius="2xl" 
@@ -252,6 +259,12 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                 {/* Content - Only show when expanded */}
                 {isDemographicOpen && (
                   <VStack spacing={3} p={3} pt={0}>
+                    {/* NEW: Show demographic reasoning at the top when expanded */}
+                    <DemographicReasoningDisplay 
+                      demographicScoring={demographicScoring}
+                      lastReasoning={lastDemographicReasoning}
+                    />
+                    
                     <Box w="full">
                       <MyAgeSlider value={ageRange} onChangeEnd={handleAgeRangeChange} />
                     </Box>
@@ -348,7 +361,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                 {/* Content - Only show when expanded */}
                 {isWeightingOpen && (
                   <VStack spacing={3} p={3} pt={0}>
-                    {/* ✅ NEW: Total weight indicator for debugging */}
+                    {/* ✅ Total weight indicator for debugging */}
                     <Box w="full" bg="gray.50" p={3} borderRadius="lg">
                       <Text fontSize="sm" color="gray.600" textAlign="center" fontWeight="medium">
                         Total Weight: {totalWeight}%

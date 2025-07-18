@@ -1,6 +1,7 @@
-// src/stores/geminiStore.ts
+// src/stores/geminiStore.ts - Enhanced with demographic scoring integration
 
 import { create } from 'zustand';
+import { useFilterStore } from './filterStore'; // Import to access filter store
 
 /**
  * Defines the shape of the current filter state that can be passed 
@@ -14,6 +15,14 @@ interface FilterContext {
   selectedGenders?: string[];
   ageRange?: [number, number];
   incomeRange?: [number, number];
+  // NEW: Include demographic scoring in context
+  demographicScoring?: {
+    weights: { ethnicity: number; gender: number; age: number; income: number };
+    thresholdBonuses: Array<{ condition: string; bonus: number; description: string }>;
+    penalties: Array<{ condition: string; penalty: number; description: string }>;
+    reasoning?: string;
+  };
+  lastDemographicReasoning?: string;
 }
 
 interface Message {
@@ -92,6 +101,90 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
       const reply = data.reply ?? 'No reply received.'; // Gracefully handle missing reply
 
       console.log('[📥 Gemini API Response]', data);
+      
+      // 🆕 NEW: Process Bricky's response and apply to filter store
+      try {
+        const parsedReply = JSON.parse(reply);
+        console.log('[🔍 Gemini Store] Parsed Bricky response:', parsedReply);
+        
+        // Apply any filter updates that Bricky made
+        const filterStore = useFilterStore.getState();
+        const updates: Record<string, any> = {};
+        
+        // Apply main weight changes
+        if (parsedReply.weights && Array.isArray(parsedReply.weights)) {
+          updates.weights = parsedReply.weights;
+          console.log('[⚖️ Gemini Store] Applying weight changes:', parsedReply.weights);
+        }
+        
+        // Apply demographic filter changes
+        if (parsedReply.selectedEthnicities) {
+          updates.selectedEthnicities = parsedReply.selectedEthnicities;
+          console.log('[🌍 Gemini Store] Applying ethnicity changes:', parsedReply.selectedEthnicities);
+        }
+        
+        if (parsedReply.selectedGenders) {
+          updates.selectedGenders = parsedReply.selectedGenders;
+          console.log('[👥 Gemini Store] Applying gender changes:', parsedReply.selectedGenders);
+        }
+        
+        if (parsedReply.ageRange) {
+          updates.ageRange = parsedReply.ageRange;
+          console.log('[📅 Gemini Store] Applying age range changes:', parsedReply.ageRange);
+        }
+        
+        if (parsedReply.incomeRange) {
+          updates.incomeRange = parsedReply.incomeRange;
+          console.log('[💰 Gemini Store] Applying income range changes:', parsedReply.incomeRange);
+        }
+        
+        if (parsedReply.rentRange) {
+          updates.rentRange = parsedReply.rentRange;
+          console.log('[🏠 Gemini Store] Applying rent range changes:', parsedReply.rentRange);
+        }
+        
+        // 🎯 CRITICAL: Apply demographic scoring changes
+        if (parsedReply.demographicScoring) {
+          console.log('[🧬 Gemini Store] Applying demographic scoring:', parsedReply.demographicScoring);
+          
+          // Validate demographic scoring structure
+          const demoScoring = parsedReply.demographicScoring;
+          if (demoScoring.weights && 
+              typeof demoScoring.weights.ethnicity === 'number' &&
+              typeof demoScoring.weights.gender === 'number' &&
+              typeof demoScoring.weights.age === 'number' &&
+              typeof demoScoring.weights.income === 'number') {
+            
+            filterStore.setDemographicScoring({
+              weights: demoScoring.weights,
+              thresholdBonuses: demoScoring.thresholdBonuses || [],
+              penalties: demoScoring.penalties || [],
+              reasoning: demoScoring.reasoning || ''
+            });
+            
+            console.log('[✅ Gemini Store] Successfully applied demographic scoring!');
+          } else {
+            console.warn('[⚠️ Gemini Store] Invalid demographic scoring structure:', demoScoring);
+          }
+        }
+        
+        // Apply all other filter updates in batch
+        if (Object.keys(updates).length > 0) {
+          filterStore.setFilters(updates);
+          console.log('[✅ Gemini Store] Applied filter updates:', updates);
+        }
+        
+        // Handle special intents
+        if (parsedReply.intent === 'reset') {
+          console.log('[🔄 Gemini Store] Resetting filters per Bricky request');
+          filterStore.reset();
+        }
+        
+      } catch (parseError) {
+        console.warn('[⚠️ Gemini Store] Could not parse Bricky response as JSON:', parseError);
+        console.log('[📝 Gemini Store] Raw response:', reply);
+        // This is fine - not all responses need to be JSON (e.g., clarifying questions)
+      }
       
       set({ lastMessage: reply });
       return reply;

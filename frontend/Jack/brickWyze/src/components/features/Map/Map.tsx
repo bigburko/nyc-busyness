@@ -1,3 +1,5 @@
+// Map.tsx - Updated to properly handle weights and demographic scoring
+
 'use client';
 
 import { useRef, useEffect, useState, useCallback } from 'react';
@@ -6,15 +8,18 @@ import type { MapLayerMouseEvent } from 'mapbox-gl';
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// ✅ FIXED: Correct relative imports for Map.tsx location
+// Correct relative imports for Map.tsx location
 import rawGeojson from './manhattan_census_tracts.json';
 import { CleanGeojson, PotentiallyNonStandardFeatureCollection } from './CleanGeojson';
-import { ResilienceScore } from './fetchResilienceScores';
+import { ResilienceScore, fetchResilienceScores } from './fetchResilienceScores';
 import { ProcessGeojson } from './ProcessGeojson';
 import { addTractLayers, updateTractData } from './TractLayer';
 import { createLegend, showLegend } from './Legend';
 
-// ✅ Global type declaration
+// Import demographic scoring type
+import { DemographicScoring } from '../../../stores/filterStore';
+
+// Global type declaration
 declare global {
   interface Window {
     _brickwyzeMapRef?: mapboxgl.Map;
@@ -28,9 +33,6 @@ const INITIAL_CENTER: [number, number] = [-73.9712, 40.7831];
 const INITIAL_ZOOM = 12;
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-
-const EDGE_FUNCTION_URL =
-  'https://kwuwuutcvpdomfivdemt.supabase.co/functions/v1/calculate-resilience';
 
 const DEBUG_MODE = process.env.NODE_ENV === 'development';
 
@@ -54,6 +56,8 @@ interface MapProps {
   topN?: number;
   onSearchResults?: (results: ResilienceScore[]) => void;
   selectedTractId?: string | null;
+  // NEW: Add demographic scoring prop
+  demographicScoring?: DemographicScoring;
 }
 
 export default function Map({
@@ -66,13 +70,14 @@ export default function Map({
   topN = 10,
   onSearchResults,
   selectedTractId,
+  demographicScoring, // NEW: Accept demographic scoring
 }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [currentGeoJson, setCurrentGeoJson] = useState<FeatureCollection<Geometry, GeoJsonProperties> | null>(null);
 
-  // ✅ Function to gently center map on a specific tract (with proper validation)
+  // Function to gently center map on a specific tract (with proper validation)
   const centerOnTract = useCallback((tractId: string) => {
     const map = mapRef.current;
     if (!map || !currentGeoJson) {
@@ -111,7 +116,7 @@ export default function Map({
         // Calculate the center point of the tract
         const coords = typedTract.geometry.coordinates[0]; // Assuming polygon
         if (coords && coords.length > 0) {
-          // ✅ VALIDATE COORDINATES - Check if they're valid numbers
+          // VALIDATE COORDINATES - Check if they're valid numbers
           let totalLng = 0;
           let totalLat = 0;
           let validCoords = 0;
@@ -130,12 +135,12 @@ export default function Map({
             const centerLng = totalLng / validCoords;
             const centerLat = totalLat / validCoords;
             
-            // ✅ VALIDATE FINAL COORDINATES
+            // VALIDATE FINAL COORDINATES
             if (!isNaN(centerLng) && !isNaN(centerLat) && 
                 centerLng >= -180 && centerLng <= 180 && 
                 centerLat >= -90 && centerLat <= 90) {
               
-              // ✅ ONLY PAN - NO ZOOM, NO ROTATION, NO PITCH CHANGES
+              // ONLY PAN - NO ZOOM, NO ROTATION, NO PITCH CHANGES
               map.panTo([centerLng, centerLat], {
                 duration: 600,
               });
@@ -164,7 +169,7 @@ export default function Map({
     }
   }, [currentGeoJson]);
 
-  // ✅ Function to zoom to show top tracts after search (preserve original style)
+  // Function to zoom to show top tracts after search (preserve original style)
   const zoomToTopTracts = useCallback((zones: ResilienceScore[]) => {
     const map = mapRef.current;
     if (!map || !currentGeoJson || zones.length === 0) return;
@@ -195,31 +200,32 @@ export default function Map({
 
     if (foundTracts > 0) {
       console.log('🔍 [Map] Zooming to show top tracts (preserving original rotation/pitch)');
-      // ✅ PRESERVE ORIGINAL PITCH AND BEARING - Don't touch the map style
+      // PRESERVE ORIGINAL PITCH AND BEARING - Don't touch the map style
       map.fitBounds(bounds, {
         padding: 100,
         duration: 1200,
         maxZoom: 13
-        // ✅ NO pitch or bearing specified - keeps your original map rotation/tilt
+        // NO pitch or bearing specified - keeps your original map rotation/tilt
       });
     }
   }, [currentGeoJson]);
 
-  // ✅ Store onSearchResults in a ref to avoid dependency issues
+  // Store onSearchResults in a ref to avoid dependency issues
   const onSearchResultsRef = useRef(onSearchResults);
   useEffect(() => {
     onSearchResultsRef.current = onSearchResults;
   }, [onSearchResults]);
 
+  // 🔧 UPDATED: Use fetchResilienceScores function instead of inline fetch
   const fetchAndApplyScores = useCallback(async () => {
     const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
 
-    // ✅ STRICTER CHECK - Don't auto-load, wait for actual search
+    // STRICTER CHECK - Don't auto-load, wait for actual search
     if (!weights || weights.length === 0 || !rentRange || !selectedEthnicities || !selectedGenders || !ageRange || !incomeRange) {
       console.log('⏭️ [Map] Skipping score fetch - filters not ready or no search performed');
       
-      // ✅ Just load the base map without scores
+      // Just load the base map without scores
       setCurrentGeoJson(processed);
       if (mapRef.current) {
         updateTractData(mapRef.current, processed);
@@ -229,58 +235,35 @@ export default function Map({
 
     if (DEBUG_MODE) {
       console.log('📤 Sending to edge function:', {
-        weights,
+        weights: weights.map(w => `${w.id}: ${w.value}%`),
         rentRange,
         ethnicities: selectedEthnicities,
         genders: selectedGenders,
         ageRange,
         incomeRange,
-        topN
+        topN,
+        hasDemographicScoring: !!demographicScoring
       });
     }
 
     try {
-      const response = await fetch(EDGE_FUNCTION_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
-        },
-        body: JSON.stringify({
-          weights,
-          rentRange,
-          ethnicities: selectedEthnicities,
-          genders: selectedGenders,
-          ageRange,
-          incomeRange,
-          topN,
-          crimeYears: [
-            'year_2021',
-            'year_2022', 
-            'year_2023',
-            'year_2024',
-            'pred_2025',
-            'pred_2026',
-            'pred_2027'
-          ]
-        }),
+      // 🔧 UPDATED: Use the fetchResilienceScores function
+      const zones = await fetchResilienceScores({
+        weights: weights, // This will be properly formatted by fetchResilienceScores
+        rentRange,
+        selectedEthnicities,
+        selectedGenders,
+        ageRange,
+        incomeRange,
+        demographicScoring // NEW: Pass demographic scoring
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ Edge error ${response.status}:`, errorText);
-        throw new Error(`Edge function failed: ${errorText}`);
+      if (DEBUG_MODE) {
+        console.log('📥 Edge function returned zones:', zones.length);
+        console.log('[✅ DEBUG] Data received by edge function');
       }
 
-      interface ApiResponse {
-        zones: ResilienceScore[];
-        debug?: Record<string, unknown>;
-      }
-
-      const { zones, debug } = (await response.json()) as ApiResponse;
-
-      // ✅ SAFETY FIX: Cap all scores at 100 to prevent frontend multiplication issues
+      // SAFETY FIX: Cap all scores at 100 to prevent frontend multiplication issues
       const cappedZones = zones.map(zone => ({
         ...zone,
         custom_score: Math.min(Math.max(zone.custom_score || 0, 0), 100),
@@ -292,18 +275,12 @@ export default function Map({
         poi_score: Math.min(Math.max(zone.poi_score || 0, 0), 100),
       }));
 
-      // ✅ Log any scores that were over 100
+      // Log any scores that were over 100
       const overScores = zones.filter(zone => (zone.custom_score || 0) > 100);
       if (overScores.length > 0) {
         console.warn('⚠️ [Map] Found scores over 100, capping them:', overScores.map(z => `${z.geoid}: ${z.custom_score}`));
       }
 
-      if (DEBUG_MODE) {
-        console.log('📥 Edge function returned zones:', cappedZones.length);
-        console.log('[✅ DEBUG] Data received by edge function:', debug);
-      }
-
-      // ✅ Continue with cappedZones instead of zones
       const zonesWithRankings: ResilienceScoreWithRanking[] = cappedZones.map((zone, index) => ({
         ...zone,
         ranking: index + 1
@@ -335,7 +312,7 @@ export default function Map({
               ...(match || { custom_score: 0, ranking: null }),
               ...match,
               hasScore: !!match,
-              // ✅ FIX: Ensure NTA names are properly set from GeoJSON (with proper typing)
+              // FIX: Ensure NTA names are properly set from GeoJSON (with proper typing)
               nta_name: match?.nta_name || featProps?.NTAName || featProps?.nta_name || 'Unknown Neighborhood',
               tract_name: match?.tract_name || featProps?.tract_name || `Tract ${rawGEOID}`,
               display_name: match?.display_name || featProps?.NTAName || `Tract ${rawGEOID}`,
@@ -344,7 +321,7 @@ export default function Map({
         }),
       };
 
-      // ✅ Store current geojson for centering functionality
+      // Store current geojson for centering functionality
       setCurrentGeoJson(updated);
 
       if (DEBUG_MODE) {
@@ -356,18 +333,18 @@ export default function Map({
         showLegend();
       }
 
-      // ✅ Pass enhanced search results to parent using ref to avoid dependency loop
+      // Pass enhanced search results to parent using ref to avoid dependency loop
       if (onSearchResultsRef.current) {
         console.log('📊 [Map] Passing search results to parent:', cappedZones.length, 'tracts');
         
-        // ✅ FIX: Enhance zones with proper NTA names from GeoJSON before passing to parent
+        // FIX: Enhance zones with proper NTA names from GeoJSON before passing to parent
         const enhancedZones = cappedZones.map(zone => {
           const tract = updated.features.find((feature: unknown) => {
             const typedFeature = feature as { properties?: { GEOID?: string | number } };
             return typedFeature.properties?.GEOID?.toString().padStart(11, '0') === zone.geoid?.toString().padStart(11, '0');
           });
           
-          // ✅ Get the actual NTAName from the GeoJSON (with proper typing)
+          // Get the actual NTAName from the GeoJSON (with proper typing)
           const tractProps = (tract as { properties?: Record<string, unknown> })?.properties;
           const neighborhoodName = String(tractProps?.NTAName || 
                                   tractProps?.nta_name || 
@@ -382,7 +359,7 @@ export default function Map({
           };
         });
         
-        // ✅ Simple debug log AFTER array is created
+        // Simple debug log AFTER array is created
         if (DEBUG_MODE) {
           console.log('🏘️ [Map] Enhanced', enhancedZones.length, 'zones with neighborhood names');
         }
@@ -397,9 +374,9 @@ export default function Map({
     } catch (err) {
       console.error('[Error fetching and applying scores]', err);
     }
-  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, zoomToTopTracts]); // ✅ REMOVED onSearchResults dependency
+  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, demographicScoring, zoomToTopTracts]);
 
-  // ✅ Map initialization
+  // Map initialization
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -434,7 +411,7 @@ export default function Map({
     };
   }, []);
 
-  // ✅ Set up global centering function when map loads (prevent loops)
+  // Set up global centering function when map loads (prevent loops)
   useEffect(() => {
     if (isMapLoaded && mapRef.current) {
       // Set up the global centering function
@@ -445,9 +422,9 @@ export default function Map({
       
       console.log('🌍 [Map] Global centerMapOnTract function set up');
     }
-  }, [isMapLoaded, centerOnTract]); // ✅ INCLUDE centerOnTract dependency, not centerOnTract
+  }, [isMapLoaded]); // 🔧 REMOVED centerOnTract dependency to prevent loops
 
-  // ✅ NO POPUP - Click handlers WITHOUT popup, just opens results panel
+  // NO POPUP - Click handlers WITHOUT popup, just opens results panel
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isMapLoaded) return;
@@ -457,7 +434,7 @@ export default function Map({
       const hasScore = e.features?.[0]?.properties?.hasScore;
       const resilienceScore = e.features?.[0]?.properties?.custom_score;
       
-      // ✅ NO POPUP - just open results panel and select tract
+      // NO POPUP - just open results panel and select tract
       if (tractId && hasScore && resilienceScore && resilienceScore > 0) {
         console.log('🗺️ [Map] Tract clicked with score:', tractId, '- NO POPUP');
         
@@ -492,16 +469,16 @@ export default function Map({
     };
   }, [weights, selectedEthnicities, selectedGenders, isMapLoaded]);
 
-  // ✅ Effect to handle tract centering from results panel clicks (DISABLED AUTO-CENTERING)
+  // Effect to handle tract centering from results panel clicks (DISABLED AUTO-CENTERING)
   useEffect(() => {
-    // ✅ DISABLED: No automatic centering to prevent snapping back
+    // DISABLED: No automatic centering to prevent snapping back
     // Only center when user explicitly clicks a result, not on every prop change
     console.log('🗺️ [Map] Selected tract changed:', selectedTractId, '- Auto-centering DISABLED');
   }, [selectedTractId, isMapLoaded]);
 
   useEffect(() => {
     if (isMapLoaded) {
-      // ✅ ONLY fetch scores when we have meaningful filter data
+      // ONLY fetch scores when we have meaningful filter data
       const hasFilters = weights && weights.length > 0;
       if (hasFilters) {
         console.log('🔍 [Map] Fetching scores with filters:', { weights: weights.length, topN });
@@ -517,7 +494,7 @@ export default function Map({
         }
       }
     }
- }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN]); // eslint-disable-line react-hooks/exhaustive-deps
+ }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, demographicScoring]); // 🔧 REMOVED fetchAndApplyScores from dependencies
  
   return (
     <div
