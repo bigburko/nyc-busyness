@@ -1,8 +1,8 @@
 // useMapState.ts - Custom hook for map state management
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
-import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
+import type { FeatureCollection, Feature, Geometry, GeoJsonProperties } from 'geojson';
 
 // Extended map type for pulse interval
 type ExtendedMap = mapboxgl.Map & { _pulseInterval?: NodeJS.Timeout };
@@ -44,7 +44,7 @@ export const useMapState = (containerRef: React.RefObject<HTMLDivElement | null>
 
       addTractLayers(map);
       createLegend(map);
-      const cleaned = CleanGeojson(rawGeojson as any);
+      const cleaned = CleanGeojson(rawGeojson as { type: "FeatureCollection"; features: Feature<Geometry, GeoJsonProperties>[]; [key: string]: unknown });
       const processed = ProcessGeojson(cleaned, { precision: 6 });
       updateTractData(mapRef.current, processed);
       setCurrentGeoJson(processed);
