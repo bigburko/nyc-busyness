@@ -161,11 +161,13 @@ export default function Page() {
     setSearchResults(transformedResults);
   }, []);
 
+  // 🔧 FIX: Simplified handleMapTractSelect (back to original)
   const handleMapTractSelect = useCallback((tractId: string | null) => {
     console.log('🗺️ [Page] Highlighting tract on map:', tractId);
     setSelectedTractId(tractId);
   }, []);
 
+  // 🔧 FIX: Simplified useEffect with duplicate state update prevention
   useEffect(() => {
     console.log('🔧 [Page] Setting up global functions for map communication');
     
@@ -173,6 +175,12 @@ export default function Page() {
       console.log('🗺️ [Page] Map clicked tract with score:', tractIdParam);
       
       const tractIdStr = String(tractIdParam);
+      
+      // 🔧 SIMPLE FIX: Don't update state if it's already the current tract
+      if (selectedTractId === tractIdStr) {
+        console.log('🚫 [Page] Tract already selected, skipping state update');
+        return;
+      }
       
       let tract = searchResults.find(t => String(t.geoid) === tractIdStr);
       
@@ -206,8 +214,9 @@ export default function Page() {
       delete window.selectTractFromResultsPanel;
       delete window.openResultsPanel;
     };
-  }, [searchResults]);
+  }, [searchResults, selectedTractId]); // 🔧 ADD selectedTractId to deps
 
+  // 🔧 FIX: Simplified mapProps (removed lastMapClickTime)
   const mapProps = useMemo(() => ({
     weights: currentFilters.weights || [],
     rentRange: currentFilters.rentRange || [26, 160] as [number, number],

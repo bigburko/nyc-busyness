@@ -1,4 +1,4 @@
-// Map.tsx - Updated to properly handle weights and demographic scoring
+// Map.tsx - Complete fixed version with unified centering system
 
 'use client';
 
@@ -56,8 +56,18 @@ interface MapProps {
   topN?: number;
   onSearchResults?: (results: ResilienceScore[]) => void;
   selectedTractId?: string | null;
-  // NEW: Add demographic scoring prop
   demographicScoring?: DemographicScoring;
+}
+
+// Extended map type for pulse interval
+type ExtendedMap = mapboxgl.Map & { _pulseInterval?: NodeJS.Timeout };
+
+// 🎯 SIMPLIFIED: Centering state management (removed complex blocking properties)
+interface CenteringState {
+  isAnimating: boolean;
+  lastCenterTime: number;
+  pendingTractId: string | null;
+  source: 'map_click' | 'results_click' | 'prop_update';
 }
 
 export default function Map({
@@ -70,24 +80,132 @@ export default function Map({
   topN = 10,
   onSearchResults,
   selectedTractId,
-  demographicScoring, // NEW: Accept demographic scoring
+  demographicScoring,
 }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [currentGeoJson, setCurrentGeoJson] = useState<FeatureCollection<Geometry, GeoJsonProperties> | null>(null);
+  const [highlightedTractId, setHighlightedTractId] = useState<string | null>(null);
 
-  // Function to gently center map on a specific tract (with proper validation)
-  const centerOnTract = useCallback((tractId: string) => {
+  // 🎯 SIMPLIFIED: Unified centering state management
+  const centeringStateRef = useRef<CenteringState>({
+    isAnimating: false,
+    lastCenterTime: 0,
+    pendingTractId: null,
+    source: 'prop_update'
+  });
+
+  // Function to add highlight layers for selected tract
+  const addHighlightLayers = useCallback((map: mapboxgl.Map) => {
+    if (!map.getSource('highlighted-tract')) {
+      // Add empty source for highlighted tract
+      map.addSource('highlighted-tract', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+
+      // Add multiple highlight layers for floating effect
+      // Base glow layer
+      map.addLayer({
+        id: 'highlighted-tract-glow',
+        type: 'line',
+        source: 'highlighted-tract',
+        paint: {
+          'line-color': '#FF6B35',
+          'line-width': 8,
+          'line-opacity': 0.4,
+          'line-blur': 4
+        }
+      });
+
+      // Pulsing outline layer
+      map.addLayer({
+        id: 'highlighted-tract-pulse',
+        type: 'line',
+        source: 'highlighted-tract',
+        paint: {
+          'line-color': '#FF6B35',
+          'line-width': [
+            'interpolate',
+            ['linear'],
+            ['get', 'pulse'],
+            0, 4,
+            1, 6
+          ],
+          'line-opacity': [
+            'interpolate',
+            ['linear'],
+            ['get', 'pulse'],
+            0, 0.8,
+            1, 0.3
+          ]
+        }
+      });
+
+      // Main highlight outline
+      map.addLayer({
+        id: 'highlighted-tract-main',
+        type: 'line',
+        source: 'highlighted-tract',
+        paint: {
+          'line-color': '#FF6B35',
+          'line-width': 3,
+          'line-opacity': 1
+        }
+      });
+
+      // Elevated fill for floating effect
+      map.addLayer({
+        id: 'highlighted-tract-fill',
+        type: 'fill',
+        source: 'highlighted-tract',
+        paint: {
+          'fill-color': '#FF6B35',
+          'fill-opacity': 0.1
+        }
+      });
+
+      console.log('✨ [Map] Added highlight layers for tract selection');
+    }
+  }, []);
+
+  // 🎯 SIMPLIFIED: Single source of truth for centering logic
+  const performCentering = useCallback((
+    tractId: string, 
+    source: 'map_click' | 'results_click' | 'prop_update',
+    force: boolean = false
+  ) => {
     const map = mapRef.current;
+    const now = Date.now();
+    
     if (!map || !currentGeoJson) {
-      console.warn('🚫 [Map] Cannot center - map or geojson not ready:', { map: !!map, geojson: !!currentGeoJson });
-      return;
+      console.warn('🚫 [Map] Cannot center - map or geojson not ready');
+      return false;
     }
 
-    console.log('🔍 [Map] Searching for tract:', tractId, 'in', currentGeoJson.features.length, 'features');
+    const state = centeringStateRef.current;
     
-    // Try multiple ID formats to find the tract
+    // 🎯 SIMPLIFIED: Basic debouncing only
+    if (!force) {
+      // If we're already animating to the same tract, skip
+      if (state.isAnimating && state.pendingTractId === tractId) {
+        console.log('🚫 [Map] Already centering to tract:', tractId);
+        return false;
+      }
+      
+      // Simple debouncing - same for all sources
+      const timeSinceLastCenter = now - state.lastCenterTime;
+      if (timeSinceLastCenter < 300) { // Shorter debounce
+        console.log('🚫 [Map] Blocking rapid centering');
+        return false;
+      }
+    }
+
+    // Find the tract geometry
     const searchIds = [
       tractId,
       tractId.padStart(11, '0'),
@@ -102,72 +220,208 @@ export default function Map({
         const featureId = typedFeature.properties?.GEOID?.toString();
         return featureId === searchId || featureId?.padStart(11, '0') === searchId;
       });
-      if (tract) {
-        console.log('✅ [Map] Found tract with ID format:', searchId);
-        break;
-      }
+      if (tract) break;
     }
 
-    const typedTract = tract as { geometry?: { coordinates?: number[][][] } };
-    if (typedTract && typedTract.geometry && typedTract.geometry.coordinates) {
-      console.log('🎯 [Map] Gently centering on tract:', tractId);
+    const typedTract = tract as { geometry?: { coordinates?: number[][][] | number[][][][] } };
+    if (!typedTract?.geometry?.coordinates) {
+      console.error('❌ [Map] Tract not found:', tractId);
+      return false;
+    }
+
+    try {
+      // Calculate center coordinates
+      let coords: number[][];
+      const coordinates = typedTract.geometry.coordinates;
       
-      try {
-        // Calculate the center point of the tract
-        const coords = typedTract.geometry.coordinates[0]; // Assuming polygon
-        if (coords && coords.length > 0) {
-          // VALIDATE COORDINATES - Check if they're valid numbers
-          let totalLng = 0;
-          let totalLat = 0;
-          let validCoords = 0;
-          
-          coords.forEach((coord: number[]) => {
-            if (coord && coord.length >= 2 && 
-                typeof coord[0] === 'number' && typeof coord[1] === 'number' &&
-                !isNaN(coord[0]) && !isNaN(coord[1])) {
-              totalLng += coord[0];
-              totalLat += coord[1];
-              validCoords++;
-            }
-          });
-          
-          if (validCoords > 0) {
-            const centerLng = totalLng / validCoords;
-            const centerLat = totalLat / validCoords;
-            
-            // VALIDATE FINAL COORDINATES
-            if (!isNaN(centerLng) && !isNaN(centerLat) && 
-                centerLng >= -180 && centerLng <= 180 && 
-                centerLat >= -90 && centerLat <= 90) {
-              
-              // ONLY PAN - NO ZOOM, NO ROTATION, NO PITCH CHANGES
-              map.panTo([centerLng, centerLat], {
-                duration: 600,
-              });
-              
-              console.log('✅ [Map] Successfully panned to tract center:', [centerLng, centerLat]);
-            } else {
-              console.error('❌ [Map] Invalid calculated coordinates:', [centerLng, centerLat]);
-            }
-          } else {
-            console.error('❌ [Map] No valid coordinates found in tract geometry');
+      if (coordinates[0] && Array.isArray(coordinates[0][0])) {
+        coords = coordinates[0][0] as number[][];
+      } else if (coordinates[0]) {
+        coords = coordinates[0] as number[][];
+      } else {
+        console.error('❌ [Map] Invalid coordinate structure');
+        return false;
+      }
+      
+      if (coords?.length > 0) {
+        let totalLng = 0;
+        let totalLat = 0;
+        let validCoords = 0;
+        
+        coords.forEach((coord: number[]) => {
+          if (coord?.length >= 2 && 
+              typeof coord[0] === 'number' && typeof coord[1] === 'number' &&
+              !isNaN(coord[0]) && !isNaN(coord[1])) {
+            totalLng += coord[0];
+            totalLat += coord[1];
+            validCoords++;
           }
-        } else {
-          console.error('❌ [Map] Tract geometry has no coordinates');
+        });
+        
+        if (validCoords > 0) {
+          const centerLng = totalLng / validCoords;
+          const centerLat = totalLat / validCoords;
+          
+          if (!isNaN(centerLng) && !isNaN(centerLat) && 
+              centerLng >= -180 && centerLng <= 180 && 
+              centerLat >= -90 && centerLat <= 90) {
+            
+            // 🎯 UPDATE STATE BEFORE ANIMATION
+            state.isAnimating = true;
+            state.pendingTractId = tractId;
+            state.source = source;
+            state.lastCenterTime = now;
+            
+            // Calculate offset for popup panel
+            let adjustedCenterLng = centerLng;
+            
+            try {
+              const bounds = map.getBounds();
+              if (bounds) {
+                const eastBound = bounds.getEast();
+                const westBound = bounds.getWest();
+                
+                if (typeof eastBound === 'number' && typeof westBound === 'number') {
+                  const mapContainer = map.getContainer();
+                  const mapWidth = mapContainer.clientWidth;
+                  const popupWidth = 450;
+                  
+                  const offsetX = -(popupWidth / 2);
+                  const mapWidthInDegrees = eastBound - westBound;
+                  const pixelsPerDegree = mapWidth / mapWidthInDegrees;
+                  const longitudeOffset = offsetX / pixelsPerDegree;
+                  
+                  adjustedCenterLng = centerLng + longitudeOffset;
+                }
+              }
+            } catch (error) {
+              console.warn('⚠️ [Map] Error calculating offset, using basic centering:', error);
+            }
+            
+            console.log('🎯 [Map] Centering:', {
+              source,
+              tractId,
+              center: [adjustedCenterLng, centerLat],
+              force
+            });
+            
+            // 🎯 CONSISTENT: Always use 800ms duration and same easing
+            map.panTo([adjustedCenterLng, centerLat], {
+              duration: 800, // Same as results panel
+              easing: (t: number) => t * (2 - t) // Same easing function
+            });
+            
+            // 🎯 CONSISTENT: Same cleanup timing
+            setTimeout(() => {
+              state.isAnimating = false;
+              if (state.pendingTractId === tractId) {
+                state.pendingTractId = null;
+              }
+            }, 900); // Slightly longer than animation duration
+            
+            return true;
+          }
         }
-      } catch (error) {
-        console.error('❌ [Map] Error centering on tract:', error);
+      }
+    } catch (error) {
+      console.error('❌ [Map] Error during centering:', error);
+      state.isAnimating = false;
+      state.pendingTractId = null;
+      return false;
+    }
+    
+    return false;
+  }, [currentGeoJson]);
+
+  // 🎯 ENHANCED: Simplified highlight function (no centering)
+  const highlightTract = useCallback((tractId: string | null) => {
+    const map = mapRef.current;
+    if (!map || !currentGeoJson) return;
+
+    if (!tractId) {
+      // Clear highlight
+      const source = map.getSource('highlighted-tract') as mapboxgl.GeoJSONSource;
+      if (source) {
+        source.setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+      setHighlightedTractId(null);
+      console.log('🔄 [Map] Cleared tract highlight');
+      return;
+    }
+
+    // Find the tract to highlight
+    const searchIds = [
+      tractId,
+      tractId.padStart(11, '0'),
+      tractId.toString(),
+      tractId.toString().padStart(11, '0')
+    ];
+    
+    let tract = null;
+    for (const searchId of searchIds) {
+      tract = currentGeoJson.features.find((feature: unknown) => {
+        const typedFeature = feature as { properties?: { GEOID?: string | number } };
+        const featureId = typedFeature.properties?.GEOID?.toString();
+        return featureId === searchId || featureId?.padStart(11, '0') === searchId;
+      });
+      if (tract) break;
+    }
+
+    if (tract) {
+      // Add pulsing animation property
+      const highlightFeature = {
+        ...tract,
+        properties: {
+          ...tract.properties,
+          pulse: 0 // Will be animated
+        }
+      };
+
+      const source = map.getSource('highlighted-tract') as mapboxgl.GeoJSONSource;
+      if (source) {
+        source.setData({
+          type: 'FeatureCollection',
+          features: [highlightFeature]
+        });
+        
+        setHighlightedTractId(tractId);
+        console.log('✨ [Map] Highlighted tract:', tractId);
+
+        // Start pulsing animation
+        let pulseValue = 0;
+        const pulseInterval = setInterval(() => {
+          pulseValue = (pulseValue + 0.1) % (Math.PI * 2);
+          const normalizedPulse = (Math.sin(pulseValue) + 1) / 2; // 0 to 1
+          
+          const animatedFeature = {
+            ...highlightFeature,
+            properties: {
+              ...highlightFeature.properties,
+              pulse: normalizedPulse
+            }
+          };
+
+          const currentSource = map.getSource('highlighted-tract') as mapboxgl.GeoJSONSource;
+          if (currentSource && highlightedTractId === tractId) {
+            currentSource.setData({
+              type: 'FeatureCollection',
+              features: [animatedFeature]
+            });
+          } else {
+            clearInterval(pulseInterval);
+          }
+        }, 50); // 20fps animation
+        
+        // Store interval reference for cleanup
+        (map as ExtendedMap)._pulseInterval = pulseInterval;
       }
     } else {
-      console.error('❌ [Map] Tract not found or invalid geometry:', tractId);
-      console.log('📋 [Map] Available tract IDs (first 10):', 
-        currentGeoJson.features.slice(0, 10).map((f: unknown) => {
-          const typedF = f as { properties?: { GEOID?: string | number } };
-          return typedF.properties?.GEOID;
-        })
-      );
+      console.warn('❌ [Map] Could not find tract to highlight:', tractId);
     }
-  }, [currentGeoJson]);
+  }, [currentGeoJson, highlightedTractId]);
 
   // Function to zoom to show top tracts after search (preserve original style)
   const zoomToTopTracts = useCallback((zones: ResilienceScore[]) => {
@@ -184,12 +438,31 @@ export default function Map({
         return typedFeature.properties?.GEOID?.toString().padStart(11, '0') === zone.geoid?.toString().padStart(11, '0');
       });
 
-      const typedTract = tract as { geometry?: { coordinates?: number[][][] } };
-      if (typedTract && typedTract.geometry) {
-        const coords = typedTract.geometry.coordinates?.[0];
-        if (coords && coords.length > 0) {
+      const typedTract = tract as { geometry?: { coordinates?: number[][][] | number[][][][] } };
+      if (typedTract?.geometry?.coordinates) {
+        // Handle both Polygon and MultiPolygon geometries
+        let coords: number[][];
+        const coordinates = typedTract.geometry.coordinates;
+        
+        try {
+          if (coordinates[0] && Array.isArray(coordinates[0][0])) {
+            // MultiPolygon: [[[lng, lat], [lng, lat], ...]]
+            coords = coordinates[0][0] as number[][];
+          } else if (coordinates[0]) {
+            // Polygon: [[lng, lat], [lng, lat], ...]
+            coords = coordinates[0] as number[][];
+          } else {
+            console.warn('⚠️ [Map] Invalid coordinate structure for bounds');
+            return;
+          }
+        } catch (e) {
+          console.warn('⚠️ [Map] Could not parse tract geometry for zoom bounds:', e);
+          return;
+        }
+        
+        if (coords?.length > 0) {
           coords.forEach((coord: number[]) => {
-            if (coord && coord.length >= 2) {
+            if (coord?.length >= 2) {
               bounds.extend([coord[0], coord[1]] as [number, number]);
             }
           });
@@ -216,13 +489,13 @@ export default function Map({
     onSearchResultsRef.current = onSearchResults;
   }, [onSearchResults]);
 
-  // 🔧 UPDATED: Use fetchResilienceScores function instead of inline fetch
+  // UPDATED: Use fetchResilienceScores function instead of inline fetch
   const fetchAndApplyScores = useCallback(async () => {
     const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
     const processed = ProcessGeojson(cleaned, { precision: 6 });
 
     // STRICTER CHECK - Don't auto-load, wait for actual search
-    if (!weights || weights.length === 0 || !rentRange || !selectedEthnicities || !selectedGenders || !ageRange || !incomeRange) {
+    if (!weights?.length || !rentRange || !selectedEthnicities || !selectedGenders || !ageRange || !incomeRange) {
       console.log('⏭️ [Map] Skipping score fetch - filters not ready or no search performed');
       
       // Just load the base map without scores
@@ -247,9 +520,9 @@ export default function Map({
     }
 
     try {
-      // 🔧 UPDATED: Use the fetchResilienceScores function
+      // UPDATED: Use the fetchResilienceScores function
       const zones = await fetchResilienceScores({
-        weights: weights, // This will be properly formatted by fetchResilienceScores
+        weights, // This will be properly formatted by fetchResilienceScores
         rentRange,
         selectedEthnicities,
         selectedGenders,
@@ -331,6 +604,9 @@ export default function Map({
       if (mapRef.current) {
         updateTractData(mapRef.current, updated);
         showLegend();
+        
+        // Add highlight layers if they don't exist
+        addHighlightLayers(mapRef.current);
       }
 
       // Pass enhanced search results to parent using ref to avoid dependency loop
@@ -374,7 +650,22 @@ export default function Map({
     } catch (err) {
       console.error('[Error fetching and applying scores]', err);
     }
-  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, demographicScoring, zoomToTopTracts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, demographicScoring]); // 🔧 FIX: Functions excluded to prevent infinite loops
+
+  // Memoize the base map loading function
+  const loadBaseMap = useCallback(() => {
+    console.log('⏭️ [Map] Loading base map only');
+    const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
+    const processed = ProcessGeojson(cleaned, { precision: 6 });
+    setCurrentGeoJson(processed);
+    if (mapRef.current) {
+      updateTractData(mapRef.current, processed);
+      // Add highlight layers even without scores
+      addHighlightLayers(mapRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 🔧 FIX: Functions excluded to prevent infinite loops
 
   // Map initialization
   useEffect(() => {
@@ -400,31 +691,59 @@ export default function Map({
       const processed = ProcessGeojson(cleaned, { precision: 6 });
       updateTractData(mapRef.current, processed);
       setCurrentGeoJson(processed);
+      
+      // Add highlight layers on map load
+      addHighlightLayers(map);
+      
       setIsMapLoaded(true);
     });
 
     return () => {
+      // Clean up pulse interval
+      const mapWithInterval = map as ExtendedMap;
+      if (mapWithInterval._pulseInterval) {
+        clearInterval(mapWithInterval._pulseInterval);
+      }
       map.remove();
       mapRef.current = null;
       window._brickwyzeMapRef = undefined;
       delete window.centerMapOnTract;
     };
-  }, []);
+  }, [addHighlightLayers]);
 
-  // Set up global centering function when map loads (prevent loops)
+  // 🎯 ENHANCED: Global centering function setup
   useEffect(() => {
     if (isMapLoaded && mapRef.current) {
-      // Set up the global centering function
       window.centerMapOnTract = (tractId: string) => {
-        console.log('🌍 [Map] Global centerMapOnTract called for:', tractId);
-        centerOnTract(tractId);
+        console.log('🌍 [Map] Global centerMapOnTract called:', tractId);
+        
+        highlightTract(tractId);
+        performCentering(tractId, 'results_click', true); // Force centering from results panel
       };
       
       console.log('🌍 [Map] Global centerMapOnTract function set up');
     }
-  }, [isMapLoaded]); // 🔧 REMOVED centerOnTract dependency to prevent loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMapLoaded]); // 🔧 FIX: Functions excluded to prevent infinite loops
 
-  // NO POPUP - Click handlers WITHOUT popup, just opens results panel
+  // 🎯 SIMPLIFIED: Prop-based selection without complex blocking logic
+  useEffect(() => {
+    if (selectedTractId && selectedTractId !== highlightedTractId) {
+      console.log('📍 [Map] Prop selected tract:', selectedTractId);
+      
+      // Always highlight immediately
+      highlightTract(selectedTractId);
+      
+      // Simple centering - same function, same parameters as results panel
+      performCentering(selectedTractId, 'prop_update');
+      
+    } else if (!selectedTractId && highlightedTractId) {
+      highlightTract(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTractId, highlightedTractId]); // 🔧 FIX: Functions excluded to prevent infinite loops
+
+  // 🎯 FIXED: Map click handler using unified React state path only
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isMapLoaded) return;
@@ -434,28 +753,39 @@ export default function Map({
       const hasScore = e.features?.[0]?.properties?.hasScore;
       const resilienceScore = e.features?.[0]?.properties?.custom_score;
       
-      // NO POPUP - just open results panel and select tract
       if (tractId && hasScore && resilienceScore && resilienceScore > 0) {
-        console.log('🗺️ [Map] Tract clicked with score:', tractId, '- NO POPUP');
+        const tractIdStr = tractId.toString();
+        
+        console.log('🗺️ [Map] TRUE UNIFIED: Map click using React state path only:', tractIdStr);
+        
+        // 🎯 UNIFIED PATH: Use ONLY React state, same as results panel
+        // No direct operations, no timeouts, no blocking - just trigger the unified flow
         
         if (window.openResultsPanel) {
           window.openResultsPanel();
         }
         
         if (window.selectTractFromResultsPanel) {
-          window.selectTractFromResultsPanel(tractId);
+          console.log('🎯 [Map] Calling selectTractFromResultsPanel immediately');
+          window.selectTractFromResultsPanel(tractIdStr);
         }
+        
+        // That's it! Let the normal prop flow handle everything else
+        
       } else {
         console.log('⏭️ [Map] Tract has no resilience score, ignoring click');
+        highlightTract(null);
       }
     };
 
     const handleMouseEnter = () => {
-      if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer';
+      const canvas = map.getCanvas();
+      if (canvas) canvas.style.cursor = 'pointer';
     };
 
     const handleMouseLeave = () => {
-      if (map.getCanvas()) map.getCanvas().style.cursor = '';
+      const canvas = map.getCanvas();
+      if (canvas) canvas.style.cursor = '';
     };
 
     map.on('click', 'tracts-fill', handleClick);
@@ -467,34 +797,22 @@ export default function Map({
       map.off('mouseenter', 'tracts-fill', handleMouseEnter);
       map.off('mouseleave', 'tracts-fill', handleMouseLeave);
     };
-  }, [weights, selectedEthnicities, selectedGenders, isMapLoaded]);
+  }, [isMapLoaded]); // Simplified dependencies
 
-  // Effect to handle tract centering from results panel clicks (DISABLED AUTO-CENTERING)
-  useEffect(() => {
-    // DISABLED: No automatic centering to prevent snapping back
-    // Only center when user explicitly clicks a result, not on every prop change
-    console.log('🗺️ [Map] Selected tract changed:', selectedTractId, '- Auto-centering DISABLED');
-  }, [selectedTractId, isMapLoaded]);
-
+  // Separated useEffect to prevent infinite loops
   useEffect(() => {
     if (isMapLoaded) {
       // ONLY fetch scores when we have meaningful filter data
       const hasFilters = weights && weights.length > 0;
       if (hasFilters) {
         console.log('🔍 [Map] Fetching scores with filters:', { weights: weights.length, topN });
-        fetchAndApplyScores();
+        void fetchAndApplyScores();
       } else {
-        console.log('⏭️ [Map] No filters set, loading base map only');
-        // Load base map without scores
-        const cleaned = CleanGeojson(rawGeojson as PotentiallyNonStandardFeatureCollection);
-        const processed = ProcessGeojson(cleaned, { precision: 6 });
-        setCurrentGeoJson(processed);
-        if (mapRef.current) {
-          updateTractData(mapRef.current, processed);
-        }
+        loadBaseMap();
       }
     }
- }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, demographicScoring]); // 🔧 REMOVED fetchAndApplyScores from dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMapLoaded, weights, rentRange, selectedEthnicities, selectedGenders, ageRange, incomeRange, topN, demographicScoring]); // 🔧 FIX: Functions excluded to prevent infinite loops
  
   return (
     <div
