@@ -423,6 +423,12 @@ export default function Map({
     }
   }, [currentGeoJson, highlightedTractId]);
 
+  // 🎯 PERFORMANCE: Store highlightTract in ref to avoid event listener re-registration
+  const highlightTractRef = useRef(highlightTract);
+  useEffect(() => {
+    highlightTractRef.current = highlightTract;
+  }, [highlightTract]);
+
   // Function to zoom to show top tracts after search (preserve original style)
   const zoomToTopTracts = useCallback((zones: ResilienceScore[]) => {
     const map = mapRef.current;
@@ -740,8 +746,7 @@ export default function Map({
     } else if (!selectedTractId && highlightedTractId) {
       highlightTract(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTractId, highlightedTractId]); // 🔧 FIX: Functions excluded to prevent infinite loops
+  }, [selectedTractId, highlightedTractId, highlightTract, performCentering]);
 
   // 🎯 FIXED: Map click handler using unified React state path only
   useEffect(() => {
@@ -774,7 +779,8 @@ export default function Map({
         
       } else {
         console.log('⏭️ [Map] Tract has no resilience score, ignoring click');
-        highlightTract(null);
+        // 🎯 PERFORMANCE: Use ref to avoid dependency in event listener
+        highlightTractRef.current(null);
       }
     };
 
@@ -797,7 +803,7 @@ export default function Map({
       map.off('mouseenter', 'tracts-fill', handleMouseEnter);
       map.off('mouseleave', 'tracts-fill', handleMouseLeave);
     };
-  }, [isMapLoaded]); // Simplified dependencies
+  }, [isMapLoaded]); // 🎯 PERFORMANCE: No function dependencies to avoid frequent re-registration
 
   // Separated useEffect to prevent infinite loops
   useEffect(() => {
