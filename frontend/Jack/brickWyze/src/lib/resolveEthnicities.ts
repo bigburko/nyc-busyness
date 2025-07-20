@@ -1,133 +1,143 @@
-// src/components/DrawerGroup/BrickyAiGroup/resolveEthnicities.ts
+// src/lib/resolveEthnicities.ts - FIXED: No more hierarchy overcounting
 
 import { ethnicityData } from '../components/features/filters/DemographicGroup/RaceDropDownGroup/ethnicityData';
 
-// --- MAPPINGS ---
-// This map is kept simple. It connects a user-friendly term to the TOP-LEVEL parent code in your data.
-// The hierarchy traversal logic below will handle finding all the children.
+// 🎯 FIXED MAPPINGS - Use only Level 1 categories (no parents, no deep children)
 const ETHNICITY_MAPPINGS: Record<string, string[]> = {
-  // Top-level race categories
-  asian: ['A'],
-  white: ['W'],
-  black: ['B'],
-  hispanic: ['H'],
-  latino: ['H'],
-  latinx: ['H'],
-  nativeamerican: ['AIANA'],
-  americanindian: ['AIANA'],
-  pacificislander: ['NHPI'],
-  someotherrace: ['SOR'],
-
-  // Common subcategories that users might ask for directly
+  // === MAIN RACE CATEGORIES (Level 1 only) ===
+  asian: ['AEA', 'ASA', 'ASEA', 'ACA', 'AOth'], // East, South, Southeast, Central, Other Asian
+  white: ['WEur', 'WMENA', 'WOth'], // European, Middle Eastern/North African, Other White
+  black: ['BSSAf', 'BCrb', 'BOth'], // Sub-Saharan African, Caribbean, Other Black
+  hispanic: ['HMex', 'HCA', 'HSA', 'HCH', 'HOth'], // Mexican, Central Am, South Am, Caribbean Hispanic, Other
+  nativeamerican: ['AIANA'], // American Indian/Alaska Native
+  pacificislander: ['NHPI'], // Native Hawaiian/Pacific Islander
+  
+  // === SPECIFIC ETHNICITIES (Leaf nodes only) ===
+  mexican: ['HMex'],
+  korean: ['AEAKrn'],
+  chinese: ['AEAChnsNoT'],
+  indian: ['ASAAsnInd'], 
+  italian: ['WEurItln'],
+  irish: ['WEurIrsh'],
+  german: ['WEurGrmn'],
+  puertorican: ['HCHPrtRcn'],
+  cuban: ['HCHCuban'],
+  dominican: ['HCHDmncn'],
+  
+  // === REGIONAL GROUPINGS (Level 1 only) ===
   european: ['WEur'],
   middleeastern: ['WMENA'],
-  northafrican: ['WMENA'], // Alias for Middle Eastern
   southasian: ['ASA'],
   eastasian: ['AEA'],
   southeastasian: ['ASEA'],
   centralasian: ['ACA'],
-  caribbean: ['BCrb', 'HCH'], // Can be Black or Hispanic Caribbean
+  caribbean: ['BCrb', 'HCH'], // Both Black and Hispanic Caribbean
   subsaharanafrican: ['BSSAf'],
   
-  // Aliases for specific, commonly requested groups
-  mexican: ['HMex'],
-  puertorican: ['HCHPrtRcn'],
-  dominican: ['HCHDmncn'],
-  cuban: ['HCHCuban'],
-  italian: ['WEurItln'],
-  irish: ['WEurIrsh'],
-  german: ['WEurGrmn'],
-  chinese: ['AEAChnsNoT'],
-  korean: ['AEAKrn'],
-  indian: ['ASAAsnInd'],
+  // === ALIASES ===
+  latino: ['HMex', 'HCA', 'HSA', 'HCH', 'HOth'], // Same as hispanic
+  latinx: ['HMex', 'HCA', 'HSA', 'HCH', 'HOth'], // Same as hispanic
+  americanindian: ['AIANA'],
+  northafrican: ['WMENA'], // Same as Middle Eastern
   arab: ['WMENAArab'],
 };
 
-// --- HIERARCHY TRAVERSAL LOGIC ---
-// Create a map for quick lookups of children for any given parent code.
-// This is built once when the module is loaded.
-const parentToChildrenMap = new Map<string, string[]>();
-ethnicityData.forEach(item => {
-  if (item.parent !== item.value) { // Don't map a group to itself as a child
-    if (!parentToChildrenMap.has(item.parent)) {
-      parentToChildrenMap.set(item.parent, []);
-    }
-    parentToChildrenMap.get(item.parent)!.push(item.value);
-  }
-});
-
-/**
- * Traverses the ethnicity hierarchy to find all descendant codes for a given set of starting codes.
- * For example, starting with ['W'] will return all codes related to the White category.
- * @param startCodes - An array of parent codes to begin the search from (e.g., ['W']).
- * @returns A Set of all unique ethnicity codes found in the hierarchy.
- */
-function getAllDescendantCodes(startCodes: string[]): Set<string> {
-  const allCodes = new Set<string>();
-  const queue = [...startCodes]; // A list of codes to visit
-
-  while (queue.length > 0) {
-    const currentCode = queue.shift();
-    if (!currentCode || allCodes.has(currentCode)) {
-      continue;
-    }
-
-    allCodes.add(currentCode);
-    const children = parentToChildrenMap.get(currentCode);
-
-    if (children) {
-      for (const child of children) {
-        if (!allCodes.has(child)) {
-          queue.push(child);
-        }
-      }
-    }
-  }
-  return allCodes;
-}
-
-
-// --- MAIN RESOLVER FUNCTION ---
+// 🚫 NO MORE HIERARCHY TRAVERSAL - Use exact mappings only
 export function resolveEthnicities(inputList: string[]): string[] {
   if (!Array.isArray(inputList) || inputList.length === 0) {
     return [];
   }
+  
   console.log('🎯 [Input Ethnicities]', inputList);
-
-  const resolvedParentCodes = new Set<string>();
-
+  
+  const resolvedCodes = new Set<string>();
+  
   for (const rawInput of inputList) {
     if (typeof rawInput !== 'string' || !rawInput.trim()) {
       continue;
     }
+    
     const normalized = rawInput.toLowerCase().replace(/[^a-z\s]/g, '').trim();
-
-    // 1. Check for a direct match in our simple mappings
+    
+    // 1. Check for exact mapping (preferred)
     const mappedCodes = ETHNICITY_MAPPINGS[normalized];
     if (mappedCodes) {
-      mappedCodes.forEach(code => resolvedParentCodes.add(code));
+      mappedCodes.forEach(code => resolvedCodes.add(code));
       continue;
     }
+    
+    // 2. Direct code lookup (if someone passes AEAKrn directly)
+    const directMatch = ethnicityData.find(item => 
+      item.value.toLowerCase() === normalized
+    );
+    if (directMatch) {
+      resolvedCodes.add(directMatch.value);
+      continue;
+    }
+    
+    // 3. Label search (fallback)
+    const labelMatch = ethnicityData.find(item => {
+      const itemLabel = item.label.toLowerCase().replace(/[^a-z\s]/g, '').trim();
+      return itemLabel.includes(normalized);
+    });
+    if (labelMatch) {
+      resolvedCodes.add(labelMatch.value);
+    }
+  }
+  
+  if (resolvedCodes.size === 0) {
+    console.warn(`[ResolveEthnicities] Could not find a match for any input in:`, inputList);
+    return [];
+  }
+  
+  const result = Array.from(resolvedCodes);
+  
+  // 🚨 ANTI-OVERCOUNTING VALIDATION
+  const parentChildConflicts = detectHierarchyConflicts(result);
+  if (parentChildConflicts.length > 0) {
+    console.error(`❌ [HIERARCHY CONFLICTS DETECTED]:`, parentChildConflicts);
+    console.error(`   This will cause overcounting! Using parent categories only.`);
+    
+    // Remove child categories, keep only parents
+    const cleanedResult = result.filter(code => 
+      !parentChildConflicts.some(conflict => conflict.children.includes(code))
+    );
+    console.log(`✅ [Cleaned Ethnicities] ${cleanedResult.length} codes (conflicts removed):`, cleanedResult);
+    return cleanedResult;
+  }
+  
+  console.log(`✅ [Resolved Ethnicities] ${result.length} codes found:`, result);
+  return result;
+}
 
-    // 2. If no mapping, search for an exact match in the ethnicity data values or labels
-    for (const item of ethnicityData) {
-      const itemLabelNormalized = item.label.toLowerCase().replace(/[^a-z\s]/g, '').trim();
-      if (item.value.toLowerCase() === normalized || itemLabelNormalized.includes(normalized)) {
-        resolvedParentCodes.add(item.value); // Add the found code as a starting point
-        break; 
+// 🔍 Helper: Detect if we're mixing parent + child categories
+function detectHierarchyConflicts(codes: string[]): Array<{parent: string, children: string[]}> {
+  const conflicts: Array<{parent: string, children: string[]}> = [];
+  
+  // Build parent->children map from ethnicity data
+  const parentMap = new Map<string, string[]>();
+  ethnicityData.forEach(item => {
+    if (item.parent !== item.value) {
+      if (!parentMap.has(item.parent)) {
+        parentMap.set(item.parent, []);
+      }
+      parentMap.get(item.parent)!.push(item.value);
+    }
+  });
+  
+  // Check if any code is both a parent and has children in our selection
+  for (const code of codes) {
+    const children = parentMap.get(code);
+    if (children) {
+      const conflictingChildren = children.filter(child => codes.includes(child));
+      if (conflictingChildren.length > 0) {
+        conflicts.push({
+          parent: code,
+          children: conflictingChildren
+        });
       }
     }
   }
   
-  if (resolvedParentCodes.size === 0) {
-    console.warn(`[ResolveEthnicities] Could not find a match for any input in:`, inputList);
-    return [];
-  }
-
-  // Traverse the tree for all found parent codes
-  const finalCodes = getAllDescendantCodes(Array.from(resolvedParentCodes));
-  
-  const result = Array.from(finalCodes);
-  console.log(`✅ [Resolved Ethnicities] ${result.length} codes found.`, result);
-  return result;
+  return conflicts;
 }
