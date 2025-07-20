@@ -61,9 +61,12 @@ export default function Map(props: MapProps) {
 
   useEffect(() => {
     if (isMapLoaded && mapRef.current) {
-      window.centerMapOnTract = (tractId: string) => { highlightTract(tractId); performCentering(tractId, 'results_click', true); };
+      window.centerMapOnTract = (tractId: string) => { 
+        highlightTract(tractId); 
+        performCentering(tractId, 'results_click', true); 
+      };
     }
-  }, [isMapLoaded, highlightTract, performCentering]);
+  }, [isMapLoaded, mapRef, highlightTract, performCentering]);
 
   useEffect(() => {
     if (props.selectedTractId && props.selectedTractId !== highlightedTractId) {
@@ -77,7 +80,11 @@ export default function Map(props: MapProps) {
   useEffect(() => {
     if (isMapLoaded) {
       const hasFilters = props.weights && props.weights.length > 0;
-      hasFilters ? void fetchAndApplyScores() : loadBaseMap();
+      if (hasFilters) {
+        void fetchAndApplyScores();
+      } else {
+        loadBaseMap();
+      }
     }
   }, [isMapLoaded, props.weights, props.rentRange, props.selectedEthnicities, props.selectedGenders, props.ageRange, props.incomeRange, props.topN, props.demographicScoring, fetchAndApplyScores, loadBaseMap]);
  

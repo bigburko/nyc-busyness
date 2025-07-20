@@ -52,22 +52,37 @@ interface FetchParams {
   demographicScoring?: DemographicScoring;
 }
 
+// Define proper interfaces for filter structures
+interface WeightItem {
+  id: string;
+  value: number;
+  label?: string;
+  icon?: string;
+  color?: string;
+}
+
+interface FilterData {
+  weights?: WeightItem[];
+  selectedEthnicities?: string[];
+  demographicScoring?: DemographicScoring;
+}
+
 // 🆕 NEW: Weight integrity check function
-const checkWeightIntegrity = (filters: any) => {
+const checkWeightIntegrity = (filters: FilterData): boolean => {
   console.log('🔍 [WEIGHT INTEGRITY CHECK]');
   console.log('- Weights array:', filters.weights);
-  console.log('- Demographic weight value:', filters.weights?.find((w: any) => w.id === 'demographic')?.value || 'NOT FOUND');
+  console.log('- Demographic weight value:', filters.weights?.find((w: WeightItem) => w.id === 'demographic')?.value || 'NOT FOUND');
   console.log('- DemographicScoring object:', filters.demographicScoring);
   console.log('- Selected ethnicities:', filters.selectedEthnicities);
   
   // Check if demographic weight is 100% when ethnicity is selected
-  const demographicWeight = filters.weights?.find((w: any) => w.id === 'demographic')?.value;
-  const hasEthnicityFilter = filters.selectedEthnicities?.length > 0;
+  const demographicWeight = filters.weights?.find((w: WeightItem) => w.id === 'demographic')?.value;
+  const hasEthnicityFilter = filters.selectedEthnicities?.length && filters.selectedEthnicities.length > 0;
   
   if (hasEthnicityFilter && demographicWeight !== 100) {
     console.error('❌ [WEIGHT MISMATCH] Ethnicity selected but demographic weight is not 100%');
     console.error('   Expected: demographic = 100%');
-    console.error('   Actual:', filters.weights?.map((w: any) => `${w.id}: ${w.value}%`));
+    console.error('   Actual:', filters.weights?.map((w: WeightItem) => `${w.id}: ${w.value}%`));
     return false;
   } else if (hasEthnicityFilter && demographicWeight === 100) {
     console.log('✅ [WEIGHT MATCH] Ethnicity selected and demographic weight is 100%');
@@ -78,13 +93,13 @@ const checkWeightIntegrity = (filters: any) => {
 };
 
 // 🆕 NEW: Ensure demographic weight validation
-const validateAndFixPayload = (filters: any) => {
+const validateAndFixPayload = (filters: FilterData): FilterData => {
   // Deep clone to avoid mutations
-  const fixedFilters = JSON.parse(JSON.stringify(filters));
+  const fixedFilters: FilterData = JSON.parse(JSON.stringify(filters));
   
   // Ensure demographic weight exists when ethnicity is selected
-  if (fixedFilters.selectedEthnicities?.length > 0) {
-    const demographicWeight = fixedFilters.weights?.find((w: any) => w.id === 'demographic');
+  if (fixedFilters.selectedEthnicities?.length && fixedFilters.selectedEthnicities.length > 0) {
+    const demographicWeight = fixedFilters.weights?.find((w: WeightItem) => w.id === 'demographic');
     
     if (!demographicWeight) {
       console.warn('⚠️ [PAYLOAD FIX] Adding missing demographic weight');
@@ -103,7 +118,7 @@ const validateAndFixPayload = (filters: any) => {
       demographicWeight.value = 100;
       
       // Set all other weights to 0 for single-factor priority
-      fixedFilters.weights.forEach((w: any) => {
+      fixedFilters.weights?.forEach((w: WeightItem) => {
         if (w.id !== 'demographic') {
           w.value = 0;
         }
@@ -138,13 +153,9 @@ export async function fetchResilienceScores({
   }
 
   // Create initial payload
-  const initialFilters = {
+  const initialFilters: FilterData = {
     weights: weights.map(w => ({ id: w.id, value: w.value })),
-    rentRange,
     selectedEthnicities,
-    selectedGenders,
-    ageRange,
-    incomeRange,
     demographicScoring
   };
 
@@ -156,12 +167,12 @@ export async function fetchResilienceScores({
   
   // 🔧 FIXED: Properly format request body for edge function
   const requestBody = {
-    weights: validatedFilters.weights.map((w: any) => ({ id: w.id, value: w.value })), // Ensure proper format
-    rentRange: validatedFilters.rentRange,
-    ethnicities: validatedFilters.selectedEthnicities,
-    genders: validatedFilters.selectedGenders,
-    ageRange: validatedFilters.ageRange,
-    incomeRange: validatedFilters.incomeRange,
+    weights: validatedFilters.weights?.map((w: WeightItem) => ({ id: w.id, value: w.value })) || [], // Ensure proper format
+    rentRange: rentRange,
+    ethnicities: selectedEthnicities,
+    genders: selectedGenders,
+    ageRange: ageRange,
+    incomeRange: incomeRange,
     crimeYears: [
       'year_2021',
       'year_2022', 
@@ -172,11 +183,11 @@ export async function fetchResilienceScores({
       'pred_2027'
     ],
     // Send demographic scoring to backend
-    ...(validatedFilters.demographicScoring && {
+    ...(demographicScoring && {
       demographicScoring: {
-        weights: validatedFilters.demographicScoring.weights,
-        thresholdBonuses: validatedFilters.demographicScoring.thresholdBonuses,
-        penalties: validatedFilters.demographicScoring.penalties
+        weights: demographicScoring.weights,
+        thresholdBonuses: demographicScoring.thresholdBonuses,
+        penalties: demographicScoring.penalties
       }
     })
   };
@@ -193,7 +204,7 @@ export async function fetchResilienceScores({
   });
 
   // Special logging for demographic weight scenarios
-  const demographicWeight = requestBody.weights?.find((w: any) => w.id === 'demographic')?.value;
+  const demographicWeight = requestBody.weights?.find((w: { id: string; value: number }) => w.id === 'demographic')?.value;
   if (demographicWeight === 100) {
     console.log('🎯 [FETCH DEBUG] SINGLE FACTOR REQUEST DETECTED:', {
       demographicWeight: '100%',
@@ -251,7 +262,23 @@ export async function fetchResilienceScores({
     }
 
     console.log('📦 [fetchResilienceScores] Parsing JSON response...');
-    const data = await res.json();
+    const data = await res.json() as {
+      zones?: ResilienceScore[];
+      debug?: {
+        received_ethnicities?: string[];
+        received_demographic_scoring?: unknown;
+        demographic_weight_detected?: number;
+        is_single_factor_request?: boolean;
+        has_ethnicity_filters?: boolean;
+        has_demographic_scoring?: boolean;
+        sample_demo_scores?: unknown;
+        received_weights?: unknown;
+        received_genders?: string[];
+      };
+      demographic_scoring_applied?: boolean;
+      total_zones_found?: number;
+      top_zones_returned?: number;
+    };
     
     // 🔍 ENHANCED DEBUGGING: Log complete edge function response
     console.log('🔬 [EDGE FUNCTION DEBUG] Complete raw response:', JSON.stringify(data, null, 2));
@@ -274,21 +301,21 @@ export async function fetchResilienceScores({
     // 🔍 ENHANCED: Log first 5 zones with all demographic data
     if (data.zones && data.zones.length > 0) {
       console.log('🧬 [EDGE FUNCTION DEBUG] First 5 zones detailed analysis:');
-      data.zones.slice(0, 5).forEach((zone: any, index: number) => {
+      data.zones.slice(0, 5).forEach((zone: ResilienceScore, index: number) => {
         console.log(`🧬 [Zone ${index + 1}] ${zone.geoid}:`, {
           tract_name: zone.tract_name,
           custom_score: zone.custom_score,
           demographic_score: zone.demographic_score || 0,
           demographic_match_pct: zone.demographic_match_pct || 0,
           combined_match_pct: zone.combined_match_pct || 0,
-          ethnicity_match: (zone.ethnicity_match_pct || zone.demographic_match_pct) || 0,
+          ethnicity_match: (zone.demographic_match_pct) || 0,
           // Check if ANY demographic scores exist
           hasAnyDemographicData: !!(zone.demographic_score || zone.demographic_match_pct || zone.combined_match_pct)
         });
       });
       
       // 🔍 Check if ANY zone has demographic data
-      const zonesWithDemographicData = data.zones.filter((zone: any) => 
+      const zonesWithDemographicData = data.zones.filter((zone: ResilienceScore) => 
         (zone.demographic_score || 0) > 0 || 
         (zone.demographic_match_pct || 0) > 0 || 
         (zone.combined_match_pct || 0) > 0
@@ -315,9 +342,9 @@ export async function fetchResilienceScores({
       sent_ethnicities: sentEthnicities,
       received_ethnicities: receivedEthnicities,
       ethnicity_match: JSON.stringify(sentEthnicities) === JSON.stringify(receivedEthnicities),
-      sent_demographic_weight: requestBody.weights.find((w: any) => w.id === 'demographic')?.value,
+      sent_demographic_weight: requestBody.weights.find((w: { id: string; value: number }) => w.id === 'demographic')?.value,
       received_demographic_weight: data.debug?.demographic_weight_detected,
-      demographic_weight_match: requestBody.weights.find((w: any) => w.id === 'demographic')?.value === data.debug?.demographic_weight_detected
+      demographic_weight_match: requestBody.weights.find((w: { id: string; value: number }) => w.id === 'demographic')?.value === data.debug?.demographic_weight_detected
     });
 
     // 🔍 NEW: Add edge function logs checker
@@ -364,7 +391,7 @@ export async function fetchResilienceScores({
     });
 
     // Special validation for demographic priority requests
-    if (demographicWeight === 100 && data.zones?.length > 0) {
+    if (demographicWeight === 100 && data.zones?.length && data.zones.length > 0) {
       const topZone = data.zones[0];
       console.log('🧬 [FETCH DEBUG] Demographic priority validation:', {
         topZone: topZone.geoid,

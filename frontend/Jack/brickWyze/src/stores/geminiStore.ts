@@ -46,6 +46,56 @@ interface GeminiErrorResponse {
   [key: string]: unknown;
 }
 
+// Define interfaces for Gemini response parsing
+interface GeminiWeight {
+  id: string;
+  value: number;
+}
+
+interface GeminiDemographicScoring {
+  weights?: {
+    ethnicity?: number;
+    gender?: number;
+    age?: number;
+    income?: number;
+  };
+  thresholdBonuses?: Array<{ condition: string; bonus: number; description: string }>;
+  penalties?: Array<{ condition: string; penalty: number; description: string }>;
+  reasoning?: string;
+}
+
+interface GeminiResponseData {
+  weights?: GeminiWeight[];
+  selectedEthnicities?: string[];
+  selectedGenders?: string[];
+  ageRange?: [number, number];
+  incomeRange?: [number, number];
+  rentRange?: [number, number];
+  demographicScoring?: GeminiDemographicScoring;
+  intent?: string;
+}
+
+// Type guard functions
+function isGeminiWeight(obj: unknown): obj is GeminiWeight {
+  return typeof obj === 'object' && obj !== null && 
+         'id' in obj && 'value' in obj &&
+         typeof (obj as Record<string, unknown>).id === 'string' &&
+         typeof (obj as Record<string, unknown>).value === 'number';
+}
+
+function isGeminiWeightArray(arr: unknown): arr is GeminiWeight[] {
+  return Array.isArray(arr) && arr.every(isGeminiWeight);
+}
+
+function isValidDemographicWeights(weights: unknown): weights is { ethnicity: number; gender: number; age: number; income: number } {
+  return typeof weights === 'object' && weights !== null &&
+         'ethnicity' in weights && 'gender' in weights && 'age' in weights && 'income' in weights &&
+         typeof (weights as Record<string, unknown>).ethnicity === 'number' &&
+         typeof (weights as Record<string, unknown>).gender === 'number' &&
+         typeof (weights as Record<string, unknown>).age === 'number' &&
+         typeof (weights as Record<string, unknown>).income === 'number';
+}
+
 /**
  * Defines the state and actions for interacting with the Gemini AI.
  */
@@ -107,17 +157,18 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
         const parsedReply: unknown = JSON.parse(reply);
         console.log('[🔍 Gemini Store] Parsed Bricky response:', parsedReply);
         
-        // 🎯 ENHANCED DEBUG: Log what Bricky returned
-        console.log('🎯 [GEMINI STORE DEBUG] Raw Bricky weights:', (parsedReply as any)?.weights);
-        console.log('🎯 [GEMINI STORE DEBUG] Demographic scoring:', (parsedReply as any)?.demographicScoring);
-        console.log('🎯 [GEMINI STORE DEBUG] Selected ethnicities:', (parsedReply as any)?.selectedEthnicities);
+        // 🎯 ENHANCED DEBUG: Log what Bricky returned - safe access with type guards
+        const responseData = parsedReply as Record<string, unknown>;
+        console.log('🎯 [GEMINI STORE DEBUG] Raw Bricky weights:', responseData.weights);
+        console.log('🎯 [GEMINI STORE DEBUG] Demographic scoring:', responseData.demographicScoring);
+        console.log('🎯 [GEMINI STORE DEBUG] Selected ethnicities:', responseData.selectedEthnicities);
         
         // Type guard to ensure parsedReply is an object
         if (typeof parsedReply !== 'object' || parsedReply === null) {
           throw new Error('Invalid response format');
         }
         
-        const response = parsedReply as Record<string, unknown>;
+        const response = parsedReply as GeminiResponseData;
         
         // Apply any filter updates that Bricky made
         const filterStore = useFilterStore.getState();
@@ -130,11 +181,11 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
         }> = {}; // 🔧 FIX: Use partial type without weights (handle weights separately)
         
         // Handle weights separately since they need special processing
-        if (response.weights && Array.isArray(response.weights)) {
+        if (response.weights && isGeminiWeightArray(response.weights)) {
           console.log('[⚖️ Gemini Store] Applying weight changes:', response.weights);
           
           // 🎯 ENHANCED DEBUG: Check if demographic is 100%
-          const demographicWeight = (response.weights as any[]).find(w => w.id === 'demographic');
+          const demographicWeight = response.weights.find(w => w.id === 'demographic');
           if (demographicWeight?.value === 100) {
             console.log('✅ [GEMINI STORE] DEMOGRAPHIC WEIGHT IS 100% - Single factor detected!');
           } else {
@@ -143,13 +194,8 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
           
           // Convert simple weight format to full Weighting format if needed
           const currentWeights = filterStore.weights || [];
-          const weightsArray = response.weights as unknown[]; // 🔧 FIX: Properly type the array
           const updatedWeights = currentWeights.map(weight => {
-            const geminiWeight = weightsArray.find((w: unknown) => {
-              return typeof w === 'object' && w !== null && 
-                     'id' in w && 'value' in w &&
-                     (w as { id: unknown }).id === weight.id;
-            }) as { id: string; value: number } | undefined;
+            const geminiWeight = response.weights?.find((w: GeminiWeight) => w.id === weight.id);
             return geminiWeight ? { ...weight, value: geminiWeight.value } : weight;
           });
           
@@ -161,27 +207,27 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
         
         // Apply demographic filter changes
         if (response.selectedEthnicities && Array.isArray(response.selectedEthnicities)) {
-          updates.selectedEthnicities = response.selectedEthnicities as string[];
+          updates.selectedEthnicities = response.selectedEthnicities;
           console.log('[🌍 Gemini Store] Applying ethnicity changes:', response.selectedEthnicities);
         }
         
         if (response.selectedGenders && Array.isArray(response.selectedGenders)) {
-          updates.selectedGenders = response.selectedGenders as string[];
+          updates.selectedGenders = response.selectedGenders;
           console.log('[👥 Gemini Store] Applying gender changes:', response.selectedGenders);
         }
         
         if (response.ageRange && Array.isArray(response.ageRange) && response.ageRange.length === 2) {
-          updates.ageRange = response.ageRange as [number, number];
+          updates.ageRange = response.ageRange;
           console.log('[📅 Gemini Store] Applying age range changes:', response.ageRange);
         }
         
         if (response.incomeRange && Array.isArray(response.incomeRange) && response.incomeRange.length === 2) {
-          updates.incomeRange = response.incomeRange as [number, number];
+          updates.incomeRange = response.incomeRange;
           console.log('[💰 Gemini Store] Applying income range changes:', response.incomeRange);
         }
         
         if (response.rentRange && Array.isArray(response.rentRange) && response.rentRange.length === 2) {
-          updates.rentRange = response.rentRange as [number, number];
+          updates.rentRange = response.rentRange;
           console.log('[🏠 Gemini Store] Applying rent range changes:', response.rentRange);
         }
         
@@ -190,44 +236,35 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
           console.log('[🧬 Gemini Store] Applying demographic scoring:', response.demographicScoring);
           
           // Validate demographic scoring structure
-          const demoScoring = response.demographicScoring as Record<string, unknown>;
-          if (demoScoring.weights && 
-              typeof demoScoring.weights === 'object' &&
-              demoScoring.weights !== null) {
+          const demoScoring = response.demographicScoring;
+          if (demoScoring.weights && isValidDemographicWeights(demoScoring.weights)) {
             
-            const weights = demoScoring.weights as Record<string, unknown>;
-            if (typeof weights.ethnicity === 'number' &&
-                typeof weights.gender === 'number' &&
-                typeof weights.age === 'number' &&
-                typeof weights.income === 'number') {
-              
-              // 🎯 ENHANCED DEBUG: Log demographic scoring details
-              console.log('🧬 [GEMINI STORE] Setting demographic scoring weights:', {
+            const weights = demoScoring.weights;
+            
+            // 🎯 ENHANCED DEBUG: Log demographic scoring details
+            console.log('🧬 [GEMINI STORE] Setting demographic scoring weights:', {
+              ethnicity: weights.ethnicity,
+              gender: weights.gender,
+              age: weights.age,
+              income: weights.income,
+              reasoning: demoScoring.reasoning
+            });
+            
+            filterStore.setDemographicScoring({
+              weights: {
                 ethnicity: weights.ethnicity,
                 gender: weights.gender,
                 age: weights.age,
-                income: weights.income,
-                reasoning: demoScoring.reasoning
-              });
-              
-              filterStore.setDemographicScoring({
-                weights: {
-                  ethnicity: weights.ethnicity,
-                  gender: weights.gender,
-                  age: weights.age,
-                  income: weights.income
-                },
-                thresholdBonuses: Array.isArray(demoScoring.thresholdBonuses) ? demoScoring.thresholdBonuses as Array<{ condition: string; bonus: number; description: string }> : [],
-                penalties: Array.isArray(demoScoring.penalties) ? demoScoring.penalties as Array<{ condition: string; penalty: number; description: string }> : [],
-                reasoning: typeof demoScoring.reasoning === 'string' ? demoScoring.reasoning : ''
-              });
-              
-              console.log('[✅ Gemini Store] Successfully applied demographic scoring!');
-            } else {
-              console.warn('[⚠️ Gemini Store] Invalid demographic scoring weights structure:', weights);
-            }
+                income: weights.income
+              },
+              thresholdBonuses: Array.isArray(demoScoring.thresholdBonuses) ? demoScoring.thresholdBonuses : [],
+              penalties: Array.isArray(demoScoring.penalties) ? demoScoring.penalties : [],
+              reasoning: typeof demoScoring.reasoning === 'string' ? demoScoring.reasoning : ''
+            });
+            
+            console.log('[✅ Gemini Store] Successfully applied demographic scoring!');
           } else {
-            console.warn('[⚠️ Gemini Store] Invalid demographic scoring structure:', demoScoring);
+            console.warn('[⚠️ Gemini Store] Invalid demographic scoring weights structure:', demoScoring.weights);
           }
         }
         
