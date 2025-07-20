@@ -1,4 +1,4 @@
-// src/app/api/gemini/route.ts - UPDATED: Edge function provides individual scores, frontend handles weighting
+// src/app/api/gemini/route.ts - FINAL FIX: Ultra-strong single-factor detection
 import { NextRequest, NextResponse } from 'next/server';
 
 // ✅ Enhanced type definitions for demographic sub-weighting
@@ -68,9 +68,24 @@ interface WeightObject {
   color: string;
 }
 
-// ✅ Keep your original normalization logic - these weights are for FRONTEND use
+// 🔧 NEW: Check if this is a single-factor 100% request
+function isSingleFactor100Request(weights: WeightObject[]): boolean {
+  const hundredWeights = weights.filter(w => w.value === 100);
+  const zeroWeights = weights.filter(w => w.value === 0);
+  
+  // If we have exactly 1 weight at 100% and the rest at 0%, this is single-factor
+  return hundredWeights.length === 1 && (hundredWeights.length + zeroWeights.length) === weights.length;
+}
+
+// ✅ Enhanced normalization logic with single-factor skip
 function normalizeWeights(weights: WeightObject[]): WeightObject[] {
   if (!weights || !Array.isArray(weights)) return weights;
+  
+  // 🔧 CRITICAL FIX: Skip normalization for single-factor 100% requests
+  if (isSingleFactor100Request(weights)) {
+    console.log('✅ [Gemini API] Single-factor 100% detected, skipping normalization');
+    return weights;
+  }
   
   const totalWeight = weights.reduce((sum, w) => sum + (w.value || 0), 0);
   
@@ -120,138 +135,96 @@ export async function POST(req: NextRequest) {
   console.log('✅ Gemini API route hit with message:', message);
   console.log('🧠 Current State Received:', currentState);
   
-  // ✅ UPDATED prompt with new defaults and examples
+  // ✅ ULTRA-STRONG prompt with ALL weights mandatory
   const improvedPrompt = `
-You are Bricky, a stateful AI assistant for an NYC neighborhood filtering app. Your ONLY task is to return a valid JSON object. **Do not add any markdown, comments, or text outside of the JSON object itself.**
+🚨🚨🚨 MANDATORY SINGLE-FACTOR DETECTION 🚨🚨🚨
 
---- 🏗️ SYSTEM ARCHITECTURE ---
-The edge function provides individual scores (0-100 scale):
-- foot_traffic_score, crime_score, flood_risk_score, rent_score, poi_score, demographic_score, resilience_score
-- Frontend applies user's weight sliders to combine these into final scores
-- Your "weights" parameter controls FRONTEND combination, not edge function calculation
+You are Bricky. Return ONLY valid JSON. NO markdown, NO comments.
 
---- 🎯 SPECIAL COMMAND: RESET ---
-If the user's request is to "reset", "start over", or "return to defaults", your ONLY response MUST be this exact JSON object:
+🔥 CRITICAL RULE: ALWAYS RETURN ALL 6 WEIGHTS 🔥
+You MUST always return ALL these weights in your response:
+- foot_traffic
+- demographic  
+- crime
+- flood_risk
+- rent_score
+- poi
+
+🚨 SINGLE-FACTOR = SET ONE TO 100%, OTHERS TO 0 🚨
+
+SINGLE ETHNICITY PATTERNS:
+- "korean ethnicity" / "korean" / "korean areas" → demographic: 100, all others: 0
+- "chinese" / "hispanic" / "black" → demographic: 100, all others: 0
+
+SINGLE OTHER PATTERNS:
+- "foot traffic" → foot_traffic: 100, all others: 0
+- "safety" / "crime" → crime: 100, all others: 0
+- "flood risk" → flood_risk: 100, all others: 0
+
+🔥 MANDATORY RESPONSES (COPY EXACTLY): 🔥
+
+For "korean ethnicity":
 {
-  "intent": "reset",
-  "message": "Okay, I've reset all filters to their defaults for you."
-}
-
---- 🧬 DEMOGRAPHIC SUB-WEIGHTING RULES ---
-
-**STEP 1: IDENTIFY TARGET DEMOGRAPHICS (for demographicScoring weights)**
-Look for WHO the business is targeting - ALL these should get weights:
-- "Hispanic women" → ethnicity + gender mentioned
-- "young professionals" → age + income mentioned  
-- "middle-income Hispanic residents" → ethnicity + income mentioned
-- "middle age Hispanic girls" → ethnicity + gender + age mentioned
-- "wealthy Chinese customers" → ethnicity + income mentioned
-
-**IMPORTANT: Income levels ALWAYS refer to target population demographics:**
-- "middle-income residents" = targeting people with middle income
-- "professionals" = targeting high-income people  
-- "low-income families" = targeting people with low income
-- These should ALL be included in demographic weights
-
-**STEP 2: IDENTIFY AREA CHARACTERISTICS (for filter ranges only)**
-Look for WHAT KIND OF AREA they want (these don't affect demographic weights):
-- "high rent areas" → set rentRange: [100, 160] 
-- "average to high rent" → set rentRange: [60, 160]
-- "affordable areas" → set rentRange: [26, 80]
-- "high foot traffic" → increase foot_traffic weight in main weights array
-
-**STEP 3: SET FRONTEND WEIGHTS (for main score combination)**
-The "weights" array controls how frontend combines individual scores:
-- If user mentions "foot traffic is important" → increase foot_traffic weight
-- If user mentions "safety matters" → increase crime weight  
-- If user mentions "demographic fit crucial" → increase demographic weight
-- These weights control final score = (foot_traffic_score × foot_traffic_weight) + (demographic_score × demographic_weight) + etc.
-
-**DEFAULT WEIGHTS (when no specific priorities mentioned):**
-- foot_traffic: 45% (primary factor for business success)
-- crime: 25% (safety is important)
-- flood_risk: 15% (environmental risk)
-- rent_score: 10% (cost consideration)
-- poi: 5% (commercial ecosystem)
-- demographic: 0% (only when demographic filters are selected)
-
-When users select demographic filters, suggest increasing demographic weight to 20-30%.
-
-**CRITICAL EXAMPLES:**
-
-Example 1: "café for middle age Hispanic girls in areas with middle-income Hispanic residents, foot traffic is very important"
-{
-  "ageRange": [35, 55],
-  "selectedGenders": ["female"],
-  "selectedEthnicities": ["hispanic"],
-  "incomeRange": [35000, 90000],
-  "rentRange": [60, 160],
+  "selectedEthnicities": ["korean"],
   "weights": [
-    {"id": "foot_traffic", "value": 50, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
-    {"id": "demographic", "value": 30, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
-    {"id": "crime", "value": 15, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
-    {"id": "flood_risk", "value": 3, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
-    {"id": "rent_score", "value": 2, "label": "Rent", "icon": "🏠", "color": "#FF6D01"}
+    {"id": "demographic", "value": 100, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
+    {"id": "foot_traffic", "value": 0, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
+    {"id": "crime", "value": 0, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
+    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
+    {"id": "rent_score", "value": 0, "label": "Rent", "icon": "🏠", "color": "#FF6D01"},
+    {"id": "poi", "value": 0, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"}
   ],
   "demographicScoring": {
-    "weights": {"ethnicity": 0.4, "gender": 0.25, "age": 0.25, "income": 0.1},
-    "reasoning": "Target demographics: Hispanic (ethnicity), girls (gender), middle age (age), middle-income residents (income). All mentioned factors weighted."
+    "weights": {"ethnicity": 1.0, "gender": 0.0, "age": 0.0, "income": 0.0},
+    "reasoning": "Single ethnicity focus: Korean population"
   }
 }
 
-Example 2: "café for middle-income Hispanic women, safety is crucial"
-{
-  "selectedGenders": ["female"], 
-  "selectedEthnicities": ["hispanic"],
-  "incomeRange": [35000, 90000],
-  "weights": [
-    {"id": "demographic", "value": 45, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
-    {"id": "crime", "value": 30, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
-    {"id": "foot_traffic", "value": 20, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
-    {"id": "flood_risk", "value": 3, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
-    {"id": "rent_score", "value": 2, "label": "Rent", "icon": "🏠", "color": "#FF6D01"}
-  ],
-  "demographicScoring": {
-    "weights": {"ethnicity": 0.4, "gender": 0.3, "income": 0.3, "age": 0.0},
-    "reasoning": "Target demographics: Hispanic (ethnicity), women (gender), middle-income (income). Age not specified."
-  }
-}
-
-Example 3: "best areas for foot traffic and safety" (no demographic filters)
+For "foot traffic":
 {
   "weights": [
-    {"id": "foot_traffic", "value": 60, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
-    {"id": "crime", "value": 35, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
-    {"id": "flood_risk", "value": 3, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
-    {"id": "rent_score", "value": 2, "label": "Rent", "icon": "🏠", "color": "#FF6D01"}
+    {"id": "foot_traffic", "value": 100, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
+    {"id": "demographic", "value": 0, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
+    {"id": "crime", "value": 0, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
+    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
+    {"id": "rent_score", "value": 0, "label": "Rent", "icon": "🏠", "color": "#FF6D01"},
+    {"id": "poi", "value": 0, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"}
   ]
 }
 
---- RENT RANGE MAPPING ---
-- "low rent/affordable/cheap" → [26, 80]
-- "average/moderate rent" → [60, 120] 
-- "high rent/expensive" → [100, 160]
-- "average to high rent" → [60, 160]
+For "safety":
+{
+  "weights": [
+    {"id": "crime", "value": 100, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
+    {"id": "foot_traffic", "value": 0, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
+    {"id": "demographic", "value": 0, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
+    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
+    {"id": "rent_score", "value": 0, "label": "Rent", "icon": "🏠", "color": "#FF6D01"},
+    {"id": "poi", "value": 0, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"}
+  ]
+}
 
---- INCOME RANGE MAPPING ---
-- "low-income" → [0, 35000]
+🔥 VALIDATION CHECKLIST: 🔥
+✅ Did I return ALL 6 weights?
+✅ Is the primary factor set to 100?
+✅ Are all other factors set to 0?
+✅ No mixed weights for single requests?
+
+--- MULTI-FACTOR (only if 2+ things mentioned) ---
+"korean women" → demographic: 100, others: 0, but ethnicity: 0.6, gender: 0.4
+"foot traffic and safety" → foot_traffic: 60, crime: 40, others: 0
+
+--- RANGES ---
+- "korean" → ["korean"]
+- "chinese" → ["chinese"]  
+- "hispanic" → ["hispanic"]
+- "low rent" → [26, 80]
 - "middle-income" → [35000, 90000]
-- "high-income/professionals/wealthy" → [75000, 250000]
 
---- AGE RANGE MAPPING ---
-- "young/teenagers" → [18, 35]
-- "middle-aged/middle age" → [35, 55]
-- "elderly/seniors" → [55, 100]
+--- RESET COMMAND ---
+"reset" → {"intent": "reset", "message": "Filters reset to defaults."}
 
---- CORE BEHAVIOR ---
-- You are STATEFUL - modify current state based on requests
-- ALWAYS ensure selectedGenders has at least one value
-- Include demographicScoring for business demographic queries
-- Distinguish between target demographics vs area characteristics
-- Set main weights based on user priorities (foot traffic, safety, etc.)
-- Default demographic weight to 0% unless demographic filters are selected
-
---- CURRENT FILTER STATE ---
+--- CURRENT STATE ---
 ${JSON.stringify(currentState, null, 2)}
 `;
 
@@ -288,9 +261,14 @@ ${JSON.stringify(currentState, null, 2)}
       try {
         const parsedReply = JSON.parse(reply);
         
-        // ✅ Your original weight normalization (keeping this working for FRONTEND weights)
+        // ✅ Enhanced weight normalization with single-factor detection
         if (parsedReply.weights && Array.isArray(parsedReply.weights)) {
-          console.log('🔧 [Gemini API] Normalizing frontend weights for UI sliders...');
+          console.log('🔧 [Gemini API] Processing frontend weights...');
+          
+          // Check if this is a single-factor request before normalization
+          const isSingleFactor = isSingleFactor100Request(parsedReply.weights as WeightObject[]);
+          console.log('🔍 [Gemini API] Single-factor 100% request detected:', isSingleFactor);
+          
           parsedReply.weights = normalizeWeights(parsedReply.weights as WeightObject[]);
         }
         

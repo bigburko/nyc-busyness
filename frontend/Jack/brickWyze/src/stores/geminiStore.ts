@@ -1,4 +1,4 @@
-// src/stores/geminiStore.ts - Enhanced with demographic scoring integration
+// src/stores/geminiStore.ts - Enhanced with demographic scoring integration + DEBUGGING
 
 import { create } from 'zustand';
 import { useFilterStore, type Weighting } from './filterStore'; // Import types
@@ -107,6 +107,11 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
         const parsedReply: unknown = JSON.parse(reply);
         console.log('[🔍 Gemini Store] Parsed Bricky response:', parsedReply);
         
+        // 🎯 ENHANCED DEBUG: Log what Bricky returned
+        console.log('🎯 [GEMINI STORE DEBUG] Raw Bricky weights:', (parsedReply as any)?.weights);
+        console.log('🎯 [GEMINI STORE DEBUG] Demographic scoring:', (parsedReply as any)?.demographicScoring);
+        console.log('🎯 [GEMINI STORE DEBUG] Selected ethnicities:', (parsedReply as any)?.selectedEthnicities);
+        
         // Type guard to ensure parsedReply is an object
         if (typeof parsedReply !== 'object' || parsedReply === null) {
           throw new Error('Invalid response format');
@@ -127,6 +132,15 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
         // Handle weights separately since they need special processing
         if (response.weights && Array.isArray(response.weights)) {
           console.log('[⚖️ Gemini Store] Applying weight changes:', response.weights);
+          
+          // 🎯 ENHANCED DEBUG: Check if demographic is 100%
+          const demographicWeight = (response.weights as any[]).find(w => w.id === 'demographic');
+          if (demographicWeight?.value === 100) {
+            console.log('✅ [GEMINI STORE] DEMOGRAPHIC WEIGHT IS 100% - Single factor detected!');
+          } else {
+            console.log('⚠️ [GEMINI STORE] Demographic weight:', demographicWeight?.value || 'NOT FOUND');
+          }
+          
           // Convert simple weight format to full Weighting format if needed
           const currentWeights = filterStore.weights || [];
           const weightsArray = response.weights as unknown[]; // 🔧 FIX: Properly type the array
@@ -138,6 +152,10 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
             }) as { id: string; value: number } | undefined;
             return geminiWeight ? { ...weight, value: geminiWeight.value } : weight;
           });
+          
+          // 🎯 ENHANCED DEBUG: Log weight changes
+          console.log('🛡️ [GEMINI STORE DEBUG] Updated weights being set:', updatedWeights.map(w => `${w.id}: ${w.value}%`));
+          
           filterStore.setFilters({ weights: updatedWeights });
         }
         
@@ -183,6 +201,15 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
                 typeof weights.age === 'number' &&
                 typeof weights.income === 'number') {
               
+              // 🎯 ENHANCED DEBUG: Log demographic scoring details
+              console.log('🧬 [GEMINI STORE] Setting demographic scoring weights:', {
+                ethnicity: weights.ethnicity,
+                gender: weights.gender,
+                age: weights.age,
+                income: weights.income,
+                reasoning: demoScoring.reasoning
+              });
+              
               filterStore.setDemographicScoring({
                 weights: {
                   ethnicity: weights.ethnicity,
@@ -209,6 +236,15 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
           filterStore.setFilters(updates);
           console.log('[✅ Gemini Store] Applied filter updates:', updates);
         }
+        
+        // 🎯 ENHANCED DEBUG: Log final state after all updates
+        const finalState = useFilterStore.getState();
+        console.log('🎯 [GEMINI STORE DEBUG] Final state after updates:', {
+          weights: finalState.weights.map(w => `${w.id}: ${w.value}%`),
+          selectedEthnicities: finalState.selectedEthnicities,
+          selectedGenders: finalState.selectedGenders,
+          demographicScoring: finalState.demographicScoring
+        });
         
         // Handle special intents
         if (response.intent === 'reset') {

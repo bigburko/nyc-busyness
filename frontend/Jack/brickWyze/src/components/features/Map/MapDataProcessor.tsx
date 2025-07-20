@@ -10,7 +10,7 @@ import { ResilienceScore, fetchResilienceScores } from './fetchResilienceScores'
 import { ProcessGeojson } from './ProcessGeojson';
 import { updateTractData } from './TractLayer';
 import { showLegend } from './Legend';
-import { DemographicScoring } from '../../../stores/filterStore';
+import { useFilterStore, DemographicScoring } from '../../../stores/filterStore';
 
 const DEBUG_MODE = process.env.NODE_ENV === 'development';
 
@@ -88,7 +88,16 @@ export const useMapDataProcessor = ({
       return;
     }
 
+    // 🔧 FIX: Get demographic scoring from store if prop is undefined
+    const finalDemographicScoring = demographicScoring || useFilterStore.getState().demographicScoring;
+
     if (DEBUG_MODE) {
+      console.log('🔍 [MapDataProcessor DEBUG] Demographic scoring resolution:', {
+        fromProp: !!demographicScoring,
+        fromStore: !!useFilterStore.getState().demographicScoring,
+        finalDemographicScoring: finalDemographicScoring
+      });
+
       console.log('📤 [MapDataProcessor] Sending to edge function:', {
         weights: weights.map(w => `${w.id}: ${w.value}%`),
         rentRange,
@@ -97,29 +106,95 @@ export const useMapDataProcessor = ({
         ageRange,
         incomeRange,
         topN,
-        hasDemographicScoring: !!demographicScoring
+        hasDemographicScoring: !!finalDemographicScoring,
+        demographicScoringWeights: finalDemographicScoring?.weights
       });
     }
 
     try {
       // Use the fetchResilienceScores function
-      const zones = await fetchResilienceScores({
+      const searchResults = await fetchResilienceScores({
         weights,
         rentRange,
         selectedEthnicities,
         selectedGenders,
         ageRange,
         incomeRange,
-        demographicScoring
+        demographicScoring: finalDemographicScoring  // 🚨 Use the resolved version
       });
 
       if (DEBUG_MODE) {
-        console.log('📥 [MapDataProcessor] Edge function returned zones:', zones.length);
+        console.log('📥 [MapDataProcessor] Edge function returned zones:', searchResults.length);
         console.log('[✅ DEBUG] Data received by edge function');
       }
 
+      // 🔬 ENHANCED EDGE FUNCTION RESPONSE DEBUGGING
+      console.log('🔬 [MapDataProcessor] EDGE FUNCTION RESPONSE ANALYSIS:');
+      console.log('   📊 Total zones returned:', searchResults.length);
+      console.log('   🧬 Demographic scoring applied:', searchResults.length > 0 ? 'Processing...' : 'No zones to analyze');
+
+      // 🔍 Analyze demographic scoring results
+      if (searchResults.length > 0) {
+        const zonesWithDemoScores = searchResults.filter(zone => (zone.demographic_score || 0) > 0);
+        const zonesWithDemoMatch = searchResults.filter(zone => (zone.demographic_match_pct || 0) > 0);
+        const zonesWithCombinedMatch = searchResults.filter(zone => (zone.combined_match_pct || 0) > 0);
+        
+        console.log('🔬 [MapDataProcessor] DEMOGRAPHIC SCORING BREAKDOWN:');
+        console.log(`   🎯 Zones with demographic_score > 0: ${zonesWithDemoScores.length}/${searchResults.length}`);
+        console.log(`   🎯 Zones with demographic_match_pct > 0: ${zonesWithDemoMatch.length}/${searchResults.length}`);
+        console.log(`   🎯 Zones with combined_match_pct > 0: ${zonesWithCombinedMatch.length}/${searchResults.length}`);
+        
+        // Show top 3 zones by each metric
+        const topByDemoScore = [...searchResults].sort((a, b) => (b.demographic_score || 0) - (a.demographic_score || 0)).slice(0, 3);
+        const topByDemoMatch = [...searchResults].sort((a, b) => (b.demographic_match_pct || 0) - (a.demographic_match_pct || 0)).slice(0, 3);
+        
+        console.log('🏆 [MapDataProcessor] TOP 3 BY DEMOGRAPHIC SCORE:');
+        topByDemoScore.forEach((zone, i) => {
+          console.log(`   ${i + 1}. ${zone.geoid}: score=${zone.demographic_score || 0}, match=${zone.demographic_match_pct || 0}%, custom=${zone.custom_score}`);
+        });
+        
+        console.log('🏆 [MapDataProcessor] TOP 3 BY DEMOGRAPHIC MATCH %:');
+        topByDemoMatch.forEach((zone, i) => {
+          console.log(`   ${i + 1}. ${zone.geoid}: match=${zone.demographic_match_pct || 0}%, score=${zone.demographic_score || 0}, custom=${zone.custom_score}`);
+        });
+        
+        // 🚨 CRITICAL: Check for Korean ethnicity specifically
+        const demographicWeight = weights?.find(w => w.id === 'demographic')?.value || 0;
+        
+        if (selectedEthnicities && selectedEthnicities.includes('AEAKrn') && demographicWeight === 100) {
+          console.log('🇰🇷 [MapDataProcessor] KOREAN ETHNICITY ANALYSIS:');
+          console.log('   🎯 Korean ethnicity selected with 100% demographic weight');
+          console.log('   🎯 Expected: High demographic scores in Korean areas (Koreatown, Flushing)');
+          
+          if (zonesWithDemoScores.length === 0 && zonesWithDemoMatch.length === 0) {
+            console.error('❌ [MapDataProcessor] KOREAN ISSUE: No demographic scores found!');
+            console.log('🔍 [MapDataProcessor] Troubleshooting steps:');
+            console.log('   1. Check Supabase edge function logs');
+            console.log('   2. Verify Korean column "AEAKrn" exists in tract_race_ethnicity table');
+            console.log('   3. Confirm demographic-scoring.ts was properly deployed');
+            console.log('   4. Test edge function directly with Korean data');
+          } else {
+            console.log('✅ [MapDataProcessor] Some demographic scores found - edge function partially working');
+          }
+        }
+        
+        // 🔍 Show sample zone data structure
+        console.log('🔬 [MapDataProcessor] SAMPLE ZONE DATA STRUCTURE (first zone):');
+        const sampleZone = searchResults[0];
+        console.log('   📋 Zone keys:', Object.keys(sampleZone));
+        console.log('   📋 Demographic fields:', {
+          demographic_score: sampleZone.demographic_score || 0,
+          demographic_match_pct: sampleZone.demographic_match_pct || 0,
+          combined_match_pct: sampleZone.combined_match_pct || 0,
+          ethnicity_match_pct: sampleZone.ethnicity_match_pct || 0,
+          custom_score: sampleZone.custom_score
+        });
+      } else {
+        console.error('❌ [MapDataProcessor] No zones returned from edge function!');
+      }
+
       // SAFETY FIX: Cap all scores at 100 to prevent frontend multiplication issues
-      const cappedZones = zones.map(zone => ({
+      const cappedZones = searchResults.map(zone => ({
         ...zone,
         custom_score: Math.min(Math.max(zone.custom_score || 0, 0), 100),
         // Also cap other scores if needed
@@ -131,7 +206,7 @@ export const useMapDataProcessor = ({
       }));
 
       // Log any scores that were over 100
-      const overScores = zones.filter(zone => (zone.custom_score || 0) > 100);
+      const overScores = searchResults.filter(zone => (zone.custom_score || 0) > 100);
       if (overScores.length > 0) {
         console.warn('⚠️ [MapDataProcessor] Found scores over 100, capping them:', overScores.map(z => `${z.geoid}: ${z.custom_score}`));
       }
