@@ -1,4 +1,4 @@
-// src/components/DrawerGroup/ChatbotDrawer.tsx
+// src/components/features/search/ChatbotDrawer.tsx - FIXED TypeScript errors
 
 'use client';
 
@@ -60,7 +60,17 @@ export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: Chatb
     setIsLoading(true);
 
     try {
-      const reply = await sendToGemini(userMsg, currentState);
+      // ✅ FIXED: Create a simplified state object that matches what gemini expects
+      const simpleState = {
+        weights: currentState.weights || [],
+        selectedEthnicities: currentState.selectedEthnicities || [],
+        selectedGenders: currentState.selectedGenders || [],
+        rentRange: currentState.rentRange || [26, 160],
+        ageRange: currentState.ageRange || [0, 100], 
+        incomeRange: currentState.incomeRange || [0, 250000]
+      };
+      
+      const reply = await sendToGemini(userMsg, simpleState);
       console.log('[Gemini Raw Reply]', reply);
 
       // ✅ FIXED: Use proper typing for parsed response

@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel.tsx
+// src/components/features/search/TractDetailPanel.tsx - FIXED SYNTAX ERRORS
 'use client';
 
 import { 
@@ -6,6 +6,7 @@ import {
 } from '@chakra-ui/react';
 import { CloseIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 
+// ✅ FIXED: Use exact interface that matches your existing data structure
 interface TractResult {
   geoid: string;
   tract_name: string;
@@ -27,6 +28,25 @@ interface TractResult {
   gender_match_pct?: number;
   age_match_pct?: number;
   income_match_pct?: number;
+  
+  // ✅ NEW: Optional foot traffic timeline data (will be undefined if not available)
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  
   crime_timeline?: {
     year_2020?: number;
     year_2021?: number;
@@ -44,7 +64,7 @@ interface TractDetailPanelProps {
   onClose: () => void;
 }
 
-// Score meter component
+// Score meter component - ✅ FIXED: Handles 0-100 scale properly
 function ScoreMeter({ 
   label, 
   score, 
@@ -58,6 +78,8 @@ function ScoreMeter({
   max?: number;
   icon?: string;
 }) {
+  // ✅ FIXED: Scores are already 0-100, no conversion needed
+  const displayScore = Math.min(Math.max(Math.round(score), 0), max);
   const percentage = Math.min((score / max) * 100, 100);
   
   return (
@@ -67,7 +89,7 @@ function ScoreMeter({
           {icon} {label}
         </Text>
         <Text fontSize="md" fontWeight="bold" color={color}>
-          {Math.round(score)}/{max}
+          {displayScore}/{max}
         </Text>
       </HStack>
       <Progress 
@@ -82,26 +104,128 @@ function ScoreMeter({
   );
 }
 
-// ✅ FIXED: Crime trend chart - scores are now 0-100 scale
-function CrimeTrendChart({ tract }: { tract: TractResult }) {
-  // ✅ FIX: Scores are now 0-100, no need to multiply
-  const currentScore = Math.round(tract.crime_score || 10);
+// ✅ FIXED: Simple foot traffic chart (optional, only shows if data available)
+function FootTrafficChart({ tract }: { tract: TractResult }) {
+  const currentScore = Math.round(tract.foot_traffic_score || 50);
   
-  // Check if we have real crime timeline data
+  const hasRealData = tract.foot_traffic_timeline && Object.keys(tract.foot_traffic_timeline).length > 0;
+  
+  if (!hasRealData) {
+    // ✅ FALLBACK: Show simple current score if no timeline data
+    return (
+      <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+        <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
+          🚶 Foot Traffic Score
+        </Text>
+        <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
+          {currentScore}/100
+        </Text>
+        <Text fontSize="sm" color="gray.500" textAlign="center" mt={2}>
+          Current foot traffic level
+        </Text>
+      </Box>
+    );
+  }
+  
+  // ✅ FIXED: Show timeline if data is available (with null check)
+  const timeline = tract.foot_traffic_timeline!; // We already checked it exists above
+  const chartData = [
+    { year: '2019', value: Math.round(timeline['2019'] || 0) },
+    { year: '2020', value: Math.round(timeline['2020'] || 0) },
+    { year: '2021', value: Math.round(timeline['2021'] || 0) },
+    { year: '2022', value: Math.round(timeline['2022'] || 0) },
+    { year: '2023', value: Math.round(timeline['2023'] || 0) },
+    { year: '2024', value: Math.round(timeline['2024'] || 0) },
+    { year: '2025', value: Math.round(timeline['pred_2025'] || 0) },
+    { year: '2026', value: Math.round(timeline['pred_2026'] || 0) },
+    { year: '2027', value: Math.round(timeline['pred_2027'] || 0) },
+  ];
+
+  const maxValue = Math.max(...chartData.map(d => d.value));
+  const minValue = Math.min(...chartData.map(d => d.value));
+  
+  const getHeight = (value: number) => {
+    const range = maxValue - minValue;
+    if (range === 0) return 60;
+    const normalizedValue = (value - minValue) / range;
+    return Math.max(40, 40 + (normalizedValue * 120));
+  };
+
+  return (
+    <Box w="full">
+      <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
+        🚶 Foot Traffic Trend (9-Year View) 📊
+      </Text>
+
+      <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
+        <Flex justify="space-between" align="end" h="200px" mb={3} px={1}>
+          {chartData.map((item, index) => {
+            const isPast = index < 6; // 2019-2024
+            const isCurrent = index === 6; // 2025
+            const height = getHeight(item.value);
+            
+            return (
+              <VStack key={`ft-chart-${item.year}`} spacing={1} flex="1" align="center">
+                <Text fontSize="9px" fontWeight="bold" color="gray.700" lineHeight="1">
+                  {item.value}
+                </Text>
+                <Box
+                  bg={isPast ? "#6B7280" : isCurrent ? "#4299E1" : "#60A5FA"}
+                  h={`${height}px`}
+                  w="18px"
+                  borderRadius="md"
+                  boxShadow="sm"
+                />
+                <Text fontSize="xs" color="gray.500" fontWeight={isCurrent ? "bold" : "normal"}>
+                  {item.year}
+                </Text>
+              </VStack>
+            );
+          })}
+        </Flex>
+        
+        <HStack justify="center" spacing={4} fontSize="xs" color="gray.600" py={2}>
+          <HStack spacing={1}>
+            <Box w="8px" h="8px" bg="#6B7280" borderRadius="sm" />
+            <Text>Historical</Text>
+          </HStack>
+          <HStack spacing={1}>
+            <Box w="8px" h="8px" bg="#4299E1" borderRadius="sm" />
+            <Text fontWeight="bold">Current</Text>
+          </HStack>
+          <HStack spacing={1}>
+            <Box w="8px" h="8px" bg="#60A5FA" borderRadius="sm" />
+            <Text>Forecast</Text>
+          </HStack>
+        </HStack>
+        
+        <Text fontSize="xs" color="gray.500" textAlign="center" mt={2}>
+          Real timeline data - Current: {currentScore}/100
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+// ✅ FIXED: Crime trend chart - Updated for 0-100 scale
+function CrimeTrendChart({ tract }: { tract: TractResult }) {
+  // ✅ FIXED: Scores are already 0-100 scale
+  const currentScore = Math.round(tract.crime_score || 50);
+  
   const hasRealData = tract.crime_timeline && Object.keys(tract.crime_timeline).length > 0;
   
   let chartData = [];
   
   if (hasRealData && tract.crime_timeline) {
-    // ✅ FIX: Timeline data is 0-10 scale, convert to 0-100
+    // ✅ FIXED: Timeline data is already 0-100 scale
     chartData = [
-      { year: '2021', value: Math.round((tract.crime_timeline.year_2021 || 0) / 10 * 100) },
-      { year: '2022', value: Math.round((tract.crime_timeline.year_2022 || 0) / 10 * 100) },
-      { year: '2023', value: Math.round((tract.crime_timeline.year_2023 || 0) / 10 * 100) },
-      { year: '2024', value: Math.round((tract.crime_timeline.year_2024 || 0) / 10 * 100) },
-      { year: '2025', value: Math.round((tract.crime_timeline.pred_2025 || 0) / 10 * 100) },
-      { year: '2026', value: Math.round((tract.crime_timeline.pred_2026 || 0) / 10 * 100) },
-      { year: '2027', value: Math.round((tract.crime_timeline.pred_2027 || 0) / 10 * 100) },
+      { year: '2021', value: Math.round(tract.crime_timeline.year_2021 || 0) },
+      { year: '2022', value: Math.round(tract.crime_timeline.year_2022 || 0) },
+      { year: '2023', value: Math.round(tract.crime_timeline.year_2023 || 0) },
+      { year: '2024', value: Math.round(tract.crime_timeline.year_2024 || 0) },
+      { year: '2025', value: Math.round(tract.crime_timeline.pred_2025 || 0) },
+      { year: '2026', value: Math.round(tract.crime_timeline.pred_2026 || 0) },
+      { year: '2027', value: Math.round(tract.crime_timeline.pred_2027 || 0) },
     ];
   } else {
     // Fallback to calculated data
@@ -119,37 +243,14 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
   const maxValue = Math.max(...chartData.map(d => d.value));
   const minValue = Math.min(...chartData.map(d => d.value));
   
-  // ✅ FIX: Use logarithmic scaling to amplify small differences
-  const range = maxValue - minValue;
-  const hasVariation = range > 1;
-  
-  let effectiveMin, effectiveMax;
-  
-  if (!hasVariation) {
-    // For identical/similar values, use log scaling around the average
-    const avgValue = (maxValue + minValue) / 2;
-    effectiveMin = Math.max(1, avgValue - 8);
-    effectiveMax = avgValue + 8;
-  } else {
-    // Use actual range with padding
-    effectiveMin = Math.max(1, minValue - 3);
-    effectiveMax = maxValue + 3;
-  }
-  
-  // ✅ Logarithmic height calculation function
-  const getLogHeight = (value: number) => {
-    const safeValue = Math.max(1, value);
-    const safeMin = Math.max(1, effectiveMin);
-    const safeMax = Math.max(2, effectiveMax);
-    
-    const logValue = Math.log(safeValue);
-    const logMin = Math.log(safeMin);
-    const logMax = Math.log(safeMax);
-    
-    const logRange = logMax - logMin;
-    const normalizedLog = logRange > 0 ? (logValue - logMin) / logRange : 0.5;
-    
-    return Math.max(60, 60 + (normalizedLog * 120));
+  const getHeight = (value: number) => {
+    const range = maxValue - minValue;
+    if (range < 5) {
+      // For small ranges, use fixed heights
+      return 80;
+    }
+    const normalizedValue = (value - minValue) / range;
+    return Math.max(60, 60 + (normalizedValue * 100));
   };
 
   return (
@@ -159,21 +260,21 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
       </Text>
 
       <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
-        <Flex justify="space-between" align="end" h="220px" mb={3} px={1}>
+        <Flex justify="space-between" align="end" h="180px" mb={3} px={1}>
           {chartData.map((item, index) => {
             const isPast = index < 4;
             const isCurrent = index === 4;
-            const height = getLogHeight(item.value);
+            const height = getHeight(item.value);
             
             return (
-              <VStack key={`chart-${item.year}`} spacing={1} flex="1" align="center">
-                <Text fontSize="10px" fontWeight="bold" color="gray.700" lineHeight="1">
+              <VStack key={`crime-chart-${item.year}`} spacing={1} flex="1" align="center">
+                <Text fontSize="9px" fontWeight="bold" color="gray.700" lineHeight="1">
                   {item.value}
                 </Text>
                 <Box
                   bg={isPast ? "#9CA3AF" : isCurrent ? "#10B981" : "#60A5FA"}
                   h={`${height}px`}
-                  w="22px"
+                  w="20px"
                   borderRadius="md"
                   boxShadow="sm"
                 />
@@ -185,7 +286,7 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
           })}
         </Flex>
         
-        <HStack justify="center" spacing={6} fontSize="xs" color="gray.600" py={2}>
+        <HStack justify="center" spacing={4} fontSize="xs" color="gray.600" py={2}>
           <HStack spacing={1}>
             <Box w="8px" h="8px" bg="#9CA3AF" borderRadius="sm" />
             <Text>Historical</Text>
@@ -196,7 +297,7 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
           </HStack>
           <HStack spacing={1}>
             <Box w="8px" h="8px" bg="#60A5FA" borderRadius="sm" />
-            <Text>2-Year Forecast</Text>
+            <Text>Forecast</Text>
           </HStack>
         </HStack>
         
@@ -226,7 +327,7 @@ function getResilienceLabel(score: number): string {
 }
 
 export default function TractDetailPanel({ tract, onClose }: TractDetailPanelProps) {
-  // ✅ FIX: Scores are now 0-100, no need to multiply
+  // ✅ FIXED: Scores are already 0-100 scale
   const resilienceScore = Math.round(tract.custom_score || 0);
   const rentText = tract.avg_rent ? `${tract.avg_rent.toFixed(2)}` : 'N/A';
   const resilienceColor = getResilienceColor(resilienceScore);
@@ -298,7 +399,7 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
           </VStack>
         </Box>
 
-        {/* Quick stats grid */}
+        {/* Quick stats grid - ✅ FIXED: Updated for 0-100 scale */}
         <Box p={6} bg="gray.50" borderBottom="1px solid" borderColor="gray.200">
           <SimpleGrid columns={2} spacing={6}>
             <VStack spacing={2}>
@@ -329,17 +430,8 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
               <Text fontSize="2xl" fontWeight="bold" color="gray.600">
                 👥 {(() => {
                   const rawValue = tract.demographic_match_pct || 0;
-                  let displayValue;
-                  
-                  if (rawValue > 1) {
-                    displayValue = Math.round(rawValue);
-                  } else {
-                    displayValue = Math.round(rawValue * 100);
-                  }
-                  
-                  displayValue = Math.min(displayValue, 100);
-                  
-                  return `${displayValue}%`;
+                  const displayValue = rawValue > 1 ? Math.round(rawValue) : Math.round(rawValue * 100);
+                  return `${Math.min(displayValue, 100)}%`;
                 })()}
               </Text>
               <Text fontSize="sm" color="gray.600" textAlign="center">
@@ -351,59 +443,32 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             </VStack>
             
             <VStack spacing={2}>
-              {(() => {
-                // ✅ FIX: Crime score is now 0-100
-                const safetyScore = Math.round(tract.crime_score || 0);
-                
-                let trendStatus = "Stable";
-                let trendColor = "#6B7280";
-                
-                if (tract.crime_timeline) {
-                  // ✅ FIXED: Remove unused variables and simplify logic
-                  const raw2025 = tract.crime_timeline.pred_2025 || 0;
-                  const raw2027 = tract.crime_timeline.pred_2027 || 0;
-                  
-                  const val2025 = Math.round((raw2025 / 10) * 100);
-                  const val2027 = Math.round((raw2027 / 10) * 100);
-                  
-                  const trendChange = val2027 - val2025;
-                  
-                  if (trendChange > 0.5) {
-                    trendStatus = "Increasing";
-                    trendColor = "#10B981";
-                  } else if (trendChange < -0.5) {
-                    trendStatus = "Declining";
-                    trendColor = "#E53E3E";
-                  }
-                } else {
-                  if (safetyScore > 85) {
-                    trendStatus = "Increasing";
-                    trendColor = "#10B981";
-                  } else if (safetyScore < 50) {
-                    trendStatus = "Declining";
-                    trendColor = "#E53E3E";
-                  }
-                }
-                
-                return (
-                  <>
-                    <Text fontSize="2xl" fontWeight="bold" color={trendColor}>
-                      🛡️ {trendStatus}
-                    </Text>
-                    <Text fontSize="sm" color="gray.600" textAlign="center">
-                      Safety
-                    </Text>
-                    <Text fontSize="xs" color="gray.500">
-                      {safetyScore}/100
-                    </Text>
-                  </>
-                );
-              })()}
+              <Text fontSize="2xl" fontWeight="bold" color="#10B981">
+                🛡️ {Math.round(tract.crime_score || 0)}
+              </Text>
+              <Text fontSize="sm" color="gray.600" textAlign="center">
+                Safety Score
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                out of 100
+              </Text>
             </VStack>
           </SimpleGrid>
         </Box>
 
-        {/* Score breakdown */}
+        {/* Charts section */}
+        <Box p={6}>
+          <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.800">
+            📈 Trend Analysis
+          </Text>
+          
+          <VStack spacing={6}>
+            <FootTrafficChart tract={tract} />
+            <CrimeTrendChart tract={tract} />
+          </VStack>
+        </Box>
+
+        {/* Score breakdown - ✅ FIXED: Updated for 0-100 scale */}
         <Box p={6}>
           <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.800">
             📊 Score Breakdown
@@ -411,49 +476,44 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
           <VStack spacing={6}>
             <ScoreMeter
               label="Foot Traffic"
-              score={Math.round(tract.foot_traffic_score || 0)}
+              score={tract.foot_traffic_score || 0} // Already 0-100
               color="#4299E1"
               icon="🚶"
             />
             <ScoreMeter
               label="Demographics"
-              score={Math.round(tract.demographic_score || 0)}
+              score={tract.demographic_score || 0} // Already 0-100
               color="#48BB78"
               icon="👥"
             />
             <ScoreMeter
               label="Safety Score"
-              score={Math.round(tract.crime_score || 0)}
+              score={tract.crime_score || 0} // Already 0-100
               color="#10B981"
               icon="🛡️"
             />
             <ScoreMeter
               label="Flood Risk"
-              score={Math.round(tract.flood_risk_score || 0)}
+              score={tract.flood_risk_score || 0} // Already 0-100
               color="#38B2AC"
               icon="🌊"
             />
             <ScoreMeter
               label="Rent Score"
-              score={Math.round(tract.rent_score || 0)}
+              score={tract.rent_score || 0} // Already 0-100
               color="#ED8936"
               icon="💰"
             />
             <ScoreMeter
               label="Points of Interest"
-              score={Math.round(tract.poi_score || 0)}
+              score={tract.poi_score || 0} // Already 0-100
               color="#9F7AEA"
               icon="📍"
             />
           </VStack>
         </Box>
 
-        {/* Crime Trend Chart */}
-        <Box p={6}>
-          <CrimeTrendChart tract={tract} />
-        </Box>
-
-        {/* Demographic details */}
+        {/* Demographic details - ✅ FIXED: Proper percentage calculations */}
         <Box p={6}>
           <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.800">
             👥 Demographic Details
