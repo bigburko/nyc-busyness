@@ -6,7 +6,7 @@ import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 import rawGeojson from './manhattan_census_tracts.json';
 import { CleanGeojson, PotentiallyNonStandardFeatureCollection } from './CleanGeojson';
-import { ResilienceScore, fetchResilienceScores } from './fetchResilienceScores';
+import { ResilienceScore, fetchResilienceScores, EdgeFunctionResponse } from './fetchResilienceScores';
 import { ProcessGeojson } from './ProcessGeojson';
 import { updateTractData } from './TractLayer';
 import { showLegend } from './Legend';
@@ -24,6 +24,8 @@ interface ResilienceScoreWithRanking extends ResilienceScore {
   ranking: number;
 }
 
+
+
 interface UseMapDataProcessorProps {
   map: mapboxgl.Map | null;
   weights?: Weighting[];
@@ -35,6 +37,7 @@ interface UseMapDataProcessorProps {
   topN?: number;
   demographicScoring?: DemographicScoring;
   onSearchResults?: (results: ResilienceScore[]) => void;
+  onSearchResponse?: (response: EdgeFunctionResponse | null) => void; // NEW: Add this prop
   setCurrentGeoJson: (data: FeatureCollection<Geometry, GeoJsonProperties>) => void;
   addHighlightLayers: (map: mapboxgl.Map) => void;
   zoomToTopTracts: (zones: ResilienceScore[]) => void;
@@ -51,6 +54,7 @@ export const useMapDataProcessor = ({
   topN = 10,
   demographicScoring,
   onSearchResults,
+  onSearchResponse, // NEW: Accept this prop
   setCurrentGeoJson,
   addHighlightLayers,
   zoomToTopTracts,
@@ -67,9 +71,12 @@ export const useMapDataProcessor = ({
 
   // Store onSearchResults in a ref to avoid dependency issues
   const onSearchResultsRef = useRef(onSearchResults);
+  const onSearchResponseRef = useRef(onSearchResponse); // NEW: Add ref for search response
+  
   useEffect(() => {
     onSearchResultsRef.current = onSearchResults;
-  }, [onSearchResults]);
+    onSearchResponseRef.current = onSearchResponse; // NEW: Update ref
+  }, [onSearchResults, onSearchResponse]);
 
   // Use fetchResilienceScores function instead of inline fetch
   const fetchAndApplyScores = useCallback(async () => {
@@ -85,6 +92,12 @@ export const useMapDataProcessor = ({
       if (map) {
         updateTractData(map, processed);
       }
+      
+      // Clear search response
+      if (onSearchResponseRef.current) {
+        onSearchResponseRef.current(null);
+      }
+      
       return;
     }
 
@@ -112,25 +125,39 @@ export const useMapDataProcessor = ({
     }
 
     try {
-      // Use the fetchResilienceScores function
-      const searchResults = await fetchResilienceScores({
+      // 🔧 FIX: fetchResilienceScores now returns full response object
+      const fullResponse = await fetchResilienceScores({
         weights,
         rentRange,
         selectedEthnicities,
         selectedGenders,
         ageRange,
         incomeRange,
-        demographicScoring: finalDemographicScoring  // 🚨 Use the resolved version
+        demographicScoring: finalDemographicScoring,
+        topN // Make sure topN is passed
       });
 
+      console.log('📥 [MapDataProcessor] Full response received:', fullResponse);
+      
+      // 🔧 FIX: Extract zones from the full response
+      const searchResults = fullResponse?.zones || [];
+
       if (DEBUG_MODE) {
-        console.log('📥 [MapDataProcessor] Edge function returned zones:', searchResults.length);
+        console.log('📥 [MapDataProcessor] Extracted zones from response:', searchResults.length);
         console.log('[✅ DEBUG] Data received by edge function');
+      }
+
+      // 🔧 FIX: Pass full response to parent for TopNSelector
+      if (onSearchResponseRef.current) {
+        console.log('📊 [MapDataProcessor] Passing full response to parent for TopNSelector');
+        onSearchResponseRef.current(fullResponse);
       }
 
       // 🔬 ENHANCED EDGE FUNCTION RESPONSE DEBUGGING
       console.log('🔬 [MapDataProcessor] EDGE FUNCTION RESPONSE ANALYSIS:');
       console.log('   📊 Total zones returned:', searchResults.length);
+      console.log('   📊 Full response top_zones_returned:', fullResponse?.top_zones_returned);
+      console.log('   📊 Full response total_zones_found:', fullResponse?.total_zones_found);
       console.log('   🧬 Demographic scoring applied:', searchResults.length > 0 ? 'Processing...' : 'No zones to analyze');
 
       // 🔍 Analyze demographic scoring results
@@ -306,6 +333,11 @@ export const useMapDataProcessor = ({
 
     } catch (err) {
       console.error('[MapDataProcessor Error fetching and applying scores]', err);
+      
+      // Clear search response on error
+      if (onSearchResponseRef.current) {
+        onSearchResponseRef.current(null);
+      }
     }
   }, [
     weights, 

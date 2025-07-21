@@ -90,6 +90,35 @@ interface MapSearchResult {
   [key: string]: unknown;
 }
 
+// ✅ FIXED: Proper interface for debug info instead of any
+interface DebugInfo {
+  received_ethnicities?: string[];
+  received_genders?: string[];
+  received_age_range?: [number, number];
+  received_income_range?: [number, number];
+  received_top_n?: number;
+  received_crime_years?: string[];
+  received_time_periods?: string[];
+  received_demographic_scoring?: Record<string, unknown>;
+  received_weights?: string[];
+  demographic_weight_detected?: number;
+  is_single_factor_request?: boolean;
+  has_ethnicity_filters?: boolean;
+  has_demographic_scoring?: boolean;
+  [key: string]: unknown;
+}
+
+// ✅ FIXED: Add interface for the full edge function response
+interface EdgeFunctionResponse {
+  zones: MapSearchResult[];
+  total_zones_found: number;
+  top_zones_returned: number;
+  top_percentage: number;
+  demographic_scoring_applied?: boolean;
+  foot_traffic_periods_used?: string[];
+  debug?: DebugInfo; // ✅ FIXED: Use proper interface instead of any
+}
+
 interface FilterUpdate {
   weights?: Weighting[];
   rentRange?: [number, number];
@@ -98,6 +127,14 @@ interface FilterUpdate {
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number;
+}
+
+// ✅ FIXED: Proper error interface instead of any
+interface SearchError {
+  message?: string;
+  status?: number;
+  code?: string;
+  [key: string]: unknown;
 }
 
 declare global {
@@ -113,6 +150,10 @@ export default function Page() {
   const [searchResults, setSearchResults] = useState<TractResult[]>([]);
   const [selectedTractId, setSelectedTractId] = useState<string | null>(null);
   const [selectedTract, setSelectedTract] = useState<TractResult | undefined>(undefined);
+  
+  // ✅ FIXED: Add state for full search response (for MyDrawer)
+  const [fullSearchResponse, setFullSearchResponse] = useState<EdgeFunctionResponse | null>(null);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
 
   const handleFilterUpdate = useCallback((filters: FilterUpdate) => {
     console.log('🔄 [Page] Updating map filters - topN:', filters.topN);
@@ -131,8 +172,27 @@ export default function Page() {
     setCurrentFilters(mapFilters);
   }, []);
 
-  const handleSearchResults = useCallback((results: MapSearchResult[]) => {
+  // ✅ FIXED: Enhanced handleSearchResults to store full response
+  const handleSearchResults = useCallback((results: MapSearchResult[], fullResponse?: EdgeFunctionResponse) => {
     console.log('📊 [Page] Received search results:', results.length, 'tracts');
+    
+    // Store the full edge function response for MyDrawer
+    if (fullResponse) {
+      console.log('📊 [Page] Storing full search response:', {
+        zones_returned: fullResponse.zones?.length || 0,
+        total_zones_found: fullResponse.total_zones_found || 0,
+        top_percentage: fullResponse.top_percentage || 0
+      });
+      setFullSearchResponse(fullResponse);
+    } else {
+      // Fallback: create a response object from just the results
+      setFullSearchResponse({
+        zones: results,
+        total_zones_found: results.length,
+        top_zones_returned: results.length,
+        top_percentage: currentFilters.topN || 10
+      });
+    }
     
     const transformedResults: TractResult[] = results.map(r => ({
       geoid: r.geoid || '',
@@ -159,6 +219,24 @@ export default function Page() {
     }));
     
     setSearchResults(transformedResults);
+  }, [currentFilters.topN]);
+
+  // ✅ FIXED: Add search loading state handlers
+  const handleSearchStart = useCallback(() => {
+    console.log('🔄 [Page] Search started');
+    setIsSearchLoading(true);
+  }, []);
+
+  const handleSearchComplete = useCallback(() => {
+    console.log('✅ [Page] Search completed');
+    setIsSearchLoading(false);
+  }, []);
+
+  // ✅ FIXED: Use proper error interface instead of any
+  const handleSearchError = useCallback((error: SearchError) => {
+    console.error('❌ [Page] Search error:', error);
+    setIsSearchLoading(false);
+    setFullSearchResponse(null);
   }, []);
 
   // 🔧 FIX: Simplified handleMapTractSelect (back to original)
@@ -214,9 +292,9 @@ export default function Page() {
       delete window.selectTractFromResultsPanel;
       delete window.openResultsPanel;
     };
-  }, [searchResults, selectedTractId]); // 🔧 ADD selectedTractId to deps
+  }, [searchResults, selectedTractId]);
 
-  // 🔧 FIX: Simplified mapProps (removed lastMapClickTime)
+  // 🔧 FIX: Enhanced mapProps with search handlers
   const mapProps = useMemo(() => ({
     weights: currentFilters.weights || [],
     rentRange: currentFilters.rentRange || [26, 160] as [number, number],
@@ -226,8 +304,36 @@ export default function Page() {
     incomeRange: currentFilters.incomeRange || [0, 250000] as [number, number],
     topN: currentFilters.topN || 10,
     onSearchResults: handleSearchResults,
+    onSearchStart: handleSearchStart,
+    onSearchComplete: handleSearchComplete,
+    onSearchError: handleSearchError,
     selectedTractId: selectedTractId,
-  }), [currentFilters, handleSearchResults, selectedTractId]);
+  }), [
+    currentFilters, 
+    handleSearchResults, 
+    handleSearchStart, 
+    handleSearchComplete, 
+    handleSearchError, 
+    selectedTractId
+  ]);
+
+  // ✅ FIXED: Enhanced TopLeftUI props with search results for MyDrawer
+  const topLeftUIProps = useMemo(() => ({
+    onFilterUpdate: handleFilterUpdate,
+    searchResults: searchResults,
+    onMapTractSelect: handleMapTractSelect,
+    selectedTract: selectedTract,
+    // ✅ NEW: Pass full search response and loading state for MyDrawer
+    fullSearchResponse: fullSearchResponse,
+    isSearchLoading: isSearchLoading,
+  }), [
+    handleFilterUpdate,
+    searchResults,
+    handleMapTractSelect,
+    selectedTract,
+    fullSearchResponse,
+    isSearchLoading
+  ]);
 
   return (
     <main style={{ height: '100vh', width: '100vw', position: 'relative' }}>
@@ -244,12 +350,8 @@ export default function Page() {
         pointerEvents: 'none' 
       }}>
         <div style={{ pointerEvents: 'auto' }}>
-          <TopLeftUI 
-            onFilterUpdate={handleFilterUpdate}
-            searchResults={searchResults}
-            onMapTractSelect={handleMapTractSelect}
-            selectedTract={selectedTract}
-          />
+          {/* ✅ FIXED: Pass enhanced props including search response for MyDrawer */}
+          <TopLeftUI {...topLeftUIProps} />
         </div>
       </div>
     </main>

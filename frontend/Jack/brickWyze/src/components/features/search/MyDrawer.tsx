@@ -1,4 +1,4 @@
-// src/components/features/search/MyDrawer.tsx - FIXED: Removed unused variables
+// src/components/features/search/MyDrawer.tsx - FIXED: No any types
 
 'use client';
 
@@ -29,10 +29,46 @@ interface SubmissionData extends FilterState {
   topN: number;
 }
 
+// ✅ FIXED: Proper interface for search zone results instead of any
+interface SearchZone {
+  geoid: string;
+  tract_name?: string;
+  display_name?: string;
+  nta_name?: string;
+  custom_score: number;
+  resilience_score?: number;
+  avg_rent?: number;
+  demographic_score?: number;
+  foot_traffic_score?: number;
+  crime_score?: number;
+  flood_risk_score?: number;
+  rent_score?: number;
+  poi_score?: number;
+  main_crime_score?: number;
+  crime_trend_direction?: string;
+  crime_trend_change?: string;
+  demographic_match_pct?: number;
+  gender_match_pct?: number;
+  age_match_pct?: number;
+  income_match_pct?: number;
+  [key: string]: unknown;
+}
+
+// ✅ FIXED: Added search results interface with proper typing
+interface SearchResults {
+  zones: SearchZone[]; // ✅ FIXED: Use proper interface instead of any[]
+  total_zones_found: number;
+  top_zones_returned: number;
+  top_percentage: number;
+}
+
 interface MyDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onSearchSubmit: (filters: SubmissionData) => void;
+  // ✅ FIXED: Add search results props
+  searchResults?: SearchResults | null;
+  isSearchLoading?: boolean;
 }
 
 const ALL_AVAILABLE_LAYERS: Layer[] = [
@@ -44,7 +80,13 @@ const ALL_AVAILABLE_LAYERS: Layer[] = [
   { id: 'poi', label: 'Points of Interest', icon: '📍', color: '#9F7AEA' },
 ];
 
-export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerProps) {
+export default function MyDrawer({ 
+  isOpen, 
+  onClose, 
+  onSearchSubmit, 
+  searchResults, 
+  isSearchLoading = false 
+}: MyDrawerProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
@@ -58,8 +100,6 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
   const incomeRange = state.incomeRange;
   const selectedEthnicities = state.selectedEthnicities;
   const selectedGenders = state.selectedGenders;
-  
-  // ✅ FIXED: Removed unused variables demographicScoring and lastDemographicReasoning
   
   // ✅ FIXED: Get actions from the store
   const setFilters = state.setFilters;
@@ -96,6 +136,19 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
   const handleIncomeRangeChange = useCallback((newVal: [number, number]) => setFilters({ incomeRange: newVal }), [setFilters]);
   const handleGenderChange = useCallback((newVal: string[]) => setFilters({ selectedGenders: newVal }), [setFilters]);
   const handleEthnicityChange = useCallback((newVal: string[]) => setFilters({ selectedEthnicities: newVal }), [setFilters]);
+
+  // ✅ FIXED: Handle TopN changes and trigger search
+  const handleTopNChange = useCallback((newValue: number) => {
+    setTopN(newValue);
+    
+    // Auto-submit search when topN changes (with current filters)
+    const currentState = useFilterStore.getState();
+    const submissionData: SubmissionData = {
+      ...currentState,
+      topN: newValue
+    };
+    onSearchSubmit(submissionData);
+  }, [onSearchSubmit]);
 
   const handleSubmit = () => {
     if (!selectedGenders.length) {
@@ -165,7 +218,7 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
           >
             <VStack spacing={4} p={2} align="stretch">
               
-              {/* Results Display */}
+              {/* Results Display - FIXED */}
               <Box 
                 bg="rgba(255, 255, 255, 0.8)" 
                 borderRadius="2xl" 
@@ -183,11 +236,21 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                   </MyToolTip>
                 </HStack>
                 
+                {/* ✅ FIXED: Use actual search results instead of hardcoded 310 */}
                 <TopNSelector
                   value={topN}
-                  onChange={setTopN}
-                  estimatedTotalTracts={310}
+                  onChange={handleTopNChange}
+                  actualMatchingTracts={searchResults?.zones?.length}
+                  totalTractsFound={searchResults?.total_zones_found}
+                  isLoading={isSearchLoading}
                 />
+                
+                {/* ✅ Debug info (optional - can remove in production) */}
+                {searchResults && (
+                  <Text fontSize="xs" color="gray.500" mt={2}>
+                    Debug: {searchResults.zones?.length || 0} zones shown, {searchResults.total_zones_found || 0} total found
+                  </Text>
+                )}
               </Box>
 
               {/* Rent Range */}
@@ -436,6 +499,8 @@ export default function MyDrawer({ isOpen, onClose, onSearchSubmit }: MyDrawerPr
                 boxShadow="0 4px 15px rgba(255, 73, 44, 0.2)"
                 h="50px"
                 px={8}
+                isLoading={isSearchLoading}
+                loadingText="Searching..."
               >
                 Search
               </Button>

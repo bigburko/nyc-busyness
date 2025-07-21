@@ -1,4 +1,4 @@
-// src/components/features/Map/fetchResilienceScores.tsx - Enhanced debugging and validation
+// src/components/features/Map/fetchResilienceScores.tsx - FIXED for TopNSelector
 
 import { DemographicScoring } from '../../../stores/filterStore';
 
@@ -41,6 +41,27 @@ export type ResilienceScore = {
   [key: string]: number | string | undefined | object;
 };
 
+// ✅ FIXED: Add interface for full edge function response
+export interface EdgeFunctionResponse {
+  zones: ResilienceScore[];
+  total_zones_found: number;
+  top_zones_returned: number;
+  top_percentage: number;
+  demographic_scoring_applied?: boolean;
+  foot_traffic_periods_used?: string[];
+  debug?: {
+    received_ethnicities?: string[];
+    received_demographic_scoring?: unknown;
+    demographic_weight_detected?: number;
+    is_single_factor_request?: boolean;
+    has_ethnicity_filters?: boolean;
+    has_demographic_scoring?: boolean;
+    sample_demo_scores?: unknown;
+    received_weights?: unknown;
+    received_genders?: string[];
+  };
+}
+
 interface FetchParams {
   // 🔧 FIXED: Properly type weights to match what edge function expects
   weights?: Array<{ id: string; value: number }>;
@@ -49,6 +70,7 @@ interface FetchParams {
   selectedGenders?: string[];
   ageRange?: [number, number];
   incomeRange?: [number, number];
+  topN?: number; // ✅ FIXED: Add topN parameter
   demographicScoring?: DemographicScoring;
 }
 
@@ -129,6 +151,7 @@ const validateAndFixPayload = (filters: FilterData): FilterData => {
   return fixedFilters;
 };
 
+// ✅ FIXED: Return full edge function response instead of just zones
 export async function fetchResilienceScores({
   weights = [],
   rentRange = [0, Infinity],
@@ -136,8 +159,9 @@ export async function fetchResilienceScores({
   selectedGenders = [],
   ageRange = [0, 100],
   incomeRange = [0, 250000],
+  topN = 10, // ✅ FIXED: Add topN parameter with default
   demographicScoring,
-}: FetchParams) {
+}: FetchParams): Promise<EdgeFunctionResponse> { // ✅ FIXED: Return full response
   // Environment check
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   console.log('🔑 [fetchResilienceScores] Environment check:', {
@@ -165,14 +189,15 @@ export async function fetchResilienceScores({
   // Validate and fix payload if needed
   const validatedFilters = validateAndFixPayload(initialFilters);
   
-  // 🔧 FIXED: Properly format request body for edge function
+  // 🔧 FIXED: Include topN in request body
   const requestBody = {
-    weights: validatedFilters.weights?.map((w: WeightItem) => ({ id: w.id, value: w.value })) || [], // Ensure proper format
+    weights: validatedFilters.weights?.map((w: WeightItem) => ({ id: w.id, value: w.value })) || [],
     rentRange: rentRange,
     ethnicities: selectedEthnicities,
     genders: selectedGenders,
     ageRange: ageRange,
     incomeRange: incomeRange,
+    topN: topN, // ✅ FIXED: Include topN parameter
     crimeYears: [
       'year_2021',
       'year_2022', 
@@ -200,6 +225,7 @@ export async function fetchResilienceScores({
     authHeaderLength: anonKey?.length,
     requestBodySize: JSON.stringify(requestBody).length,
     integrityPassed,
+    topN: requestBody.topN, // ✅ FIXED: Log topN
     payload: requestBody
   });
 
@@ -210,6 +236,7 @@ export async function fetchResilienceScores({
       demographicWeight: '100%',
       ethnicities: requestBody.ethnicities,
       genders: requestBody.genders,
+      topN: requestBody.topN, // ✅ FIXED: Include topN in debug
       demographicScoring: requestBody.demographicScoring?.weights,
       expectedBehavior: 'Edge function should prioritize demographic scoring'
     });
@@ -262,26 +289,20 @@ export async function fetchResilienceScores({
     }
 
     console.log('📦 [fetchResilienceScores] Parsing JSON response...');
-    const data = await res.json() as {
-      zones?: ResilienceScore[];
-      debug?: {
-        received_ethnicities?: string[];
-        received_demographic_scoring?: unknown;
-        demographic_weight_detected?: number;
-        is_single_factor_request?: boolean;
-        has_ethnicity_filters?: boolean;
-        has_demographic_scoring?: boolean;
-        sample_demo_scores?: unknown;
-        received_weights?: unknown;
-        received_genders?: string[];
-      };
-      demographic_scoring_applied?: boolean;
-      total_zones_found?: number;
-      top_zones_returned?: number;
-    };
+    const data = await res.json() as EdgeFunctionResponse; // ✅ FIXED: Type as full response
     
     // 🔍 ENHANCED DEBUGGING: Log complete edge function response
     console.log('🔬 [EDGE FUNCTION DEBUG] Complete raw response:', JSON.stringify(data, null, 2));
+
+    // ✅ FIXED: Log topN response data
+    console.log('📊 [FETCH DEBUG] TopN Response Analysis:', {
+      requested_topN: requestBody.topN,
+      total_zones_found: data.total_zones_found,
+      top_zones_returned: data.top_zones_returned,
+      top_percentage: data.top_percentage,
+      expected_zones: data.total_zones_found ? Math.ceil(data.total_zones_found * (requestBody.topN / 100)) : 'N/A',
+      topN_working: data.top_zones_returned === Math.ceil((data.total_zones_found || 0) * (requestBody.topN / 100))
+    });
 
     // 🔍 Log the debug info that edge function should return
     if (data.debug) {
@@ -344,26 +365,16 @@ export async function fetchResilienceScores({
       ethnicity_match: JSON.stringify(sentEthnicities) === JSON.stringify(receivedEthnicities),
       sent_demographic_weight: requestBody.weights.find((w: { id: string; value: number }) => w.id === 'demographic')?.value,
       received_demographic_weight: data.debug?.demographic_weight_detected,
-      demographic_weight_match: requestBody.weights.find((w: { id: string; value: number }) => w.id === 'demographic')?.value === data.debug?.demographic_weight_detected
+      demographic_weight_match: requestBody.weights.find((w: { id: string; value: number }) => w.id === 'demographic')?.value === data.debug?.demographic_weight_detected,
+      sent_topN: requestBody.topN, // ✅ FIXED: Include topN comparison
+      received_topN: data.top_percentage
     });
-
-    // 🔍 NEW: Add edge function logs checker
-    console.log('🔍 [EDGE FUNCTION LOGS] Check Supabase Function logs for these messages:');
-    console.log('   ✅ Should see: "✅ Mapping \'korean\' to columns: [\'AEAKrn\']"');
-    console.log('   ✅ Should see: "Korean column (AEAKrn) found in data"');
-    console.log('   ✅ Should see: "Top 5 ethnicity matches: [some percentages > 0%]"');
-    console.log('   ❌ Should NOT see: "No column mapping found for ethnicity: korean"');
-    console.log('   ❌ Should NOT see: "Korean column (AEAKrn) NOT found in data"');
 
     // 🔍 Add specific Korean debugging
     if (sentEthnicities && sentEthnicities.includes('AEAKrn')) {
       console.log('🇰🇷 [KOREAN DEBUG] Korean ethnicity properly sent to edge function');
       console.log('🇰🇷 [KOREAN DEBUG] Expected: Edge function should find Korean column "AEAKrn" in tract_race_ethnicity table');
       console.log('🇰🇷 [KOREAN DEBUG] Expected: Some Manhattan/Queens tracts should show 5-15% Korean population');
-      console.log('🇰🇷 [KOREAN DEBUG] If still getting 0s, check:');
-      console.log('   1. Supabase edge function logs');
-      console.log('   2. Database table "tract_race_ethnicity" has data');
-      console.log('   3. Column "AEAKrn" exists and has non-zero values');
     }
     
     // 🎯 ENHANCED RESPONSE LOGGING
@@ -373,9 +384,10 @@ export async function fetchResilienceScores({
       demographic_scoring_applied: data.demographic_scoring_applied,
       total_zones_found: data.total_zones_found,
       top_zones_returned: data.top_zones_returned,
+      top_percentage: data.top_percentage, // ✅ FIXED: Log topN response
       sample_zone: data.zones?.[0] ? {
         geoid: data.zones[0].geoid,
-        custom_score: data.zones[0].custom_score, // This is the final weighted score
+        custom_score: data.zones[0].custom_score,
         demographic_score: data.zones[0].demographic_score || 0,
         combined_match_pct: data.zones[0].combined_match_pct || 0,
         tract_name: data.zones[0].tract_name,
@@ -411,7 +423,8 @@ export async function fetchResilienceScores({
       console.warn('⚠️ [fetchResilienceScores] No zones returned from backend');
     }
     
-    return data.zones as ResilienceScore[];
+    // ✅ FIXED: Return the full response object instead of just zones
+    return data;
 
   } catch (error) {
     // Enhanced error handling

@@ -126,8 +126,8 @@ function TractResultCard({
         position="absolute"
         top={2}
         right={2}
-        bg="#FF492C"
-        color="white"
+        bg={getScoreBadgeColor(resilienceScore).bg}
+        color={getScoreBadgeColor(resilienceScore).color}
         borderRadius="full"
         px={3}
         py={1}
@@ -304,7 +304,15 @@ export default function TractResultsList({
             
             {/* Top score highlight */}
             {sortedResults[0] && (
-              <Badge bg="#FF492C" color="white" px={3} py={1} borderRadius="full" fontSize="sm">
+              <Badge 
+                bg={getScoreBadgeColor(getDisplayScore(sortedResults[0].custom_score)).bg} 
+                color={getScoreBadgeColor(getDisplayScore(sortedResults[0].custom_score)).color} 
+                px={3} 
+                py={1} 
+                borderRadius="full" 
+                fontSize="sm"
+                fontWeight="bold"
+              >
                 Best: {getDisplayScore(sortedResults[0].custom_score)}
               </Badge>
             )}
