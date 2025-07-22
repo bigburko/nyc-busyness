@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel.tsx - FIXED SYNTAX ERRORS
+// src/components/features/search/TractDetailPanel.tsx - COMPLETE WITH ENHANCED FOOT TRAFFIC CHART
 'use client';
 
 import { 
@@ -104,105 +104,294 @@ function ScoreMeter({
   );
 }
 
-// ✅ FIXED: Simple foot traffic chart (optional, only shows if data available)
+// ✅ ENHANCED: Foot traffic chart with period data support
 function FootTrafficChart({ tract }: { tract: TractResult }) {
+  console.log('🔍 [TractDetailPanel FootTrafficChart] Processing data for:', tract.tract_name);
+  console.log('🔍 [TractDetailPanel FootTrafficChart] foot_traffic_by_period:', tract.foot_traffic_by_period);
+  console.log('🔍 [TractDetailPanel FootTrafficChart] foot_traffic_timeline:', tract.foot_traffic_timeline);
+  
   const currentScore = Math.round(tract.foot_traffic_score || 50);
   
-  const hasRealData = tract.foot_traffic_timeline && Object.keys(tract.foot_traffic_timeline).length > 0;
+  // Check if we have period data (the rich data from your API)
+  const hasperiodData = tract.foot_traffic_by_period && 
+    Object.keys(tract.foot_traffic_by_period).length > 0;
   
-  if (!hasRealData) {
-    // ✅ FALLBACK: Show simple current score if no timeline data
+  // Check if we have timeline data (simpler fallback)
+  const hasTimelineData = tract.foot_traffic_timeline && 
+    Object.keys(tract.foot_traffic_timeline).length > 0;
+
+  console.log('🔍 [TractDetailPanel FootTrafficChart] hasperiodData:', hasperiodData);
+  console.log('🔍 [TractDetailPanel FootTrafficChart] hasTimelineData:', hasTimelineData);
+
+  // If we have the rich period data, use it!
+  if (hasperiodData && tract.foot_traffic_by_period) {
+    const periods = tract.foot_traffic_by_period;
+    const years = ['2019', '2020', '2021', '2022', '2023', '2024', 'pred_2025', 'pred_2026', 'pred_2027'];
+    
+    // Process period data into chart format
+    const chartData = years.map(year => {
+      const morning = periods.morning?.[year] || 0;
+      const afternoon = periods.afternoon?.[year] || 0;  
+      const evening = periods.evening?.[year] || 0;
+      
+      return {
+        year: year.replace('pred_', ''),
+        morning: Math.round(morning),
+        afternoon: Math.round(afternoon), 
+        evening: Math.round(evening),
+        isPrediction: year.startsWith('pred_')
+      };
+    }).filter(item => item.morning > 0 || item.afternoon > 0 || item.evening > 0);
+    
+    console.log('🔍 [TractDetailPanel FootTrafficChart] Processed chart data:', chartData);
+    
+    if (chartData.length === 0) {
+      return (
+        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+          <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
+            🚶 Foot Traffic Score
+          </Text>
+          <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
+            {currentScore}/100
+          </Text>
+          <Text fontSize="sm" color="gray.500" textAlign="center" mt={2}>
+            Period data available but no valid years found
+          </Text>
+        </Box>
+      );
+    }
+
+    const maxValue = Math.max(
+      ...chartData.flatMap(d => [d.morning, d.afternoon, d.evening])
+    );
+    const minValue = Math.min(
+      ...chartData.flatMap(d => [d.morning, d.afternoon, d.evening])
+    );
+    
+    // Logarithmic scaling for better visualization
+    const getHeight = (value: number) => {
+      if (value <= 0) return 20;
+      const logValue = Math.log10(value + 1);
+      const maxLog = Math.log10(maxValue + 1);
+      const minLog = Math.log10(minValue + 1);
+      const range = maxLog - minLog;
+      
+      if (range === 0) return 60;
+      
+      const normalizedValue = (logValue - minLog) / range;
+      return Math.max(30, 30 + (normalizedValue * 100));
+    };
+
     return (
-      <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
-        <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
-          🚶 Foot Traffic Score
+      <Box w="full">
+        <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
+          🚶 Foot Traffic by Time Period (9-Year View) 📊
         </Text>
-        <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
-          {currentScore}/100
-        </Text>
-        <Text fontSize="sm" color="gray.500" textAlign="center" mt={2}>
-          Current foot traffic level
-        </Text>
+
+        <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
+          {/* Chart */}
+          <Box overflowX="auto" mb={4}>
+            <Flex justify="space-between" align="end" h="200px" mb={3} px={1} minW="400px">
+              {chartData.map((item, index) => {
+                const isPast = parseInt(item.year) < 2025;
+                const isCurrent = item.year === '2025';
+                
+                return (
+                  <VStack key={`ft-period-${item.year}`} spacing={2} flex="1" align="center" minW="35px">
+                    {/* Values on top */}
+                    <VStack spacing={0}>
+                      <Text fontSize="8px" fontWeight="bold" color="#F59E0B" lineHeight="1">
+                        {item.morning}
+                      </Text>
+                      <Text fontSize="8px" fontWeight="bold" color="#3B82F6" lineHeight="1">
+                        {item.afternoon}  
+                      </Text>
+                      <Text fontSize="8px" fontWeight="bold" color="#6366F1" lineHeight="1">
+                        {item.evening}
+                      </Text>
+                    </VStack>
+                    
+                    {/* Bars */}
+                    <HStack spacing="1px" align="end">
+                      {/* Morning */}
+                      <Box
+                        bg={isPast ? "#FCD34D" : isCurrent ? "#F59E0B" : "#FDE68A"}
+                        h={`${getHeight(item.morning)}px`}
+                        w="8px"
+                        borderRadius="sm"
+                        opacity={isPast ? 0.7 : 1}
+                      />
+                      
+                      {/* Afternoon */}
+                      <Box
+                        bg={isPast ? "#60A5FA" : isCurrent ? "#3B82F6" : "#93C5FD"}
+                        h={`${getHeight(item.afternoon)}px`}
+                        w="8px"
+                        borderRadius="sm"
+                        opacity={isPast ? 0.7 : 1}
+                      />
+                      
+                      {/* Evening */}
+                      <Box
+                        bg={isPast ? "#8B5CF6" : isCurrent ? "#6366F1" : "#A5B4FC"}
+                        h={`${getHeight(item.evening)}px`}
+                        w="8px"
+                        borderRadius="sm"
+                        opacity={isPast ? 0.7 : 1}
+                      />
+                    </HStack>
+                    
+                    {/* Year label */}
+                    <Text fontSize="xs" color="gray.500" fontWeight={isCurrent ? "bold" : "normal"}>
+                      {item.year}
+                    </Text>
+                  </VStack>
+                );
+              })}
+            </Flex>
+          </Box>
+          
+          {/* Legend */}
+          <VStack spacing={2}>
+            <HStack justify="center" spacing={6} fontSize="xs" color="gray.600">
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="#F59E0B" borderRadius="sm" />
+                <Text>🌅 Morning</Text>
+              </HStack>
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="#3B82F6" borderRadius="sm" />
+                <Text>☀️ Afternoon</Text>
+              </HStack>
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="#6366F1" borderRadius="sm" />
+                <Text>🌙 Evening</Text>
+              </HStack>
+            </HStack>
+            
+            <HStack justify="center" spacing={4} fontSize="xs" color="gray.600">
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="gray.400" borderRadius="sm" opacity={0.7} />
+                <Text>Historical</Text>
+              </HStack>
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="#F59E0B" borderRadius="sm" />
+                <Text fontWeight="bold">Current</Text>
+              </HStack>
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="#93C5FD" borderRadius="sm" />
+                <Text>Forecast</Text>
+              </HStack>
+            </HStack>
+          </VStack>
+          
+          <Text fontSize="xs" color="gray.500" textAlign="center" mt={3}>
+            Period-based data - Current overall: {currentScore}/100
+          </Text>
+          
+          {/* Debug info */}
+          <Box mt={2} p={2} bg="blue.50" borderRadius="md" border="1px solid" borderColor="blue.200">
+            <Text fontSize="xs" color="blue.700">
+              📊 Chart Data: {chartData.length} years, Using foot_traffic_by_period data
+            </Text>
+          </Box>
+        </Box>
       </Box>
     );
   }
-  
-  // ✅ FIXED: Show timeline if data is available (with null check)
-  const timeline = tract.foot_traffic_timeline!; // We already checked it exists above
-  const chartData = [
-    { year: '2019', value: Math.round(timeline['2019'] || 0) },
-    { year: '2020', value: Math.round(timeline['2020'] || 0) },
-    { year: '2021', value: Math.round(timeline['2021'] || 0) },
-    { year: '2022', value: Math.round(timeline['2022'] || 0) },
-    { year: '2023', value: Math.round(timeline['2023'] || 0) },
-    { year: '2024', value: Math.round(timeline['2024'] || 0) },
-    { year: '2025', value: Math.round(timeline['pred_2025'] || 0) },
-    { year: '2026', value: Math.round(timeline['pred_2026'] || 0) },
-    { year: '2027', value: Math.round(timeline['pred_2027'] || 0) },
-  ];
 
-  const maxValue = Math.max(...chartData.map(d => d.value));
-  const minValue = Math.min(...chartData.map(d => d.value));
-  
-  const getHeight = (value: number) => {
-    const range = maxValue - minValue;
-    if (range === 0) return 60;
-    const normalizedValue = (value - minValue) / range;
-    return Math.max(40, 40 + (normalizedValue * 120));
-  };
+  // Fallback: Use timeline data if available 
+  if (hasTimelineData && tract.foot_traffic_timeline) {
+    const timeline = tract.foot_traffic_timeline;
+    const chartData = [
+      { year: '2019', value: Math.round(timeline['2019'] || 0) },
+      { year: '2020', value: Math.round(timeline['2020'] || 0) },
+      { year: '2021', value: Math.round(timeline['2021'] || 0) },
+      { year: '2022', value: Math.round(timeline['2022'] || 0) },
+      { year: '2023', value: Math.round(timeline['2023'] || 0) },
+      { year: '2024', value: Math.round(timeline['2024'] || 0) },
+      { year: '2025', value: Math.round(timeline['pred_2025'] || 0) },
+      { year: '2026', value: Math.round(timeline['pred_2026'] || 0) },
+      { year: '2027', value: Math.round(timeline['pred_2027'] || 0) },
+    ];
 
-  return (
-    <Box w="full">
-      <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
-        🚶 Foot Traffic Trend (9-Year View) 📊
-      </Text>
+    const maxValue = Math.max(...chartData.map(d => d.value));
+    const minValue = Math.min(...chartData.map(d => d.value));
+    
+    const getHeight = (value: number) => {
+      const range = maxValue - minValue;
+      if (range === 0) return 60;
+      const normalizedValue = (value - minValue) / range;
+      return Math.max(40, 40 + (normalizedValue * 120));
+    };
 
-      <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
-        <Flex justify="space-between" align="end" h="200px" mb={3} px={1}>
-          {chartData.map((item, index) => {
-            const isPast = index < 6; // 2019-2024
-            const isCurrent = index === 6; // 2025
-            const height = getHeight(item.value);
-            
-            return (
-              <VStack key={`ft-chart-${item.year}`} spacing={1} flex="1" align="center">
-                <Text fontSize="9px" fontWeight="bold" color="gray.700" lineHeight="1">
-                  {item.value}
-                </Text>
-                <Box
-                  bg={isPast ? "#6B7280" : isCurrent ? "#4299E1" : "#60A5FA"}
-                  h={`${height}px`}
-                  w="18px"
-                  borderRadius="md"
-                  boxShadow="sm"
-                />
-                <Text fontSize="xs" color="gray.500" fontWeight={isCurrent ? "bold" : "normal"}>
-                  {item.year}
-                </Text>
-              </VStack>
-            );
-          })}
-        </Flex>
-        
-        <HStack justify="center" spacing={4} fontSize="xs" color="gray.600" py={2}>
-          <HStack spacing={1}>
-            <Box w="8px" h="8px" bg="#6B7280" borderRadius="sm" />
-            <Text>Historical</Text>
-          </HStack>
-          <HStack spacing={1}>
-            <Box w="8px" h="8px" bg="#4299E1" borderRadius="sm" />
-            <Text fontWeight="bold">Current</Text>
-          </HStack>
-          <HStack spacing={1}>
-            <Box w="8px" h="8px" bg="#60A5FA" borderRadius="sm" />
-            <Text>Forecast</Text>
-          </HStack>
-        </HStack>
-        
-        <Text fontSize="xs" color="gray.500" textAlign="center" mt={2}>
-          Real timeline data - Current: {currentScore}/100
+    return (
+      <Box w="full">
+        <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
+          🚶 Foot Traffic Trend (9-Year View) 📊
         </Text>
+
+        <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
+          <Flex justify="space-between" align="end" h="200px" mb={3} px={1}>
+            {chartData.map((item, index) => {
+              const isPast = index < 6;
+              const isCurrent = index === 6; 
+              const height = getHeight(item.value);
+              
+              return (
+                <VStack key={`ft-timeline-${item.year}`} spacing={1} flex="1" align="center">
+                  <Text fontSize="9px" fontWeight="bold" color="gray.700" lineHeight="1">
+                    {item.value}
+                  </Text>
+                  <Box
+                    bg={isPast ? "#6B7280" : isCurrent ? "#4299E1" : "#60A5FA"}
+                    h={`${height}px`}
+                    w="18px"
+                    borderRadius="md"
+                    boxShadow="sm"
+                  />
+                  <Text fontSize="xs" color="gray.500" fontWeight={isCurrent ? "bold" : "normal"}>
+                    {item.year}
+                  </Text>
+                </VStack>
+              );
+            })}
+          </Flex>
+          
+          <HStack justify="center" spacing={4} fontSize="xs" color="gray.600" py={2}>
+            <HStack spacing={1}>
+              <Box w="8px" h="8px" bg="#6B7280" borderRadius="sm" />
+              <Text>Historical</Text>
+            </HStack>
+            <HStack spacing={1}>
+              <Box w="8px" h="8px" bg="#4299E1" borderRadius="sm" />
+              <Text fontWeight="bold">Current</Text>
+            </HStack>
+            <HStack spacing={1}>
+              <Box w="8px" h="8px" bg="#60A5FA" borderRadius="sm" />
+              <Text>Forecast</Text>
+            </HStack>
+          </HStack>
+          
+          <Text fontSize="xs" color="gray.500" textAlign="center" mt={2}>
+            Timeline data - Current: {currentScore}/100
+          </Text>
+        </Box>
       </Box>
+    );
+  }
+
+  // Final fallback: Show current score only
+  return (
+    <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+      <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
+        🚶 Foot Traffic Score
+      </Text>
+      <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
+        {currentScore}/100
+      </Text>
+      <Text fontSize="sm" color="gray.500" textAlign="center" mt={2}>
+        No historical data available
+      </Text>
     </Box>
   );
 }

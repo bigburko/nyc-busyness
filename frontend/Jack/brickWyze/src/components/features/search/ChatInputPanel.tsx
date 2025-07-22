@@ -58,6 +58,33 @@ export default function ChatInputPanel({
     return useFilterStore.getState();
   };
 
+  // 🔧 FIXED: Create proper FilterContext for sendToGemini
+  const createFilterContext = (state: FilterState) => {
+    return {
+      weights: state.weights,
+      rentRange: state.rentRange,
+      selectedEthnicities: state.selectedEthnicities,
+      selectedGenders: state.selectedGenders,
+      selectedTimePeriods: state.selectedTimePeriods, // ✅ Include time periods
+      ageRange: state.ageRange,
+      incomeRange: state.incomeRange,
+      // 🔧 FIXED: Convert both thresholdBonuses and penalties from object to array format
+      demographicScoring: state.demographicScoring ? {
+        weights: state.demographicScoring.weights,
+        thresholdBonuses: Object.entries(state.demographicScoring.thresholdBonuses || {}).map(([condition, bonus]) => ({
+          condition,
+          bonus: typeof bonus === 'number' ? bonus : 0,
+          description: `${condition} bonus`
+        })),
+        penalties: Object.entries(state.demographicScoring.penalties || {}).map(([condition, penalty]) => ({
+          condition,
+          penalty: typeof penalty === 'number' ? penalty : 0,
+          description: `${condition} penalty`
+        }))
+      } : undefined
+    };
+  };
+
   const handleSend = async () => {
     const userMsg = localInput.trim();
     if (!userMsg || isLoading) return;
@@ -72,7 +99,9 @@ export default function ChatInputPanel({
 
     try {
       const currentState = useFilterStore.getState();
-      const reply = await sendToGemini(userMsg, currentState);
+      // 🔧 FIXED: Use createFilterContext to convert state to expected format
+      const filterContext = createFilterContext(currentState);
+      const reply = await sendToGemini(userMsg, filterContext);
       
       const match = reply.match(/```json\s*([\s\S]*?)\s*```/);
       let parsed: ParsedResponse = {}; // ✅ FIXED: Proper type instead of any
@@ -253,6 +282,19 @@ export default function ChatInputPanel({
               >
                 🌍 Korean Areas
               </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                borderColor="rgba(255, 73, 44, 0.3)"
+                color="gray.600"
+                bg="white"
+                _hover={{ bg: '#FF492C', color: 'white', borderColor: '#FF492C' }}
+                onClick={() => handleSuggestionClick("Show foot traffic trends")}
+                borderRadius="full"
+                px={4}
+              >
+                📊 Traffic Trends
+              </Button>
             </Flex>
           </VStack>
         </Box>
@@ -277,7 +319,7 @@ export default function ChatInputPanel({
               👋 Hi! I&apos;m Bricky
             </Text>
             <Text fontSize="sm" color="gray.500" lineHeight="tall">
-              Your NYC neighborhood assistant. Use the suggestions above or ask me anything!
+              Your NYC neighborhood assistant. Ask me about foot traffic trends or use the suggestions above!
             </Text>
           </VStack>
         ) : (

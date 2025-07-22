@@ -24,20 +24,19 @@ interface ResilienceScoreWithRanking extends ResilienceScore {
   ranking: number;
 }
 
-
-
 interface UseMapDataProcessorProps {
   map: mapboxgl.Map | null;
   weights?: Weighting[];
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
+  selectedTimePeriods?: string[]; // 🆕 ADDED: Time periods support
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number;
   demographicScoring?: DemographicScoring;
   onSearchResults?: (results: ResilienceScore[]) => void;
-  onSearchResponse?: (response: EdgeFunctionResponse | null) => void; // NEW: Add this prop
+  onSearchResponse?: (response: EdgeFunctionResponse | null) => void;
   setCurrentGeoJson: (data: FeatureCollection<Geometry, GeoJsonProperties>) => void;
   addHighlightLayers: (map: mapboxgl.Map) => void;
   zoomToTopTracts: (zones: ResilienceScore[]) => void;
@@ -49,12 +48,13 @@ export const useMapDataProcessor = ({
   rentRange,
   selectedEthnicities,
   selectedGenders,
+  selectedTimePeriods, // 🆕 ADDED: Accept time periods parameter
   ageRange,
   incomeRange,
   topN = 10,
   demographicScoring,
   onSearchResults,
-  onSearchResponse, // NEW: Accept this prop
+  onSearchResponse,
   setCurrentGeoJson,
   addHighlightLayers,
   zoomToTopTracts,
@@ -71,11 +71,11 @@ export const useMapDataProcessor = ({
 
   // Store onSearchResults in a ref to avoid dependency issues
   const onSearchResultsRef = useRef(onSearchResults);
-  const onSearchResponseRef = useRef(onSearchResponse); // NEW: Add ref for search response
+  const onSearchResponseRef = useRef(onSearchResponse);
   
   useEffect(() => {
     onSearchResultsRef.current = onSearchResults;
-    onSearchResponseRef.current = onSearchResponse; // NEW: Update ref
+    onSearchResponseRef.current = onSearchResponse;
   }, [onSearchResults, onSearchResponse]);
 
   // Use fetchResilienceScores function instead of inline fetch
@@ -116,6 +116,7 @@ export const useMapDataProcessor = ({
         rentRange,
         ethnicities: selectedEthnicities,
         genders: selectedGenders,
+        timePeriods: selectedTimePeriods, // 🆕 ADDED: Log time periods being sent
         ageRange,
         incomeRange,
         topN,
@@ -131,6 +132,7 @@ export const useMapDataProcessor = ({
         rentRange,
         selectedEthnicities,
         selectedGenders,
+        selectedTimePeriods, // 🆕 ADDED: Pass time periods to edge function
         ageRange,
         incomeRange,
         demographicScoring: finalDemographicScoring,
@@ -145,6 +147,11 @@ export const useMapDataProcessor = ({
       if (DEBUG_MODE) {
         console.log('📥 [MapDataProcessor] Extracted zones from response:', searchResults.length);
         console.log('[✅ DEBUG] Data received by edge function');
+        
+        // 🆕 ADDED: Debug time period usage
+        if (fullResponse?.foot_traffic_periods_used) {
+          console.log('🕐 [MapDataProcessor] Time periods used by edge function:', fullResponse.foot_traffic_periods_used);
+        }
       }
 
       // 🔧 FIX: Pass full response to parent for TopNSelector
@@ -221,8 +228,9 @@ export const useMapDataProcessor = ({
       }
 
       // SAFETY FIX: Cap all scores at 100 to prevent frontend multiplication issues
+      // ✅ CRITICAL: Explicitly preserve foot traffic timeline data
       const cappedZones = searchResults.map(zone => ({
-        ...zone,
+        ...zone, // ✅ This preserves ALL original fields including timeline data
         custom_score: Math.min(Math.max(zone.custom_score || 0, 0), 100),
         // Also cap other scores if needed
         foot_traffic_score: Math.min(Math.max(zone.foot_traffic_score || 0, 0), 100),
@@ -230,7 +238,28 @@ export const useMapDataProcessor = ({
         flood_risk_score: Math.min(Math.max(zone.flood_risk_score || 0, 0), 100),
         rent_score: Math.min(Math.max(zone.rent_score || 0, 0), 100),
         poi_score: Math.min(Math.max(zone.poi_score || 0, 0), 100),
+        
+        // ✅ EXPLICITLY PRESERVE TIMELINE DATA (defensive programming)
+        foot_traffic_timeline: zone.foot_traffic_timeline,
+        foot_traffic_by_period: zone.foot_traffic_by_period,
+        crime_timeline: zone.crime_timeline,
+        foot_traffic_timeline_metadata: zone.foot_traffic_timeline_metadata,
+        crime_timeline_metadata: zone.crime_timeline_metadata,
+        foot_traffic_periods_used: zone.foot_traffic_periods_used,
       }));
+
+      // ✅ ADD DEBUG: Log timeline data preservation
+      if (DEBUG_MODE && cappedZones.length > 0) {
+        const firstZone = cappedZones[0];
+        console.log('🔍 [MapDataProcessor] Timeline data preservation check:', {
+          zone_geoid: firstZone.geoid,
+          has_foot_traffic_timeline: !!firstZone.foot_traffic_timeline,
+          has_foot_traffic_by_period: !!firstZone.foot_traffic_by_period,
+          has_crime_timeline: !!firstZone.crime_timeline,
+          foot_traffic_timeline_keys: firstZone.foot_traffic_timeline ? Object.keys(firstZone.foot_traffic_timeline) : 'none',
+          foot_traffic_by_period_keys: firstZone.foot_traffic_by_period ? Object.keys(firstZone.foot_traffic_by_period) : 'none'
+        });
+      }
 
       // Log any scores that were over 100
       const overScores = searchResults.filter(zone => (zone.custom_score || 0) > 100);
@@ -344,6 +373,7 @@ export const useMapDataProcessor = ({
     rentRange, 
     selectedEthnicities, 
     selectedGenders, 
+    selectedTimePeriods, // 🆕 ADDED: Time periods now in dependency array
     ageRange, 
     incomeRange, 
     topN, 

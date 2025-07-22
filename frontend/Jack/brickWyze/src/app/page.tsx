@@ -5,6 +5,7 @@ import mapboxgl from 'mapbox-gl';
 import Map from '../components/features/Map/Map';
 import TopLeftUI from '../components/features/search/TopLeftUI';
 import { uiStore } from '@/stores/uiStore';
+import { useFilterStore } from '@/stores/filterStore'; // 🆕 ADDED: Import filterStore to get selectedTimePeriods
 
 interface Weighting {
   id: string;
@@ -17,6 +18,7 @@ interface MapFilters {
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
+  selectedTimePeriods?: string[]; // 🆕 ADDED: Add selectedTimePeriods to MapFilters
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number;
@@ -53,6 +55,26 @@ interface TractResult {
     pred_2026?: number;
     pred_2027?: number;
   };
+  // ✅ ADDED: Missing timeline fields for foot traffic
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  foot_traffic_timeline_metadata?: Record<string, unknown>;
+  crime_timeline_metadata?: Record<string, unknown>;
+  foot_traffic_periods_used?: string[];
   [key: string]: unknown;
 }
 
@@ -87,6 +109,26 @@ interface MapSearchResult {
     pred_2026?: number;
     pred_2027?: number;
   };
+  // ✅ ADDED: Missing timeline fields for foot traffic
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  foot_traffic_timeline_metadata?: Record<string, unknown>;
+  crime_timeline_metadata?: Record<string, unknown>;
+  foot_traffic_periods_used?: string[];
   [key: string]: unknown;
 }
 
@@ -124,6 +166,7 @@ interface FilterUpdate {
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
+  selectedTimePeriods?: string[]; // 🆕 ADDED: Add selectedTimePeriods to FilterUpdate
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number;
@@ -146,6 +189,9 @@ declare global {
 }
 
 export default function Page() {
+  // 🆕 ADDED: Get selectedTimePeriods from filterStore
+  const { selectedTimePeriods } = useFilterStore();
+  
   const [currentFilters, setCurrentFilters] = useState<MapFilters>({});
   const [searchResults, setSearchResults] = useState<TractResult[]>([]);
   const [selectedTractId, setSelectedTractId] = useState<string | null>(null);
@@ -163,16 +209,18 @@ export default function Page() {
       rentRange: filters.rentRange || [26, 160],
       selectedEthnicities: filters.selectedEthnicities || [],
       selectedGenders: filters.selectedGenders || ['male', 'female'],
+      selectedTimePeriods: filters.selectedTimePeriods || selectedTimePeriods, // 🆕 ADDED: Include selectedTimePeriods
       ageRange: filters.ageRange || [0, 100],
       incomeRange: filters.incomeRange || [0, 250000],
       topN: filters.topN || 10,
     };
 
     console.log('🔄 [Page] Setting current filters with topN:', mapFilters.topN);
+    console.log('🕐 [Page] Setting current filters with timePeriods:', mapFilters.selectedTimePeriods); // 🆕 ADDED: Debug log for time periods
     setCurrentFilters(mapFilters);
-  }, []);
+  }, [selectedTimePeriods]); // 🆕 ADDED: Add selectedTimePeriods to dependency array
 
-  // ✅ FIXED: Enhanced handleSearchResults to store full response
+  // ✅ FIXED: Enhanced handleSearchResults to store full response AND preserve timeline data
   const handleSearchResults = useCallback((results: MapSearchResult[], fullResponse?: EdgeFunctionResponse) => {
     console.log('📊 [Page] Received search results:', results.length, 'tracts');
     
@@ -181,7 +229,8 @@ export default function Page() {
       console.log('📊 [Page] Storing full search response:', {
         zones_returned: fullResponse.zones?.length || 0,
         total_zones_found: fullResponse.total_zones_found || 0,
-        top_percentage: fullResponse.top_percentage || 0
+        top_percentage: fullResponse.top_percentage || 0,
+        foot_traffic_periods_used: fullResponse.foot_traffic_periods_used || [] // 🆕 ADDED: Log time periods used
       });
       setFullSearchResponse(fullResponse);
     } else {
@@ -194,6 +243,7 @@ export default function Page() {
       });
     }
     
+    // ✅ CRITICAL FIX: Include ALL timeline fields in transformation
     const transformedResults: TractResult[] = results.map(r => ({
       geoid: r.geoid || '',
       tract_name: r.tract_name || `Tract ${r.geoid || ''}`,
@@ -215,8 +265,27 @@ export default function Page() {
       gender_match_pct: r.gender_match_pct,
       age_match_pct: r.age_match_pct,
       income_match_pct: r.income_match_pct,
-      crime_timeline: r.crime_timeline
+      crime_timeline: r.crime_timeline,
+      // ✅ CRITICAL: Include the missing timeline fields that were being stripped out!
+      foot_traffic_timeline: r.foot_traffic_timeline,
+      foot_traffic_by_period: r.foot_traffic_by_period,
+      foot_traffic_timeline_metadata: r.foot_traffic_timeline_metadata,
+      crime_timeline_metadata: r.crime_timeline_metadata,
+      foot_traffic_periods_used: r.foot_traffic_periods_used,
     }));
+    
+    // ✅ DEBUG: Log timeline data preservation in transformation
+    if (transformedResults.length > 0) {
+      const firstResult = transformedResults[0];
+      console.log('🔍 [Page] Timeline data transformation check:', {
+        tract_geoid: firstResult.geoid,
+        has_foot_traffic_timeline: !!firstResult.foot_traffic_timeline,
+        has_foot_traffic_by_period: !!firstResult.foot_traffic_by_period,
+        has_crime_timeline: !!firstResult.crime_timeline,
+        foot_traffic_timeline_keys: firstResult.foot_traffic_timeline ? Object.keys(firstResult.foot_traffic_timeline) : 'none',
+        foot_traffic_by_period_keys: firstResult.foot_traffic_by_period ? Object.keys(firstResult.foot_traffic_by_period) : 'none'
+      });
+    }
     
     setSearchResults(transformedResults);
   }, [currentFilters.topN]);
@@ -274,6 +343,11 @@ export default function Page() {
       
       if (tract) {
         console.log('✅ [Page] Found tract in results, setting both ID and tract object:', tract.display_name || tract.tract_name);
+        console.log('🔍 [Page] Tract object timeline check:', {
+          has_foot_traffic_timeline: !!tract.foot_traffic_timeline,
+          has_foot_traffic_by_period: !!tract.foot_traffic_by_period,
+          has_crime_timeline: !!tract.crime_timeline
+        });
         setSelectedTractId(tractIdStr);
         setSelectedTract(tract);
       } else {
@@ -294,12 +368,13 @@ export default function Page() {
     };
   }, [searchResults, selectedTractId]);
 
-  // 🔧 FIX: Enhanced mapProps with search handlers
+  // 🔧 FIX: Enhanced mapProps with search handlers and selectedTimePeriods
   const mapProps = useMemo(() => ({
     weights: currentFilters.weights || [],
     rentRange: currentFilters.rentRange || [26, 160] as [number, number],
     selectedEthnicities: currentFilters.selectedEthnicities || [],
     selectedGenders: currentFilters.selectedGenders || [],
+    selectedTimePeriods: selectedTimePeriods, // 🆕 ADDED: Pass selectedTimePeriods to Map component
     ageRange: currentFilters.ageRange || [0, 100] as [number, number],
     incomeRange: currentFilters.incomeRange || [0, 250000] as [number, number],
     topN: currentFilters.topN || 10,
@@ -310,6 +385,7 @@ export default function Page() {
     selectedTractId: selectedTractId,
   }), [
     currentFilters, 
+    selectedTimePeriods, // 🆕 ADDED: Add selectedTimePeriods to dependency array
     handleSearchResults, 
     handleSearchStart, 
     handleSearchComplete, 

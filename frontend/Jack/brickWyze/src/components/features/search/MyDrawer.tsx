@@ -21,6 +21,7 @@ import HierarchicalMultiSelect from '../filters/DemographicGroup/RaceDropDownGro
 import { ethnicityData } from '../filters/DemographicGroup/RaceDropDownGroup/ethnicityData';
 import CancelResetButton from '../filters/ScoreWeightingGroup/CancelResetButton';
 import GenderSelect from '../filters/DemographicGroup/GenderSelect';
+import TimePeriodSelect from '../filters/ScoreWeightingGroup/TimePeriodSelect';
 import TopNSelector from '../filters/ScoreWeightingGroup/TopNSelector';
 import MyToolTip from '../../ui/MyToolTip';
 
@@ -100,6 +101,7 @@ export default function MyDrawer({
   const incomeRange = state.incomeRange;
   const selectedEthnicities = state.selectedEthnicities;
   const selectedGenders = state.selectedGenders;
+  const selectedTimePeriods = state.selectedTimePeriods;
   
   // ✅ FIXED: Get actions from the store
   const setFilters = state.setFilters;
@@ -136,6 +138,19 @@ export default function MyDrawer({
   const handleIncomeRangeChange = useCallback((newVal: [number, number]) => setFilters({ incomeRange: newVal }), [setFilters]);
   const handleGenderChange = useCallback((newVal: string[]) => setFilters({ selectedGenders: newVal }), [setFilters]);
   const handleEthnicityChange = useCallback((newVal: string[]) => setFilters({ selectedEthnicities: newVal }), [setFilters]);
+  const handleTimePeriodChange = useCallback((newVal: string[]) => {
+    console.log('🕐 [MyDrawer] Time period change:', newVal);
+    setFilters({ selectedTimePeriods: newVal });
+    
+    // ✅ AUTO-SUBMIT: Trigger search when time periods change (like TopN does)
+    const currentState = useFilterStore.getState();
+    const submissionData: SubmissionData = {
+      ...currentState,
+      selectedTimePeriods: newVal, // Use the new time periods
+      topN: topN
+    };
+    onSearchSubmit(submissionData);
+  }, [setFilters, onSearchSubmit, topN]);
 
   // ✅ FIXED: Handle TopN changes and trigger search
   const handleTopNChange = useCallback((newValue: number) => {
@@ -155,11 +170,26 @@ export default function MyDrawer({
       alert('Please select at least one gender.');
       return;
     }
+    
+    // ✅ DEBUG: Log current state before submission
     const currentState = useFilterStore.getState();
+    console.log('🔍 [MyDrawer] Current store state on search:', {
+      selectedTimePeriods: currentState.selectedTimePeriods,
+      storeState: currentState
+    });
+    
     const submissionData: SubmissionData = {
       ...currentState,
       topN: topN
     };
+    
+    // ✅ DEBUG: Log what we're actually sending
+    console.log('📤 [MyDrawer] Submitting data:', {
+      timePeriods: submissionData.selectedTimePeriods,
+      topN: submissionData.topN,
+      fullData: submissionData
+    });
+    
     onSearchSubmit(submissionData);
     onClose();
   };
@@ -275,6 +305,30 @@ export default function MyDrawer({
                   heading="" 
                   defaultRange={rentRange} 
                   onChangeEnd={handleRentRangeChange}
+                />
+              </Box>
+
+              {/* Time Period Selection - NEW LOCATION */}
+              <Box 
+                bg="rgba(255, 255, 255, 0.8)" 
+                borderRadius="2xl" 
+                p={4} 
+                boxShadow="0 4px 20px rgba(255, 73, 44, 0.08)"
+                border="1px solid rgba(255, 255, 255, 0.3)"
+                backdropFilter="blur(10px)"
+              >
+                <HStack spacing={3} mb={3}>
+                  <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                    🕐 Foot Traffic Timing
+                  </Text>
+                  <MyToolTip label="Foot Traffic Timing">
+                    Select which time periods to analyze for foot traffic patterns. Choose morning, afternoon, or night to find areas busy during your preferred times.
+                  </MyToolTip>
+                </HStack>
+                
+                <TimePeriodSelect 
+                  value={selectedTimePeriods}
+                  onChange={handleTimePeriodChange}
                 />
               </Box>
               
