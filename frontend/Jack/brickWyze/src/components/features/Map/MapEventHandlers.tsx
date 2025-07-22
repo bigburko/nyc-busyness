@@ -4,6 +4,17 @@ import { useEffect, MutableRefObject } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { MapLayerMouseEvent } from 'mapbox-gl';
 
+// NEW: Extend global window interface for this file
+declare global {
+  interface Window {
+    closeTractDetailPanel?: () => void;
+    closeResultsPanel?: () => void;
+    resetToInitialView?: () => void;
+    openResultsPanel?: () => void;
+    selectTractFromResultsPanel?: (tractId: string) => void;
+  }
+}
+
 interface UseMapEventHandlersProps {
   map: mapboxgl.Map | null;
   isMapLoaded: boolean;
@@ -20,7 +31,7 @@ export const useMapEventHandlers = ({
   useEffect(() => {
     if (!map || !isMapLoaded) return;
 
-    const handleClick = (e: MapLayerMouseEvent) => {
+    const handleTractClick = (e: MapLayerMouseEvent) => {
       const tractId = e.features?.[0]?.properties?.GEOID;
       const hasScore = e.features?.[0]?.properties?.hasScore;
       const resilienceScore = e.features?.[0]?.properties?.custom_score;
@@ -45,9 +56,56 @@ export const useMapEventHandlers = ({
         // That's it! Let the normal prop flow handle everything else
         
       } else {
-        console.log('⏭️ [MapEventHandlers] Tract has no resilience score, ignoring click');
-        // PERFORMANCE: Use ref to avoid dependency in event listener
+        console.log('⏭️ [MapEventHandlers] Tract has no resilience score, closing panel');
+        
+        // Clear highlight
         highlightTractRef.current(null);
+        
+        // Close the tract detail panel when clicking invalid tracts
+        if (window.closeTractDetailPanel) {
+          window.closeTractDetailPanel();
+        } else {
+          console.log('⚠️ [MapEventHandlers] closeTractDetailPanel not available');
+        }
+        
+        // Reset UI to initial state (closes chat panel, shows search bar)
+        if (window.resetToInitialView) {
+          console.log('🔄 [MapEventHandlers] Calling resetToInitialView');
+          window.resetToInitialView();
+        } else {
+          console.log('⚠️ [MapEventHandlers] resetToInitialView not available');
+        }
+      }
+    };
+
+    // NEW: General map click handler for non-tract areas
+    const handleGeneralMapClick = (e: mapboxgl.MapMouseEvent) => {
+      // Check if we clicked on a tract layer
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: ['tracts-fill']
+      });
+      
+      // If no tract features found, we clicked on empty map space
+      if (!features || features.length === 0) {
+        console.log('🗺️ [MapEventHandlers] Clicked on empty map area, closing tract panel');
+        
+        // Clear any highlighted tract
+        highlightTractRef.current(null);
+        
+        // Close the tract detail panel if it's open
+        if (window.closeTractDetailPanel) {
+          window.closeTractDetailPanel();
+        } else {
+          console.log('⚠️ [MapEventHandlers] closeTractDetailPanel not available');
+        }
+        
+        // Reset UI to initial state (closes chat panel, shows search bar)
+        if (window.resetToInitialView) {
+          console.log('🔄 [MapEventHandlers] Calling resetToInitialView');
+          window.resetToInitialView();
+        } else {
+          console.log('⚠️ [MapEventHandlers] resetToInitialView not available');
+        }
       }
     };
 
@@ -61,14 +119,21 @@ export const useMapEventHandlers = ({
       if (canvas) canvas.style.cursor = '';
     };
 
-    map.on('click', 'tracts-fill', handleClick);
+    // Tract-specific event listeners
+    map.on('click', 'tracts-fill', handleTractClick);
     map.on('mouseenter', 'tracts-fill', handleMouseEnter);
     map.on('mouseleave', 'tracts-fill', handleMouseLeave);
+    
+    // NEW: General map click listener (fires for all map clicks)
+    map.on('click', handleGeneralMapClick);
 
     return () => {
-      map.off('click', 'tracts-fill', handleClick);
+      map.off('click', 'tracts-fill', handleTractClick);
       map.off('mouseenter', 'tracts-fill', handleMouseEnter);
       map.off('mouseleave', 'tracts-fill', handleMouseLeave);
+      
+      // Clean up general map click listener
+      map.off('click', handleGeneralMapClick);
     };
   }, [map, isMapLoaded, highlightTractRef]);
 

@@ -6,10 +6,6 @@ import { useState, useEffect } from 'react';
 import TractResultsList from './TractResultsList';
 import TractDetailPanel from './TractDetailPanel';
 
-// We need to update TractResultsList.tsx and TractDetailPanel.tsx as well
-// Based on the errors, let me update the complete fixed TractDetailPanel.tsx
-
-// In TractDetailPanel.tsx, change this interface:
 interface TractResult {
   geoid: string;
   tract_name: string;
@@ -21,7 +17,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score?: number; // ✅ CHANGE: Made optional
+  flood_risk_score?: number;
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -47,18 +43,22 @@ interface TractResultsContainerProps {
   searchResults: TractResult[];
   onMapTractSelect?: (tractId: string | null) => void;
   selectedTract?: TractResult;
+  // 🆕 NEW: Add callback to clear parent's selectedTract state
+  onClearSelectedTract?: () => void;
 }
 
 declare global {
   interface Window {
     openTractDetailPanel?: (tract: TractResult) => void;
+    closeTractDetailPanel?: () => void;
   }
 }
 
 export default function TractResultsContainer({ 
   searchResults, 
   onMapTractSelect,
-  selectedTract: mapSelectedTract
+  selectedTract: mapSelectedTract,
+  onClearSelectedTract // 🆕 NEW: Accept the clear callback
 }: TractResultsContainerProps) {
   const [selectedTract, setSelectedTract] = useState<TractResult | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -71,20 +71,12 @@ export default function TractResultsContainer({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // ✅ FIXED: Handle tract selection WITHOUT automatic centering
   const handleTractSelect = (tract: TractResult) => {
     console.log('📍 [TractResultsContainer] User selected tract from results:', tract.display_name);
-    
     setSelectedTract(tract);
-    
-    // ✅ ONLY notify parent for highlighting - NO automatic centering
     onMapTractSelect?.(tract.geoid);
-    
-    // ✅ REMOVED: No automatic centering to prevent snapping back
-    // User can move map freely without interference
   };
 
-  // ✅ Effect to handle tract selection from map clicks
   useEffect(() => {
     if (mapSelectedTract) {
       console.log('🎯 [TractResultsContainer] Map selected tract:', mapSelectedTract.display_name || mapSelectedTract.tract_name);
@@ -92,23 +84,36 @@ export default function TractResultsContainer({
     }
   }, [mapSelectedTract]);
 
-  // ✅ FIXED: Global function for legacy support WITHOUT centering
+  const handleCloseDetail = () => {
+    console.log('❌ [TractResultsContainer] Closing detail panel - clearing ALL tract states');
+    
+    // Clear local state
+    setSelectedTract(null);
+    
+    // Clear map highlight
+    onMapTractSelect?.(null);
+    
+    // 🔧 CRITICAL FIX: Clear parent's selectedTract state
+    onClearSelectedTract?.();
+  };
+
   useEffect(() => {
     window.openTractDetailPanel = (tract: TractResult) => {
       console.log('📋 [TractResultsContainer] Opening detail panel for tract:', tract.display_name);
       setSelectedTract(tract);
-      onMapTractSelect?.(tract.geoid); // This will trigger centering via Map.tsx
+      onMapTractSelect?.(tract.geoid);
+    };
+    
+    window.closeTractDetailPanel = () => {
+      console.log('❌ [TractResultsContainer] Closing detail panel from map click');
+      handleCloseDetail();
     };
     
     return () => {
       delete window.openTractDetailPanel;
+      delete window.closeTractDetailPanel;
     };
-  }, [onMapTractSelect]);
-
-  const handleCloseDetail = () => {
-    setSelectedTract(null);
-    onMapTractSelect?.(null);
-  };
+  }, [onMapTractSelect, onClearSelectedTract]); // 🔧 FIX: Add onClearSelectedTract to dependencies
 
   if (!searchResults || searchResults.length === 0) {
     return (
@@ -123,7 +128,6 @@ export default function TractResultsContainer({
 
   return (
     <>
-      {/* ✅ Results list - always full width */}
       <Box h="100%" w="100%">
         <TractResultsList 
           searchResults={searchResults}
@@ -132,7 +136,6 @@ export default function TractResultsContainer({
         />
       </Box>
 
-      {/* ✅ Detail panel - Google Maps style with increased gap */}
       {selectedTract && (
         <Box
           position="fixed"
@@ -157,7 +160,6 @@ export default function TractResultsContainer({
         </Box>
       )}
 
-      {/* ✅ Mobile backdrop */}
       {selectedTract && isMobile && (
         <Box
           position="fixed"

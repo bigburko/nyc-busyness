@@ -184,6 +184,7 @@ declare global {
   interface Window {
     selectTractFromResultsPanel?: (tractId: string) => void;
     openResultsPanel?: () => void;
+    resetToInitialView?: () => void; // NEW: Add reset function
     _brickwyzeMapRef?: mapboxgl.Map;
   }
 }
@@ -314,18 +315,35 @@ export default function Page() {
     setSelectedTractId(tractId);
   }, []);
 
-  // 🔧 FIX: Simplified useEffect with duplicate state update prevention
+  // 🔧 NEW: Add callback to clear selectedTract state
+  const handleClearSelectedTract = useCallback(() => {
+    console.log('🔄 [Page] Clearing parent selectedTract state');
+    setSelectedTract(undefined);
+  }, []);
+
+  // 🔧 FIX: Enhanced useEffect with resetToInitialView function
   useEffect(() => {
     console.log('🔧 [Page] Setting up global functions for map communication');
     
     window.selectTractFromResultsPanel = (tractIdParam: string) => {
-      console.log('🗺️ [Page] Map clicked tract with score:', tractIdParam);
+      console.log('🗺️ [Page] Map clicked tract with ID:', tractIdParam);
       
       const tractIdStr = String(tractIdParam);
       
-      // 🔧 SIMPLE FIX: Don't update state if it's already the current tract
-      if (selectedTractId === tractIdStr) {
-        console.log('🚫 [Page] Tract already selected, skipping state update');
+      // 🔧 CRITICAL DEBUG: Log current state before condition check
+      console.log('🔍 [Page] Current state check:', {
+        selectedTractId: selectedTractId,
+        tractIdStr: tractIdStr,
+        selectedTract: selectedTract ? selectedTract.geoid : 'undefined',
+        idsMatch: selectedTractId === tractIdStr,
+        hasSelectedTract: !!selectedTract,
+        willSkip: selectedTractId === tractIdStr && selectedTract
+      });
+      
+      // 🔧 IMPROVED FIX: Only skip if tract is selected AND detail panel is open
+      // If detail panel was closed (selectedTract is undefined), allow re-selection
+      if (selectedTractId === tractIdStr && selectedTract) {
+        console.log('🚫 [Page] Tract already selected and detail panel open, skipping state update');
         return;
       }
       
@@ -348,6 +366,9 @@ export default function Page() {
           has_foot_traffic_by_period: !!tract.foot_traffic_by_period,
           has_crime_timeline: !!tract.crime_timeline
         });
+        console.log('🔍 [Page] Setting selectedTractId to:', tractIdStr);
+        console.log('🔍 [Page] Setting selectedTract to tract with geoid:', tract.geoid);
+        
         setSelectedTractId(tractIdStr);
         setSelectedTract(tract);
       } else {
@@ -361,12 +382,29 @@ export default function Page() {
       uiStore.setState({ viewState: 'results' });
     };
     
+    // NEW: Add resetToInitialView function that ONLY closes chat input
+    window.resetToInitialView = () => {
+      const currentState = uiStore.getState().viewState;
+      console.log('🔄 [Page] resetToInitialView called - current state:', currentState);
+      
+      if (currentState === 'typing') {
+        // ONLY close chat input by switching to results state
+        console.log('🔄 [Page] Closing chat input only - switching typing → results');
+        uiStore.setState({ viewState: 'results' });
+        console.log('✅ [Page] Chat input closed, results panel kept open');
+      } else {
+        // For any other state (results/initial), do absolutely nothing
+        console.log('🚫 [Page] Not in typing state, doing nothing to preserve current UI');
+      }
+    };
+    
     return () => {
       console.log('🧹 [Page] Cleaning up global functions');
       delete window.selectTractFromResultsPanel;
       delete window.openResultsPanel;
+      delete window.resetToInitialView; // NEW: Clean up reset function
     };
-  }, [searchResults, selectedTractId]);
+  }, [searchResults, selectedTractId, selectedTract]); // 🔧 CRITICAL: Add selectedTract to deps
 
   // 🔧 FIX: Enhanced mapProps with search handlers and selectedTimePeriods
   const mapProps = useMemo(() => ({
@@ -393,12 +431,14 @@ export default function Page() {
     selectedTractId
   ]);
 
-  // ✅ FIXED: Enhanced TopLeftUI props with search results for MyDrawer
+  // ✅ FIXED: Enhanced TopLeftUI props with search results for MyDrawer and clear callback
   const topLeftUIProps = useMemo(() => ({
     onFilterUpdate: handleFilterUpdate,
     searchResults: searchResults,
     onMapTractSelect: handleMapTractSelect,
     selectedTract: selectedTract,
+    // 🔧 NEW: Pass the clear callback
+    onClearSelectedTract: handleClearSelectedTract,
     // ✅ NEW: Pass full search response and loading state for MyDrawer
     fullSearchResponse: fullSearchResponse,
     isSearchLoading: isSearchLoading,
@@ -407,6 +447,7 @@ export default function Page() {
     searchResults,
     handleMapTractSelect,
     selectedTract,
+    handleClearSelectedTract, // 🔧 NEW: Add to dependencies
     fullSearchResponse,
     isSearchLoading
   ]);
@@ -426,7 +467,7 @@ export default function Page() {
         pointerEvents: 'none' 
       }}>
         <div style={{ pointerEvents: 'auto' }}>
-          {/* ✅ FIXED: Pass enhanced props including search response for MyDrawer */}
+          {/* ✅ FIXED: Pass enhanced props including search response for MyDrawer and clear callback */}
           <TopLeftUI {...topLeftUIProps} />
         </div>
       </div>

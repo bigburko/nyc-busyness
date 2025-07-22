@@ -54,6 +54,13 @@ export default function ChatInputPanel({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // NEW: Handle input focus - only close tract panel if user starts typing
+  const handleInputFocus = () => {
+    // Don't automatically close tract detail panel just for focusing
+    // Let user view tract details while potentially wanting to ask questions about it
+    console.log('🔍 [ChatInputPanel] Chat input focused - keeping tract panel open for now');
+  };
+
   const formatFiltersForSubmission = (): FilterState => {
     return useFilterStore.getState();
   };
@@ -88,6 +95,12 @@ export default function ChatInputPanel({
   const handleSend = async () => {
     const userMsg = localInput.trim();
     if (!userMsg || isLoading) return;
+
+    // Close tract detail panel when user actually starts searching/asking questions
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [ChatInputPanel] Closed tract detail panel - user is actively searching');
+    }
 
     // ✅ Hide suggestions after first interaction
     setShowSuggestions(false);
@@ -367,6 +380,7 @@ export default function ChatInputPanel({
               placeholder="Ask about neighborhoods, filters, or demographics..."
               value={localInput} // ✅ Use local state
               onChange={(e) => setLocalInput(e.target.value)} // ✅ Update local state only
+              onFocus={handleInputFocus} // NEW: Close tract detail panel on focus
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
