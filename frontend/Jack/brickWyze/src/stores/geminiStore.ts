@@ -1,4 +1,4 @@
-// src/stores/geminiStore.ts - Fixed types and enhanced with time period support
+// src/stores/geminiStore.ts - FIXED: Validates and corrects ethnicity weight logic
 
 import { create } from 'zustand';
 import { useFilterStore, type Weighting } from './filterStore';
@@ -94,6 +94,56 @@ function isValidDemographicWeights(weights: unknown): weights is { ethnicity: nu
 function isValidTimePeriodArray(periods: unknown): periods is string[] {
   const validPeriods = ['morning', 'afternoon', 'evening'];
   return Array.isArray(periods) && periods.every(p => typeof p === 'string' && validPeriods.includes(p));
+}
+
+// ✅ NEW: Smart weight validation and redistribution
+function validateAndFixDemographicWeights(
+  weights: { ethnicity: number; gender: number; age: number; income: number },
+  selectedEthnicities: string[]
+): { ethnicity: number; gender: number; age: number; income: number } {
+  
+  const hasEthnicities = selectedEthnicities && selectedEthnicities.length > 0;
+  
+  console.log('🔧 [Weight Validation] Input:', {
+    weights,
+    hasEthnicities,
+    selectedEthnicities: selectedEthnicities?.length || 0
+  });
+  
+  // If no ethnicities selected but ethnicity weight > 0, redistribute
+  if (!hasEthnicities && weights.ethnicity > 0) {
+    console.warn('⚠️ [Weight Validation] No ethnicities selected but ethnicity weighted:', weights.ethnicity);
+    
+    const ethnicityWeight = weights.ethnicity;
+    const correctedWeights = {
+      ethnicity: 0, // Set to 0 when no ethnicities
+      age: Math.min(1.0, weights.age + (ethnicityWeight * 0.5)), // Give 50% to age
+      income: Math.min(1.0, weights.income + (ethnicityWeight * 0.4)), // Give 40% to income  
+      gender: Math.min(1.0, weights.gender + (ethnicityWeight * 0.1)) // Give 10% to gender
+    };
+    
+    // Ensure total doesn't exceed 1.0
+    const total = correctedWeights.ethnicity + correctedWeights.age + correctedWeights.income + correctedWeights.gender;
+    if (total > 1.0) {
+      const scale = 1.0 / total;
+      correctedWeights.age *= scale;
+      correctedWeights.income *= scale;
+      correctedWeights.gender *= scale;
+    }
+    
+    console.log('✅ [Weight Validation] Corrected weights:', correctedWeights);
+    console.log('📊 [Weight Validation] Redistributed', ethnicityWeight, 'from ethnicity to age/income/gender');
+    
+    return correctedWeights;
+  }
+  
+  // If ethnicities selected but ethnicity weight is 0, this might be intentional
+  if (hasEthnicities && weights.ethnicity === 0) {
+    console.log('ℹ️ [Weight Validation] Ethnicities selected but ethnicity weight is 0 - keeping as intended');
+  }
+  
+  console.log('✅ [Weight Validation] Weights are valid, no changes needed');
+  return weights;
 }
 
 /**
@@ -230,32 +280,26 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
           console.log('[🏠 Gemini Store] Applying rent range changes:', response.rentRange);
         }
         
-        // ✅ FIXED: Handle demographic scoring changes with proper array handling
+        // ✅ FIXED: Handle demographic scoring changes with weight validation
         if (response.demographicScoring && typeof response.demographicScoring === 'object') {
           console.log('[🧬 Gemini Store] Applying demographic scoring:', response.demographicScoring);
           
           const demoScoring = response.demographicScoring;
           if (demoScoring.weights && isValidDemographicWeights(demoScoring.weights)) {
             
-            const weights = demoScoring.weights;
+            // ✅ CRITICAL FIX: Validate weights against selected ethnicities
+            const selectedEthnicities = response.selectedEthnicities || updates.selectedEthnicities || filterStore.selectedEthnicities || [];
+            const validatedWeights = validateAndFixDemographicWeights(demoScoring.weights, selectedEthnicities);
             
-            console.log('🧬 [GEMINI STORE] Setting demographic scoring weights:', {
-              ethnicity: weights.ethnicity,
-              gender: weights.gender,
-              age: weights.age,
-              income: weights.income,
+            console.log('🧬 [GEMINI STORE] Setting validated demographic scoring weights:', {
+              original: demoScoring.weights,
+              validated: validatedWeights,
               reasoning: demoScoring.reasoning
             });
             
-            // ✅ FIXED: Use arrays directly as expected by the new filterStore format
+            // ✅ FIXED: Use validated weights and pass arrays directly
             filterStore.setDemographicScoring({
-              weights: {
-                ethnicity: weights.ethnicity,
-                gender: weights.gender,
-                age: weights.age,
-                income: weights.income
-              },
-              // ✅ FIXED: Pass arrays directly (don't convert to objects)
+              weights: validatedWeights,
               thresholdBonuses: Array.isArray(demoScoring.thresholdBonuses) ? 
                 demoScoring.thresholdBonuses : [],
               penalties: Array.isArray(demoScoring.penalties) ? 
@@ -263,7 +307,7 @@ export const useGeminiStore = create<GeminiStore>((set) => ({
               reasoning: demoScoring.reasoning
             });
             
-            console.log('[✅ Gemini Store] Successfully applied demographic scoring with arrays!');
+            console.log('[✅ Gemini Store] Successfully applied validated demographic scoring!');
           } else {
             console.warn('[⚠️ Gemini Store] Invalid demographic scoring weights structure:', demoScoring.weights);
           }

@@ -1,4 +1,4 @@
-// src/components/features/search/MyDrawer.tsx - ENHANCED: Show demographic sub-weighting
+// src/components/features/search/MyDrawer.tsx - FULLY UPDATED: New justification architecture
 
 'use client';
 
@@ -24,7 +24,8 @@ import GenderSelect from '../filters/DemographicGroup/GenderSelect';
 import TimePeriodSelect from '../filters/ScoreWeightingGroup/TimePeriodSelect';
 import TopNSelector from '../filters/ScoreWeightingGroup/TopNSelector';
 import MyToolTip from '../../ui/MyToolTip';
-// ✅ NEW: Import demographic reasoning display
+// ✅ NEW: Import both justification components
+import OverallJustificationDisplay from '../../ui/OverallJustificationDisplay';
 import DemographicReasoningDisplay from '../../ui/DemographicReasoningDisplay';
 
 // ✅ FIXED: Extended FilterState interface for submission data with topN
@@ -72,6 +73,9 @@ interface MyDrawerProps {
   // ✅ FIXED: Add search results props
   searchResults?: SearchResults | null;
   isSearchLoading?: boolean;
+  // ✅ NEW: Add support for overall AI reasoning and last query
+  lastQuery?: string;
+  aiReasoning?: string;
 }
 
 const ALL_AVAILABLE_LAYERS: Layer[] = [
@@ -88,7 +92,9 @@ export default function MyDrawer({
   onClose, 
   onSearchSubmit, 
   searchResults, 
-  isSearchLoading = false 
+  isSearchLoading = false,
+  lastQuery,
+  aiReasoning
 }: MyDrawerProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
@@ -114,6 +120,7 @@ export default function MyDrawer({
   const addWeight = state.addWeight;
   const removeWeight = state.removeWeight;
   const reset = state.reset;
+  const setDemographicScoring = state.setDemographicScoring;
 
   // ✅ Local state for UI
   const [topN, setTopN] = useState(10);
@@ -156,6 +163,17 @@ export default function MyDrawer({
     };
     onSearchSubmit(submissionData);
   }, [setFilters, onSearchSubmit, topN]);
+
+  // ✅ NEW: Handle demographic reset
+  const handleDemographicReset = useCallback(() => {
+    console.log('🔄 [MyDrawer] Resetting demographic scoring to defaults');
+    setDemographicScoring({
+      weights: { ethnicity: 0.25, age: 0.25, income: 0.25, gender: 0.25 },
+      thresholdBonuses: [],
+      penalties: [],
+      reasoning: undefined
+    });
+  }, [setDemographicScoring]);
 
   // ✅ FIXED: Handle TopN changes and trigger search
   const handleTopNChange = useCallback((newValue: number) => {
@@ -204,7 +222,7 @@ export default function MyDrawer({
   // ✅ Calculate total weight for debugging
   const totalWeight = activeWeights.reduce((sum, w) => sum + w.value, 0);
 
-  // ✅ NEW: Check if AI has set custom demographic scoring
+  // ✅ NEW: Check if AI has set custom demographic scoring (for persistent display)
   const hasAIDemographicStrategy = demographicScoring.reasoning || 
                                    demographicScoring.thresholdBonuses.length > 0 ||
                                    demographicScoring.penalties.length > 0 ||
@@ -264,13 +282,13 @@ export default function MyDrawer({
           >
             <VStack spacing={4} p={2} align="stretch">
               
-              {/* ✅ NEW: AI Demographic Strategy Display */}
-              {hasAIDemographicStrategy && (
-                <DemographicReasoningDisplay 
-                  demographicScoring={demographicScoring}
-                  lastReasoning={lastDemographicReasoning?.summary}
-                />
-              )}
+              {/* ✅ NEW ARCHITECTURE: Overall AI Justification (explains WHY these results) */}
+              <OverallJustificationDisplay
+                searchResults={searchResults}
+                lastQuery={lastQuery}
+                aiReasoning={aiReasoning}
+                isVisible={!!searchResults?.zones?.length}
+              />
               
               {/* Results Display - FIXED */}
               <Box 
@@ -404,6 +422,15 @@ export default function MyDrawer({
                 {/* Content - Only show when expanded */}
                 {isDemographicOpen && (
                   <VStack spacing={3} p={3} pt={0}>
+                    
+                    {/* ✅ NEW ARCHITECTURE: Persistent Demographic Strategy (shows HOW - technical weights) */}
+                    <DemographicReasoningDisplay 
+                      demographicScoring={demographicScoring}
+                      lastReasoning={lastDemographicReasoning?.summary}
+                      isPersistent={true}
+                      onReset={handleDemographicReset}
+                    />
+                    
                     <Box w="full">
                       <MyAgeSlider value={ageRange} onChangeEnd={handleAgeRangeChange} />
                     </Box>
