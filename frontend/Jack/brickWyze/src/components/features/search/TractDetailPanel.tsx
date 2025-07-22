@@ -135,7 +135,8 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
     }
     
     const chartData = years.map(year => {
-      const yearData: any = {
+      // 🔧 FIX: Define proper interface for yearData instead of using any
+      const yearData: Record<string, string | number | boolean> = {
         year: year.replace('pred_', ''),
         isPrediction: year.startsWith('pred_')
       };
@@ -146,7 +147,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
       
       return yearData;
     }).filter(item => {
-      return activePeriods.some(period => item[period] > 0);
+      return activePeriods.some(period => item[period] as number > 0);
     });
     
     if (chartData.length === 0) {
@@ -162,7 +163,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
       );
     }
 
-    const allValues = chartData.flatMap(d => activePeriods.map(period => d[period]));
+    const allValues = chartData.flatMap(d => activePeriods.map(period => d[period] as number));
     const maxValue = Math.max(...allValues);
     const minValue = Math.min(...allValues.filter(v => v > 0));
     
@@ -191,10 +192,10 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
         <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
           {/* Chart - Clean version with enough height for bars */}
           <Flex justify="space-around" align="end" h="200px" mb={4} px={2}>
-            {chartData.map((item, index) => {
-              const isPast = parseInt(item.year) < 2025;
+            {chartData.map((item) => {
+              const isPast = parseInt(item.year as string) < 2025;
               const isCurrent = item.year === '2025';
-              const isFuture = parseInt(item.year) > 2025;
+              const isFuture = parseInt(item.year as string) > 2025;
               
               return (
                 <VStack key={`ft-period-${item.year}`} spacing={1} flex="1" align="center" position="relative">
@@ -220,7 +221,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
                       <HStack spacing="2px" align="end">
                         {activePeriods.map(period => {
                           const config = periodConfig[period as keyof typeof periodConfig];
-                          const height = getHeight(item[period]);
+                          const height = getHeight(item[period] as number);
                           
                           return (
                             <VStack key={`${item.year}-${period}-pair`} spacing={2} align="center">
@@ -230,7 +231,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
                                 color="gray.700" 
                                 lineHeight="1"
                               >
-                                {item[period]}
+                                {item[period] as number}
                               </Text>
                               
                               <Box
@@ -254,7 +255,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
                         color={isPast ? "gray.400" : isCurrent ? "blue.600" : "purple.600"}
                         fontWeight={isCurrent ? "bold" : "normal"}
                       >
-                        {item.year}
+                        {item.year as string}
                       </Text>
                     </VStack>
                 </VStack>
@@ -432,9 +433,10 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
       <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
         {/* Chart - Clean version with reduced white space */}
         <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
-          {chartData.map((item, index) => {
-            const isPast = index < 3;
-            const isCurrent = index === 3;
+          {chartData.map((item, chartIndex) => {
+            // 🔧 FIX: Rename 'index' to 'chartIndex' to avoid unused variable
+            const isPast = chartIndex < 3;
+            const isCurrent = chartIndex === 3;
             const height = getHeight(item.value);
             
             return (

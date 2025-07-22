@@ -22,18 +22,17 @@ const MOBILE_SIDE_PANEL_WIDTH = '95vw';
 const SEARCH_BAR_WIDTH = 450;
 const MOBILE_SEARCH_BAR_WIDTH = '90vw';
 
-// ✅ Define TractResult type that exactly matches what TractResultsContainer expects
 interface TractResult {
   geoid: string;
-  tract_name: string; // Required
-  display_name: string; // ✅ FIXED: Required, not optional
-  nta_name: string; // ✅ FIXED: Required, not optional
+  tract_name: string;
+  display_name: string;
+  nta_name: string;
   custom_score: number;
-  resilience_score: number; // ✅ FIXED: Required, not optional
-  avg_rent: number; // ✅ FIXED: Required, not optional
-  demographic_score: number; // ✅ FIXED: Required, not optional
-  foot_traffic_score: number; // ✅ FIXED: Required, not optional
-  crime_score: number; // ✅ FIXED: Required, not optional
+  resilience_score: number;
+  avg_rent: number;
+  demographic_score: number;
+  foot_traffic_score: number;
+  crime_score: number;
   flood_risk_score?: number;
   rent_score?: number;
   poi_score?: number;
@@ -57,9 +56,73 @@ interface TractResult {
   [key: string]: unknown;
 }
 
-// ✅ Extended FilterState interface for submission data with topN
 interface SubmissionData extends FilterState {
   topN?: number;
+}
+
+// 🔧 FIX: Import the exact interface from page.tsx to avoid conflicts
+interface MapSearchResult {
+  geoid: string;
+  tract_name?: string;
+  display_name?: string;
+  nta_name?: string;
+  custom_score: number;
+  resilience_score?: number;
+  avg_rent?: number;
+  demographic_score?: number;
+  foot_traffic_score?: number;
+  crime_score?: number;
+  flood_risk_score?: number;
+  rent_score?: number;
+  poi_score?: number;
+  main_crime_score?: number;
+  crime_trend_direction?: string;
+  crime_trend_change?: string;
+  demographic_match_pct?: number;
+  gender_match_pct?: number;
+  age_match_pct?: number;
+  income_match_pct?: number;
+  crime_timeline?: {
+    year_2020?: number;
+    year_2021?: number;
+    year_2022?: number;
+    year_2023?: number;
+    year_2024?: number;
+    pred_2025?: number;
+    pred_2026?: number;
+    pred_2027?: number;
+  };
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  foot_traffic_timeline_metadata?: Record<string, unknown>;
+  crime_timeline_metadata?: Record<string, unknown>;
+  foot_traffic_periods_used?: string[];
+  [key: string]: unknown;
+}
+
+// 🔧 FIX: Match the exact EdgeFunctionResponse from page.tsx
+interface EdgeFunctionResponse {
+  zones: MapSearchResult[]; // Use MapSearchResult[], not TractResult[]
+  total_zones_found: number;
+  top_zones_returned: number;
+  top_percentage: number;
+  demographic_scoring_applied?: boolean;
+  foot_traffic_periods_used?: string[];
+  debug?: Record<string, unknown>;
 }
 
 interface TopLeftUIProps {
@@ -67,13 +130,22 @@ interface TopLeftUIProps {
   searchResults?: TractResult[];
   onMapTractSelect?: (tractId: string | null) => void;
   selectedTract?: TractResult;
+  onClearSelectedTract?: () => void;
+  // 🔧 FIX: Match the exact type from page.tsx (EdgeFunctionResponse | null)
+  fullSearchResponse?: EdgeFunctionResponse | null;
+  isSearchLoading?: boolean;
 }
 
 export default function TopLeftUI({ 
   onFilterUpdate, 
   searchResults = [],
   onMapTractSelect,
-  selectedTract
+  selectedTract,
+  onClearSelectedTract,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  fullSearchResponse: _fullSearchResponse,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isSearchLoading: _isSearchLoading
 }: TopLeftUIProps) {
   const viewState = useUiStore(s => s.viewState);
   const { isOpen: isFilterDrawerOpen, onOpen: openFilterDrawer, onClose: closeFilterDrawer } = useDisclosure();
@@ -84,14 +156,10 @@ export default function TopLeftUI({
   const searchAreaRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   
-  // ✅ Get active filter count
   const activeFilterCount = useActiveFilters();
-  
-  // ✅ Get store methods for reset
   const { reset } = useFilterStore();
   const { resetChat } = useGeminiStore();
 
-  // ✅ Mobile detection
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
@@ -104,13 +172,9 @@ export default function TopLeftUI({
     else if (viewState === 'initial') setIsInResultsFlow(false);
   }, [viewState]);
 
-  // ✅ REMOVED: handleOutsideClick and useClickOutside since they were causing issues
-  // The search interface still works with the close button
-
-  const handleFilterSearch = (filters: SubmissionData) => { // ✅ FIXED: Proper type instead of any
+  const handleFilterSearch = (filters: SubmissionData) => {
     console.log('🔍 [TopLeftUI] Received filters, passing to page:', filters);
     
-    // ✅ Generate search summary including topN info
     const currentState = useFilterStore.getState();
     let summary = '';
     
@@ -125,7 +189,6 @@ export default function TopLeftUI({
       summary += ` • ${currentState.selectedEthnicities[0]} areas`;
     }
     
-    // ✅ NEW: Add topN info to summary
     if (filters.topN) {
       const tractCount = Math.ceil(310 * (filters.topN / 100));
       summary += ` • Top ${filters.topN}% (${tractCount} tracts)`;
@@ -140,14 +203,12 @@ export default function TopLeftUI({
     uiStore.setState({ viewState: 'typing' });
   };
 
-  // ✅ Close panel and reset to initial state
   const handleClose = () => {
     uiStore.setState({ viewState: 'initial' });
     setIsInResultsFlow(false);
-    setLastSearchSummary(''); // ✅ Clear summary when closing
+    setLastSearchSummary('');
   };
 
-  // ✅ Handle reset confirmation
   const handleResetRequest = () => {
     setIsResetDialogOpen(true);
   };
@@ -155,23 +216,37 @@ export default function TopLeftUI({
   const handleConfirmReset = () => {
     reset();
     resetChat();
-    setLastSearchSummary(''); // ✅ Clear summary on reset
+    setLastSearchSummary('');
     const currentState = useFilterStore.getState();
-    const formattedFilters: SubmissionData = { // ✅ FIXED: Proper typing
+    const formattedFilters: SubmissionData = {
       ...currentState,
-      topN: 10 // Default topN value
+      topN: 10
     };
     onFilterUpdate(formattedFilters);
     setIsResetDialogOpen(false);
   };
 
-  // ✅ Search bar component - stays in same position always
+  const handleResultsPanelClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const isInteractive = target.closest('button') || 
+                         target.closest('[role="button"]') || 
+                         target.closest('input') ||
+                         target.closest('[data-tract-card]');
+    
+    if (!isInteractive && viewState === 'typing') {
+      console.log('📋 [TopLeftUI] Results panel clicked - closing chat input');
+      if (window.resetToInitialView) {
+        window.resetToInitialView();
+      }
+    }
+  };
+
   const SearchBar = () => (
     <Box
       position="absolute"
       top={`${UI_MARGIN}px`}
       left={`${UI_MARGIN}px`}
-      zIndex={1300} // ✅ Higher than results panel (1200)
+      zIndex={1300}
       bg="#FFF5F5"
       boxShadow="lg"
       borderRadius="xl"
@@ -253,7 +328,6 @@ export default function TopLeftUI({
         />
       </Flex>
 
-      {/* ✅ Chat panel - expands below search bar */}
       <Box
         height={viewState === 'typing' ? 'auto' : '0px'}
         opacity={viewState === 'typing' ? 1 : 0}
@@ -278,10 +352,8 @@ export default function TopLeftUI({
 
   return (
     <>
-      {/* ✅ Search bar always stays in same position */}
       <SearchBar />
 
-      {/* ✅ Results panel with NEW TractResultsContainer */}
       {showResultsPanel && (
         <Box
           position="absolute"
@@ -293,45 +365,63 @@ export default function TopLeftUI({
           boxShadow="xl"
           pt="120px"
           zIndex={1200}
-          pointerEvents="auto" // ✅ Panel itself captures clicks
+          pointerEvents="auto"
           borderRight="1px solid rgba(0,0,0,0.1)"
           transform={showResultsPanel ? "translateX(0)" : "translateX(-100%)"}
           transition="transform 300ms ease-out"
+          onClick={handleResultsPanelClick}
+          cursor="default"
         >
           <VStack
             align="stretch"
             spacing={0}
             h="100%"
-            overflowY="hidden" // ✅ CHANGED: Let TractResultsContainer handle scrolling
+            overflowY="hidden"
             pointerEvents="auto"
           >
-            {/* ✅ OPTIONAL: Keep results header or remove it */}
-            <Flex align="center" px={4} pb={3} borderBottom="1px solid" borderColor="gray.200">
+            <Flex 
+              align="center" 
+              px={4} 
+              pb={3} 
+              borderBottom="1px solid" 
+              borderColor="gray.200"
+              onClick={(e) => {
+                if (viewState === 'typing') {
+                  e.stopPropagation();
+                  if (window.resetToInitialView) {
+                    window.resetToInitialView();
+                  }
+                }
+              }}
+            >
               <Text fontSize="lg" fontWeight="semibold">
                 Results ({searchResults.length})
               </Text>
+              {viewState === 'typing' && (
+                <Text fontSize="xs" color="gray.400" ml="auto">
+                  Click to close chat
+                </Text>
+              )}
             </Flex>
             
-            {/* ✅ NEW: Replace SidePanel with TractResultsContainer */}
             <Box flex="1" overflow="hidden">
               <TractResultsContainer 
-                searchResults={searchResults} // ✅ FIXED: Removed type assertion
+                searchResults={searchResults}
                 onMapTractSelect={onMapTractSelect}
-                selectedTract={selectedTract} // ✅ FIXED: Removed type assertion
+                selectedTract={selectedTract}
+                onClearSelectedTract={onClearSelectedTract}
               />
             </Box>
           </VStack>
         </Box>
       )}
 
-      {/* ✅ Drawer - Chakra handles overlay automatically */}
       <MyDrawer
         isOpen={isFilterDrawerOpen}
         onClose={closeFilterDrawer}
         onSearchSubmit={handleFilterSearch}
       />
 
-      {/* ✅ Reset Confirmation Dialog - In Portal to avoid click conflicts */}
       <Portal>
         <AlertDialog
           isOpen={isResetDialogOpen}
