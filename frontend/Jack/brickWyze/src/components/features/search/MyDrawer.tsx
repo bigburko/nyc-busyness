@@ -1,4 +1,4 @@
-// src/components/features/search/MyDrawer.tsx - FIXED: No any types
+// src/components/features/search/MyDrawer.tsx - ENHANCED: Show demographic sub-weighting
 
 'use client';
 
@@ -24,6 +24,8 @@ import GenderSelect from '../filters/DemographicGroup/GenderSelect';
 import TimePeriodSelect from '../filters/ScoreWeightingGroup/TimePeriodSelect';
 import TopNSelector from '../filters/ScoreWeightingGroup/TopNSelector';
 import MyToolTip from '../../ui/MyToolTip';
+// ✅ NEW: Import demographic reasoning display
+import DemographicReasoningDisplay from '../../ui/DemographicReasoningDisplay';
 
 // ✅ FIXED: Extended FilterState interface for submission data with topN
 interface SubmissionData extends FilterState {
@@ -102,6 +104,9 @@ export default function MyDrawer({
   const selectedEthnicities = state.selectedEthnicities;
   const selectedGenders = state.selectedGenders;
   const selectedTimePeriods = state.selectedTimePeriods;
+  // ✅ NEW: Get demographic scoring and reasoning
+  const demographicScoring = state.demographicScoring;
+  const lastDemographicReasoning = state.lastDemographicReasoning;
   
   // ✅ FIXED: Get actions from the store
   const setFilters = state.setFilters;
@@ -175,6 +180,7 @@ export default function MyDrawer({
     const currentState = useFilterStore.getState();
     console.log('🔍 [MyDrawer] Current store state on search:', {
       selectedTimePeriods: currentState.selectedTimePeriods,
+      demographicScoring: currentState.demographicScoring,
       storeState: currentState
     });
     
@@ -187,6 +193,7 @@ export default function MyDrawer({
     console.log('📤 [MyDrawer] Submitting data:', {
       timePeriods: submissionData.selectedTimePeriods,
       topN: submissionData.topN,
+      demographicScoring: submissionData.demographicScoring,
       fullData: submissionData
     });
     
@@ -196,6 +203,15 @@ export default function MyDrawer({
 
   // ✅ Calculate total weight for debugging
   const totalWeight = activeWeights.reduce((sum, w) => sum + w.value, 0);
+
+  // ✅ NEW: Check if AI has set custom demographic scoring
+  const hasAIDemographicStrategy = demographicScoring.reasoning || 
+                                   demographicScoring.thresholdBonuses.length > 0 ||
+                                   demographicScoring.penalties.length > 0 ||
+                                   (demographicScoring.weights.ethnicity !== 0.25 ||
+                                    demographicScoring.weights.age !== 0.25 ||
+                                    demographicScoring.weights.income !== 0.25 ||
+                                    demographicScoring.weights.gender !== 0.25);
 
   return (
     <main>
@@ -247,6 +263,14 @@ export default function MyDrawer({
             }}
           >
             <VStack spacing={4} p={2} align="stretch">
+              
+              {/* ✅ NEW: AI Demographic Strategy Display */}
+              {hasAIDemographicStrategy && (
+                <DemographicReasoningDisplay 
+                  demographicScoring={demographicScoring}
+                  lastReasoning={lastDemographicReasoning?.summary}
+                />
+              )}
               
               {/* Results Display - FIXED */}
               <Box 
@@ -360,6 +384,12 @@ export default function MyDrawer({
                     {(selectedEthnicities?.length || 0) > 0 && (
                       <Badge bg="#FF492C" color="white" borderRadius="full">
                         {selectedEthnicities?.length}
+                      </Badge>
+                    )}
+                    {/* ✅ NEW: Show AI optimization badge */}
+                    {hasAIDemographicStrategy && (
+                      <Badge bg="#48BB78" color="white" borderRadius="full">
+                        AI Optimized
                       </Badge>
                     )}
                   </HStack>

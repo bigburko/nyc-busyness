@@ -1,7 +1,7 @@
-// src/app/api/gemini/route.ts - FINAL FIX: Ultra-strong single-factor detection
+// src/app/api/gemini/route.ts - Cultural Override Enhanced (Final Fix)
 import { NextRequest, NextResponse } from 'next/server';
 
-// ✅ Enhanced type definitions for demographic sub-weighting
+// Enhanced type definitions
 interface DemographicWeights {
   ethnicity: number;
   gender: number;
@@ -36,9 +36,9 @@ interface RequestBody {
     rentRange?: [number, number];
     selectedEthnicities?: string[];
     selectedGenders?: string[];
+    selectedTimePeriods?: string[];
     ageRange?: [number, number];
     incomeRange?: [number, number];
-    // NEW: Demographic sub-weighting
     demographicScoring?: DemographicScoring;
     lastDemographicReasoning?: string;
     [key: string]: unknown;
@@ -59,7 +59,6 @@ interface OpenRouterResponse {
   [key: string]: unknown;
 }
 
-// ✅ FIXED: Proper typing for weight objects
 interface WeightObject {
   id: string;
   value: number;
@@ -68,28 +67,22 @@ interface WeightObject {
   color: string;
 }
 
-// 🔧 NEW: Check if this is a single-factor 100% request
 function isSingleFactor100Request(weights: WeightObject[]): boolean {
   const hundredWeights = weights.filter(w => w.value === 100);
   const zeroWeights = weights.filter(w => w.value === 0);
   
-  // If we have exactly 1 weight at 100% and the rest at 0%, this is single-factor
   return hundredWeights.length === 1 && (hundredWeights.length + zeroWeights.length) === weights.length;
 }
 
-// ✅ Enhanced normalization logic with single-factor skip
 function normalizeWeights(weights: WeightObject[]): WeightObject[] {
   if (!weights || !Array.isArray(weights)) return weights;
   
-  // 🔧 CRITICAL FIX: Skip normalization for single-factor 100% requests
   if (isSingleFactor100Request(weights)) {
     console.log('✅ [Gemini API] Single-factor 100% detected, skipping normalization');
     return weights;
   }
   
   const totalWeight = weights.reduce((sum, w) => sum + (w.value || 0), 0);
-  
-  console.log('🔧 [Gemini API] Original frontend weights total:', totalWeight);
   
   if (totalWeight !== 100 && totalWeight > 0) {
     console.log('⚠️ [Gemini API] Normalizing frontend weights to sum to 100%');
@@ -106,14 +99,12 @@ function normalizeWeights(weights: WeightObject[]): WeightObject[] {
       normalizedWeights[0].value += adjustment;
     }
     
-    console.log('✅ [Gemini API] Normalized frontend weights:', normalizedWeights.map(w => `${w.id}: ${w.value}%`));
     return normalizedWeights;
   }
   
   return weights;
 }
 
-// NEW: Normalize demographic weights to sum to 1.0 (for edge function demographic sub-weighting only)
 function normalizeDemographicWeights(weights: DemographicWeights): DemographicWeights {
   const total = weights.ethnicity + weights.gender + weights.age + weights.income;
   
@@ -135,102 +126,198 @@ export async function POST(req: NextRequest) {
   console.log('✅ Gemini API route hit with message:', message);
   console.log('🧠 Current State Received:', currentState);
   
-  // ✅ ULTRA-STRONG prompt with ALL weights mandatory
-  const improvedPrompt = `
-🚨🚨🚨 MANDATORY SINGLE-FACTOR DETECTION 🚨🚨🚨
+  // 🎭 CULTURAL OVERRIDE ENHANCED PROMPT (FINAL FIX)
+  const culturalOverridePrompt = `
+🎭🚨🔥 CULTURAL OVERRIDE INTELLIGENCE - FINAL FIX 🔥🚨🎭
 
-You are Bricky. Return ONLY valid JSON. NO markdown, NO comments.
+You are Bricky, a NYC cultural expert who PRIORITIZES NEIGHBORHOOD PERSONALITY over surface metrics.
+Return ONLY valid JSON. NO markdown, NO comments.
 
-🔥 CRITICAL RULE: ALWAYS RETURN ALL 6 WEIGHTS 🔥
-You MUST always return ALL these weights in your response:
-- foot_traffic
-- demographic  
-- crime
-- flood_risk
-- rent_score
-- poi
+🚨 CRITICAL OVERRIDE PRINCIPLES 🚨
 
-🚨 SINGLE-FACTOR = SET ONE TO 100%, OTHERS TO 0 🚨
+CULTURAL FIT > SAFETY SCORES > FOOT TRAFFIC NUMBERS
+Your job is to OVERRIDE high safety/foot traffic areas if they're culturally wrong for the business.
 
-SINGLE ETHNICITY PATTERNS:
-- "korean ethnicity" / "korean" / "korean areas" → demographic: 100, all others: 0
-- "chinese" / "hispanic" / "black" → demographic: 100, all others: 0
+🎭 NEIGHBORHOOD CULTURAL OVERRIDE RULES 🎭
 
-SINGLE OTHER PATTERNS:
-- "foot traffic" → foot_traffic: 100, all others: 0
-- "safety" / "crime" → crime: 100, all others: 0
-- "flood risk" → flood_risk: 100, all others: 0
+NIGHTLIFE/BAR BUSINESSES:
+- NEVER suggest Upper East Side (family area, early-to-bed)
+- NEVER suggest Upper West Side (family area, residential)
+- NEVER suggest Financial District (business only, dead at night)
+- ALWAYS prioritize: East Village, West Village, Lower East Side
+- REASON: "Cultural fit overrides safety scores"
 
-🔥 MANDATORY RESPONSES (COPY EXACTLY): 🔥
+FOOD SCENE BUSINESSES (ramen, artisanal food):
+- NEVER suggest business districts or family residential areas
+- ALWAYS prioritize: East Village, Nolita, West Village
+- REASON: "Food culture scene essential over foot traffic volume"
 
-For "korean ethnicity":
+24-HOUR BUSINESSES:
+- NEVER suggest residential areas (they sleep at night)
+- ALWAYS prioritize: Times Square, Union Square, major transit hubs
+- REASON: "Need true 24-hour activity, not daytime foot traffic"
+
+HERITAGE/AUTHENTIC BUSINESSES:
+- NEVER suggest new development areas
+- ALWAYS prioritize: Lower East Side, established ethnic neighborhoods
+- REASON: "Cultural memory essential over demographics alone"
+
+🔥 AGGRESSIVE CULTURAL WEIGHTING STRATEGIES 🔥
+
+NIGHTLIFE OVERRIDE:
+- demographic: 60% (heavily weight age 22-40 + cultural behavior)
+- foot_traffic: 25% (but EVENING traffic only)
+- poi: 15% (nightlife clustering essential)
+- crime: 0% (safety less important than cultural fit)
+- rent_score: 0%
+- flood_risk: 0%
+
+FOOD SCENE OVERRIDE:
+- demographic: 55% (food culture appreciation + age)
+- foot_traffic: 30% (food tourists + adventurous locals)
+- poi: 15% (restaurant clustering)
+- crime: 0%
+- rent_score: 0%
+- flood_risk: 0%
+
+TRUE 24-HOUR OVERRIDE:
+- foot_traffic: 70% (but must be 24-hour foot traffic)
+- demographic: 20% (night workers, insomniacs)
+- poi: 10% (transit, late-night services)
+- crime: 0%
+- rent_score: 0%
+- flood_risk: 0%
+
+HERITAGE OVERRIDE:
+- demographic: 70% (community connection essential)
+- foot_traffic: 20% (local + cultural tourism)
+- poi: 10% (community services)
+- crime: 0%
+- rent_score: 0%
+- flood_risk: 0%
+
+🎯 BUSINESS TYPE DETECTION & OVERRIDE 🎯
+
+NIGHTLIFE KEYWORDS: "bar", "cocktail", "nightlife", "speakeasy", "club", "late night"
+→ ACTIVATE NIGHTLIFE OVERRIDE (East Village priority)
+
+FOOD SCENE KEYWORDS: "ramen", "artisanal", "craft", "premium", "gourmet", "foodie"
+→ ACTIVATE FOOD SCENE OVERRIDE (East Village/Nolita priority)
+
+24-HOUR KEYWORDS: "24 hour", "24-hour", "all night", "late night", "round the clock"
+→ ACTIVATE 24-HOUR OVERRIDE (Times Square/Union Square priority)
+
+HERITAGE KEYWORDS: "traditional", "authentic", "heritage", "family recipe", "cultural"
+→ ACTIVATE HERITAGE OVERRIDE (Lower East Side priority)
+
+📋 CULTURAL OVERRIDE EXAMPLES 📋
+
+For "nightlife business for young people":
 {
-  "selectedEthnicities": ["korean"],
+  "selectedEthnicities": [],
+  "selectedGenders": ["male", "female"],
+  "ageRange": [22, 35],
+  "incomeRange": [45000, 120000],
+  "selectedTimePeriods": ["evening"],
+  "rentRange": [70, 120],
   "weights": [
-    {"id": "demographic", "value": 100, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
-    {"id": "foot_traffic", "value": 0, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
+    {"id": "demographic", "value": 60, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
+    {"id": "foot_traffic", "value": 25, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
+    {"id": "poi", "value": 15, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"},
     {"id": "crime", "value": 0, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
-    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
     {"id": "rent_score", "value": 0, "label": "Rent", "icon": "🏠", "color": "#FF6D01"},
-    {"id": "poi", "value": 0, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"}
+    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"}
   ],
   "demographicScoring": {
-    "weights": {"ethnicity": 1.0, "gender": 0.0, "age": 0.0, "income": 0.0},
-    "reasoning": "Single ethnicity focus: Korean population"
+    "weights": {"age": 0.5, "income": 0.3, "ethnicity": 0.1, "gender": 0.1},
+    "reasoning": "CULTURAL OVERRIDE: Nightlife businesses MUST avoid family areas like UES/UWS despite high safety scores. East Village/West Village essential for nightlife culture. Safety scores irrelevant - young nightlife crowd prioritizes scene over safety."
   }
 }
 
-For "foot traffic":
+For "high-end ramen shop":
 {
+  "selectedEthnicities": ["asian", "japanese"],
+  "selectedGenders": ["male", "female"],
+  "ageRange": [22, 40],
+  "incomeRange": [50000, 130000],
+  "selectedTimePeriods": ["afternoon", "evening"],
+  "rentRange": [80, 130],
   "weights": [
-    {"id": "foot_traffic", "value": 100, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
-    {"id": "demographic", "value": 0, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
+    {"id": "demographic", "value": 55, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
+    {"id": "foot_traffic", "value": 30, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
+    {"id": "poi", "value": 15, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"},
     {"id": "crime", "value": 0, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
-    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
     {"id": "rent_score", "value": 0, "label": "Rent", "icon": "🏠", "color": "#FF6D01"},
-    {"id": "poi", "value": 0, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"}
-  ]
+    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"}
+  ],
+  "demographicScoring": {
+    "weights": {"ethnicity": 0.3, "age": 0.4, "income": 0.25, "gender": 0.05},
+    "reasoning": "FOOD SCENE OVERRIDE: Premium ramen requires food culture scene - East Village perfect with line-waiting culture and adventurous eaters. Avoid family areas or business districts. Cultural fit more important than safety scores."
+  }
 }
 
-For "safety":
+For "24-hour diner":
 {
+  "selectedEthnicities": [],
+  "selectedGenders": ["male", "female"],
+  "ageRange": [18, 60],
+  "incomeRange": [25000, 90000],
+  "selectedTimePeriods": ["morning", "afternoon", "evening"],
+  "rentRange": [50, 100],
   "weights": [
-    {"id": "crime", "value": 100, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
-    {"id": "foot_traffic", "value": 0, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
-    {"id": "demographic", "value": 0, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
-    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"},
+    {"id": "foot_traffic", "value": 70, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
+    {"id": "demographic", "value": 20, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
+    {"id": "poi", "value": 10, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"},
+    {"id": "crime", "value": 0, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
     {"id": "rent_score", "value": 0, "label": "Rent", "icon": "🏠", "color": "#FF6D01"},
-    {"id": "poi", "value": 0, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"}
-  ]
+    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"}
+  ],
+  "demographicScoring": {
+    "weights": {"age": 0.3, "income": 0.3, "ethnicity": 0.2, "gender": 0.2},
+    "reasoning": "24-HOUR OVERRIDE: Must have TRUE 24-hour foot traffic - major transit hubs only. Avoid residential areas that sleep. Night workers, insomniacs, shift workers need real all-night activity zones."
+  }
 }
 
-🔥 VALIDATION CHECKLIST: 🔥
-✅ Did I return ALL 6 weights?
-✅ Is the primary factor set to 100?
-✅ Are all other factors set to 0?
-✅ No mixed weights for single requests?
+For "speakeasy cocktail bar":
+{
+  "selectedEthnicities": [],
+  "selectedGenders": ["male", "female"],
+  "ageRange": [25, 40],
+  "incomeRange": [60000, 150000],
+  "selectedTimePeriods": ["evening"],
+  "rentRange": [80, 140],
+  "weights": [
+    {"id": "demographic", "value": 60, "label": "Demographic Match", "icon": "👨‍👩‍👧‍👦", "color": "#34A853"},
+    {"id": "foot_traffic", "value": 25, "label": "Foot Traffic", "icon": "👥", "color": "#4285F4"},
+    {"id": "poi", "value": 15, "label": "Points of Interest", "icon": "📍", "color": "#805AD5"},
+    {"id": "crime", "value": 0, "label": "Safety", "icon": "🛡️", "color": "#EA4335"},
+    {"id": "rent_score", "value": 0, "label": "Rent", "icon": "🏠", "color": "#FF6D01"},
+    {"id": "flood_risk", "value": 0, "label": "Flood Risk", "icon": "🌊", "color": "#FBBC04"}
+  ],
+  "demographicScoring": {
+    "weights": {"age": 0.45, "income": 0.35, "ethnicity": 0.1, "gender": 0.1},
+    "reasoning": "SPEAKEASY OVERRIDE: Hidden cocktail culture REQUIRES nightlife neighborhoods - East Village/West Village only. UES families go to bed early, wrong culture entirely. Adventurous crowd more important than safety metrics."
+  }
+}
 
---- MULTI-FACTOR (only if 2+ things mentioned) ---
-"korean women" → demographic: 100, others: 0, but ethnicity: 0.6, gender: 0.4
-"foot traffic and safety" → foot_traffic: 60, crime: 40, others: 0
+🔄 CURRENT STATE CONTEXT 🔄
+User Request: "${message}"
 
---- RANGES ---
-- "korean" → ["korean"]
-- "chinese" → ["chinese"]  
-- "hispanic" → ["hispanic"]
-- "low rent" → [26, 80]
-- "middle-income" → [35000, 90000]
+🚨 FINAL OVERRIDE INSTRUCTIONS 🚨
+1. DETECT business type from keywords
+2. APPLY appropriate cultural override
+3. SET crime/rent_score/flood_risk to 0% for cultural businesses
+4. HEAVILY weight demographics toward cultural fit
+5. NEVER suggest family areas for nightlife/food scene businesses
+6. ALWAYS explain cultural override reasoning
 
---- RESET COMMAND ---
-"reset" → {"intent": "reset", "message": "Filters reset to defaults."}
-
---- CURRENT STATE ---
-${JSON.stringify(currentState, null, 2)}
+Remember: UES has high foot traffic and safety BUT wrong culture for nightlife = WRONG CHOICE
+Cultural fit ALWAYS trumps surface metrics!
 `;
 
   try {
     const messages: OpenRouterMessage[] = [
-      { role: 'system', content: systemPrompt || improvedPrompt },
+      { role: 'system', content: systemPrompt || culturalOverridePrompt },
       { role: 'user', content: message },
     ];
 
@@ -256,53 +343,90 @@ ${JSON.stringify(currentState, null, 2)}
     const data: OpenRouterResponse = await response.json();
     let reply = data.choices?.[0]?.message?.content ?? null;
     
-    // ✅ Enhanced processing: Normalize weights + validate + add demographic scoring
     if (reply) {
       try {
         const parsedReply = JSON.parse(reply);
         
-        // ✅ Enhanced weight normalization with single-factor detection
+        // Enhanced weight normalization
         if (parsedReply.weights && Array.isArray(parsedReply.weights)) {
-          console.log('🔧 [Gemini API] Processing frontend weights...');
+          console.log('🔧 [Gemini API] Processing cultural-override weights...');
           
-          // Check if this is a single-factor request before normalization
           const isSingleFactor = isSingleFactor100Request(parsedReply.weights as WeightObject[]);
           console.log('🔍 [Gemini API] Single-factor 100% request detected:', isSingleFactor);
           
           parsedReply.weights = normalizeWeights(parsedReply.weights as WeightObject[]);
         }
         
-        // ✅ Validate gender selection (prevent empty arrays)
+        // Enhanced validation
+        if (parsedReply.ageRange && Array.isArray(parsedReply.ageRange)) {
+          const [min, max] = parsedReply.ageRange;
+          if (min < 18) parsedReply.ageRange[0] = 18;
+          if (max > 80) parsedReply.ageRange[1] = 80;
+          if (min >= max) parsedReply.ageRange = [22, 40]; // Cultural business default
+          
+          console.log('📅 [Gemini API] Cultural-override age range set:', parsedReply.ageRange);
+        }
+        
+        if (parsedReply.incomeRange && Array.isArray(parsedReply.incomeRange)) {
+          const [min, max] = parsedReply.incomeRange;
+          if (min < 20000) parsedReply.incomeRange[0] = 20000;
+          if (max > 250000) parsedReply.incomeRange[1] = 250000;
+          if (min >= max) parsedReply.incomeRange = [45000, 120000]; // Cultural business default
+          
+          console.log('💰 [Gemini API] Cultural-override income range set:', parsedReply.incomeRange);
+        }
+        
+        // Enhanced time period validation for cultural businesses
+        if (parsedReply.selectedTimePeriods && Array.isArray(parsedReply.selectedTimePeriods)) {
+          const validPeriods = ['morning', 'afternoon', 'evening'];
+          parsedReply.selectedTimePeriods = parsedReply.selectedTimePeriods.filter((p: string) => 
+            validPeriods.includes(p)
+          );
+          
+          if (parsedReply.selectedTimePeriods.length === 0) {
+            parsedReply.selectedTimePeriods = ['evening']; // Cultural businesses often evening-focused
+          }
+        }
+        
+        // Gender inclusivity
         if (parsedReply.selectedGenders && Array.isArray(parsedReply.selectedGenders)) {
           if (parsedReply.selectedGenders.length === 0) {
-            console.log('⚠️ [Gemini API] Empty gender selection, defaulting to both');
+            console.log('⚠️ [Gemini API] Empty gender selection, defaulting to inclusive');
             parsedReply.selectedGenders = ['male', 'female'];
           }
         }
         
-        // ✅ NEW: Process demographic scoring if present (for EDGE FUNCTION demographic sub-weighting)
+        // Cultural business rent intelligence
+        if (parsedReply.rentRange && Array.isArray(parsedReply.rentRange)) {
+          const [min, max] = parsedReply.rentRange;
+          if (min < 26) parsedReply.rentRange[0] = 26;
+          if (max > 160) parsedReply.rentRange[1] = 160;
+          if (min >= max) parsedReply.rentRange = [70, 130]; // Cultural business default
+        }
+        
+        // Process demographic scoring with cultural emphasis
         if (parsedReply.demographicScoring?.weights) {
-          console.log('🧬 [Gemini API] Processing demographic sub-weighting for edge function...');
+          console.log('🧬 [Gemini API] Processing cultural-override demographic scoring...');
+          
           parsedReply.demographicScoring.weights = normalizeDemographicWeights(
             parsedReply.demographicScoring.weights
           );
-          console.log('✅ [Gemini API] Normalized demographic sub-weights:', parsedReply.demographicScoring.weights);
+          console.log('✅ [Gemini API] Cultural-override demographic weights:', parsedReply.demographicScoring.weights);
         }
         
         reply = JSON.stringify(parsedReply);
         
       } catch (parseError) {
-        console.error('❌ Failed to parse/normalize Gemini response:', parseError);
-        // Return original reply if parsing fails
+        console.error('❌ Failed to parse cultural-override response:', parseError);
       }
     }
     
     return NextResponse.json({ reply });
 
   } catch (error: unknown) {
-    console.error('❌ Gemini fetch failed:', error);
+    console.error('❌ Cultural Override API failed:', error);
     
-    let errorMessage = 'Gemini fetch failed';
+    let errorMessage = 'Cultural Override API failed';
     if (error instanceof Error) {
       errorMessage = error.message;
     } else if (typeof error === 'string') {

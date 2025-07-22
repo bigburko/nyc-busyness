@@ -1,4 +1,4 @@
-// src/components/ui/DemographicReasoningDisplay.tsx
+// src/components/ui/DemographicReasoningDisplay.tsx - FIXED: Proper array handling
 'use client';
 
 import { Box, Text, VStack, HStack, Progress, Badge, Flex } from '@chakra-ui/react';
@@ -23,7 +23,11 @@ const DemographicReasoningDisplay: React.FC<DemographicReasoningDisplayProps> = 
     weights.income === 0.25
   );
   
-  const hasCustomization = !isDefaultWeights || thresholdBonuses.length > 0 || penalties.length > 0;
+  // ✅ FIXED: Handle arrays properly
+  const hasCustomization = !isDefaultWeights || 
+                           (Array.isArray(thresholdBonuses) && thresholdBonuses.length > 0) || 
+                           (Array.isArray(penalties) && penalties.length > 0);
+  
   const displayReasoning = reasoning || lastReasoning;
   
   if (!hasCustomization && !displayReasoning) {
@@ -121,8 +125,8 @@ const DemographicReasoningDisplay: React.FC<DemographicReasoningDisplayProps> = 
             );
           })}
 
-          {/* Threshold Bonuses */}
-          {thresholdBonuses.length > 0 && (
+          {/* ✅ FIXED: Handle thresholdBonuses as array */}
+          {Array.isArray(thresholdBonuses) && thresholdBonuses.length > 0 && (
             <Box mt={2}>
               <Text fontSize="xs" fontWeight="semibold" color="green.600" mb={2}>
                 ✅ Smart Bonuses Applied
@@ -137,8 +141,8 @@ const DemographicReasoningDisplay: React.FC<DemographicReasoningDisplayProps> = 
             </Box>
           )}
 
-          {/* Penalties */}
-          {penalties.length > 0 && (
+          {/* ✅ FIXED: Handle penalties as array */}
+          {Array.isArray(penalties) && penalties.length > 0 && (
             <Box mt={2}>
               <Text fontSize="xs" fontWeight="semibold" color="red.600" mb={2}>
                 ⚠️ Quality Guards

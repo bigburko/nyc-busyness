@@ -1,4 +1,4 @@
-// src/stores/filterStore.ts - FIXED: Removed unused get parameter
+// src/stores/filterStore.ts - FIXED: Proper demographic sub-weighting with array types
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
@@ -18,6 +18,7 @@ export interface Layer {
   color: string;
 }
 
+// ✅ FIXED: Use proper weights structure (0.0 to 1.0 scale)
 export interface DemographicScoringWeights {
   ethnicity: number;
   age: number;
@@ -25,24 +26,25 @@ export interface DemographicScoringWeights {
   gender: number;
 }
 
-export interface DemographicScoringThresholds {
-  ethnicity: number;
-  age: number;
-  income: number;
-  gender: number;
+// ✅ FIXED: Use array types for bonuses/penalties (matches edge function)
+export interface ThresholdBonus {
+  condition: string;
+  bonus: number;
+  description: string;
 }
 
-export interface DemographicScoringPenalties {
-  ethnicity: number;
-  age: number;
-  income: number;
-  gender: number;
+export interface DemographicPenalty {
+  condition: string;
+  penalty: number;
+  description: string;
 }
 
+// ✅ FIXED: Updated interface to match edge function expectations
 export interface DemographicScoring {
   weights: DemographicScoringWeights;
-  thresholdBonuses: DemographicScoringThresholds;
-  penalties: DemographicScoringPenalties;
+  thresholdBonuses: ThresholdBonus[];  // ✅ Arrays, not objects
+  penalties: DemographicPenalty[];     // ✅ Arrays, not objects
+  reasoning?: string;                  // ✅ Added missing reasoning property
 }
 
 export interface DemographicReasoning {
@@ -89,26 +91,17 @@ interface FilterActions {
   removeTimePeriod: (period: string) => void;
 }
 
-// Default demographic scoring configuration
+// ✅ FIXED: Default demographic scoring with proper array structure
 const DEFAULT_DEMOGRAPHIC_SCORING: DemographicScoring = {
   weights: {
-    ethnicity: 40,
-    age: 25,
-    income: 20,
-    gender: 15
+    ethnicity: 0.25,    // ✅ Use 0.0-1.0 scale (25% each)
+    age: 0.25,
+    income: 0.25,
+    gender: 0.25
   },
-  thresholdBonuses: {
-    ethnicity: 10,
-    age: 5,
-    income: 5,
-    gender: 5
-  },
-  penalties: {
-    ethnicity: 20,
-    age: 10,
-    income: 10,
-    gender: 5
-  }
+  thresholdBonuses: [],  // ✅ Empty arrays by default
+  penalties: [],         // ✅ Empty arrays by default
+  reasoning: undefined   // ✅ No default reasoning
 };
 
 // ✅ FIXED: DEFAULT_STATE now matches INITIAL_WEIGHTS with proper default weights
@@ -247,18 +240,19 @@ export const useFilterStore = create<FilterState & FilterActions>()(
       set(DEFAULT_STATE);
     },
 
+    // ✅ FIXED: Proper demographic scoring setter with array handling
     setDemographicScoring: (scoring: Partial<DemographicScoring>) =>
       set((state) => {
         console.log('🧬 [FilterStore] setDemographicScoring:', scoring);
         
-        const updatedScoring = {
-          ...state.demographicScoring,
-          ...scoring,
+        const updatedScoring: DemographicScoring = {
           weights: scoring.weights ? { ...state.demographicScoring.weights, ...scoring.weights } : state.demographicScoring.weights,
-          thresholdBonuses: scoring.thresholdBonuses ? { ...state.demographicScoring.thresholdBonuses, ...scoring.thresholdBonuses } : state.demographicScoring.thresholdBonuses,
-          penalties: scoring.penalties ? { ...state.demographicScoring.penalties, ...scoring.penalties } : state.demographicScoring.penalties,
+          thresholdBonuses: scoring.thresholdBonuses ?? state.demographicScoring.thresholdBonuses,
+          penalties: scoring.penalties ?? state.demographicScoring.penalties,
+          reasoning: scoring.reasoning ?? state.demographicScoring.reasoning,
         };
         
+        console.log('🧬 [FilterStore] Updated demographic scoring:', updatedScoring);
         return { ...state, demographicScoring: updatedScoring };
       }),
 
@@ -346,7 +340,8 @@ if (typeof window !== 'undefined') {
         ageRange: state.ageRange,
         incomeRange: state.incomeRange,
         selectedTimePeriods: state.selectedTimePeriods,
-        hasDemographicReasoning: !!state.lastDemographicReasoning
+        hasDemographicReasoning: !!state.lastDemographicReasoning,
+        demographicScoring: state.demographicScoring
       });
     }
   );
