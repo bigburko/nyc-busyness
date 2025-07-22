@@ -189,7 +189,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
         </Text>
 
         <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
-          {/* Chart - Clean version with proper height and better year spacing */}
+          {/* Chart - Clean version with enough height for bars */}
           <Flex justify="space-around" align="end" h="200px" mb={4} px={2}>
             {chartData.map((item, index) => {
               const isPast = parseInt(item.year) < 2025;
@@ -306,8 +306,9 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
     const getHeight = (value: number) => {
       const range = maxValue - minValue;
       if (range === 0) return 60;
+      // Less aggressive scaling
       const normalizedValue = (value - minValue) / range;
-      return Math.max(40, 40 + (normalizedValue * 120));
+      return Math.max(30, 50 + (normalizedValue * 80));
     };
 
     return (
@@ -317,7 +318,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
         </Text>
 
         <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
-          <Flex justify="space-around" align="end" h="180px" mb={2} px={2}>
+          <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
             {chartData.map((item, index) => {
               const isPast = index < 3;
               const isCurrent = index === 3;
@@ -351,7 +352,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
                       <Box
                         bg={isPast ? "#6B7280" : isCurrent ? "#4299E1" : "#60A5FA"}
                         h={`${height}px`}
-                        w="18px"
+                        w="20px"
                         borderRadius="md"
                         boxShadow="sm"
                       />
@@ -417,8 +418,9 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
     const range = maxValue - minValue;
     if (range === 0) return 80;
     
+    // Less aggressive scaling - reduced multiplier and smaller base range
     const normalizedValue = (value - minValue) / range;
-    return Math.max(40, 40 + (normalizedValue * 120));
+    return Math.max(30, 50 + (normalizedValue * 80)); // Reduced from 40 + 120 to 50 + 80
   };
 
   return (
@@ -428,8 +430,8 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
       </Text>
 
       <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
-        {/* Chart - Clean version with proper height and better year spacing */}
-        <Flex justify="space-around" align="end" h="180px" mb={2} px={2}>
+        {/* Chart - Clean version with reduced white space */}
+        <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
           {chartData.map((item, index) => {
             const isPast = index < 3;
             const isCurrent = index === 3;
@@ -469,7 +471,7 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
                     <Box
                       bg={isPast ? "#6B7280" : isCurrent ? "#10B981" : "#60A5FA"}
                       h={`${height}px`}
-                      w="8px"
+                      w="20px"
                       borderRadius="sm"
                       boxShadow="sm"
                     />
