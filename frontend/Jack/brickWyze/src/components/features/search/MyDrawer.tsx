@@ -1,14 +1,14 @@
-// src/components/features/search/MyDrawer.tsx - FULLY UPDATED: New justification architecture
+// src/components/features/search/MyDrawer.tsx - FULLY UPDATED: Fixed interfaces and removed unused props
 
 'use client';
 
 import {
   Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent, DrawerCloseButton,
   Flex, Box, Button, AlertDialog, AlertDialogOverlay, AlertDialogContent,
-  AlertDialogHeader, AlertDialogBody, AlertDialogFooter, Text, VStack, HStack, Badge
+  AlertDialogHeader, AlertDialogBody, AlertDialogFooter, Text, VStack, HStack, Badge, IconButton
 } from '@chakra-ui/react';
 import { useRef, useState, useCallback } from 'react';
-import { SearchIcon } from '@chakra-ui/icons';
+import { SearchIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import type { FocusableElement } from '@chakra-ui/utils';
 
 // ✅ FIXED: Use the correct store import pattern
@@ -33,34 +33,25 @@ interface SubmissionData extends FilterState {
   topN: number;
 }
 
-// ✅ FIXED: Proper interface for search zone results instead of any
+// ✅ FIXED: Match the interfaces from OverallJustificationDisplay exactly
 interface SearchZone {
   geoid: string;
-  tract_name?: string;
-  display_name?: string;
-  nta_name?: string;
+  tract_name: string;
+  display_name: string;
+  nta_name: string;
   custom_score: number;
-  resilience_score?: number;
   avg_rent?: number;
   demographic_score?: number;
-  foot_traffic_score?: number;
-  crime_score?: number;
-  flood_risk_score?: number;
-  rent_score?: number;
-  poi_score?: number;
-  main_crime_score?: number;
-  crime_trend_direction?: string;
-  crime_trend_change?: string;
-  demographic_match_pct?: number;
-  gender_match_pct?: number;
-  age_match_pct?: number;
-  income_match_pct?: number;
-  [key: string]: unknown;
+  foot_traffic_score: number;
+  crime_score: number;
+  flood_risk_score: number;
+  rent_score: number;
+  poi_score: number;
 }
 
-// ✅ FIXED: Added search results interface with proper typing
+// ✅ FIXED: Match the interface from OverallJustificationDisplay exactly
 interface SearchResults {
-  zones: SearchZone[]; // ✅ FIXED: Use proper interface instead of any[]
+  zones: SearchZone[];
   total_zones_found: number;
   top_zones_returned: number;
   top_percentage: number;
@@ -73,9 +64,8 @@ interface MyDrawerProps {
   // ✅ FIXED: Add search results props
   searchResults?: SearchResults | null;
   isSearchLoading?: boolean;
-  // ✅ NEW: Add support for overall AI reasoning and last query
+  // ✅ FIXED: Removed unused aiReasoning prop
   lastQuery?: string;
-  aiReasoning?: string;
 }
 
 const ALL_AVAILABLE_LAYERS: Layer[] = [
@@ -93,8 +83,7 @@ export default function MyDrawer({
   onSearchSubmit, 
   searchResults, 
   isSearchLoading = false,
-  lastQuery,
-  aiReasoning
+  lastQuery
 }: MyDrawerProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
@@ -282,11 +271,10 @@ export default function MyDrawer({
           >
             <VStack spacing={4} p={2} align="stretch">
               
-              {/* ✅ NEW ARCHITECTURE: Overall AI Justification (explains WHY these results) */}
+              {/* ✅ Overall AI Justification */}
               <OverallJustificationDisplay
                 searchResults={searchResults}
                 lastQuery={lastQuery}
-                aiReasoning={aiReasoning}
                 isVisible={!!searchResults?.zones?.length}
               />
               
@@ -374,7 +362,7 @@ export default function MyDrawer({
                 />
               </Box>
               
-              {/* Demographics - COLLAPSIBLE */}
+              {/* Demographics - COLLAPSIBLE with Updated Chevron Style */}
               <Box 
                 bg="rgba(255, 255, 255, 0.8)" 
                 borderRadius="2xl" 
@@ -411,12 +399,20 @@ export default function MyDrawer({
                       </Badge>
                     )}
                   </HStack>
-                  <Box
-                    transform={isDemographicOpen ? 'rotate(180deg)' : 'rotate(0deg)'}
-                    transition="transform 0.2s"
-                  >
-                    <Text fontSize="xl" color="#FF492C">▼</Text>
-                  </Box>
+                  
+                  {/* ✅ UPDATED: Use same chevron style as other components */}
+                  <IconButton
+                    aria-label={isDemographicOpen ? "Collapse Demographics" : "Expand Demographics"}
+                    icon={isDemographicOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                    size="lg"
+                    variant="ghost"
+                    color="gray.600"
+                    fontSize="24px"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDemographicOpen(!isDemographicOpen);
+                    }}
+                  />
                 </Flex>
 
                 {/* Content - Only show when expanded */}
@@ -487,7 +483,7 @@ export default function MyDrawer({
                 )}
               </Box>
               
-              {/* Score Weighting - COLLAPSIBLE */}
+              {/* Score Weighting - COLLAPSIBLE with Updated Chevron Style */}
               <Box 
                 bg="rgba(255, 255, 255, 0.8)" 
                 borderRadius="2xl" 
@@ -516,12 +512,20 @@ export default function MyDrawer({
                       Adjust the importance of different factors when ranking neighborhoods. Higher percentages mean that factor has more influence on the results.
                     </MyToolTip>
                   </HStack>
-                  <Box
-                    transform={isWeightingOpen ? 'rotate(180deg)' : 'rotate(0deg)'}
-                    transition="transform 0.2s"
-                  >
-                    <Text fontSize="xl" color="#FF492C">▼</Text>
-                  </Box>
+                  
+                  {/* ✅ UPDATED: Use same chevron style as other components */}
+                  <IconButton
+                    aria-label={isWeightingOpen ? "Collapse Score Weighting" : "Expand Score Weighting"}
+                    icon={isWeightingOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                    size="lg"
+                    variant="ghost"
+                    color="gray.600"
+                    fontSize="24px"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsWeightingOpen(!isWeightingOpen);
+                    }}
+                  />
                 </Flex>
 
                 {/* Content - Only show when expanded */}

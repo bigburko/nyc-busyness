@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { 
   Box, Input, IconButton, Spinner, Text, Flex, Button, VStack
 } from '@chakra-ui/react';
@@ -31,12 +31,38 @@ interface FilterUpdates {
   selectedGenders?: string[];
 }
 
+// ✅ NEW: Search results interface for rich responses
+interface SearchZone {
+  geoid: string;
+  tract_name?: string;
+  display_name?: string;
+  nta_name?: string;
+  custom_score: number;
+  demographic_match_pct?: number;
+  foot_traffic_score?: number;
+  crime_score?: number;
+  avg_rent?: number;
+  [key: string]: unknown;
+}
+
+interface SearchResults {
+  zones: SearchZone[];
+  total_zones_found: number;
+  top_zones_returned: number;
+  top_percentage: number;
+}
+
+// ✅ UPDATED: Removed unused lastQuery and aiReasoning props
 export default function ChatInputPanel({
   onSearchSubmit,
   onResetRequest,
+  searchResults,
+  isSearchLoading = false
 }: {
   onSearchSubmit: (filters: FilterState) => void;
   onResetRequest: () => void;
+  searchResults?: SearchResults | null;
+  isSearchLoading?: boolean;
 }) {
   const messages = useGeminiStore((s) => s.messages);
   const setMessages = useGeminiStore((s) => s.setMessages);
@@ -45,11 +71,13 @@ export default function ChatInputPanel({
   const [localInput, setLocalInput] = useState('');
   
   const chatBodyRef = useRef<HTMLDivElement>(null);
-  const { setFilters, reset } = useFilterStore();
+  const { setFilters, reset, demographicScoring } = useFilterStore();
 
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+  // ✅ NEW: Track if we've shown results for current search
+  const lastResultsShown = useRef<number>(0);
 
   const handleInputFocus = () => {
     console.log('🔍 [ChatInputPanel] Chat input focused - keeping tract panel open for now');
@@ -57,6 +85,201 @@ export default function ChatInputPanel({
 
   const formatFiltersForSubmission = (): FilterState => {
     return useFilterStore.getState();
+  };
+
+  // ✅ NEW: Generate rich justification message based on search results
+  const generateJustificationMessage = (userQuery: string, updates: FilterUpdates): string => {
+    const businessType = detectBusinessType(userQuery);
+    const customerProfile = analyzeCustomerProfile(updates);
+    
+    let response = `🤖 **Business Intelligence Analysis:**\n\n`;
+    
+    // Business type detection
+    if (businessType) {
+      response += `🎯 **Detected:** ${businessType.type}\n`;
+      response += `📊 **Strategy:** ${businessType.strategy}\n\n`;
+    }
+    
+    // Customer targeting analysis
+    if (customerProfile.demographics) {
+      response += `👥 **Target Demographics:**\n${customerProfile.demographics}\n\n`;
+    }
+    
+    // Location strategy
+    if (updates.selectedTimePeriods) {
+      const timeStrategy = analyzeTimeStrategy(updates.selectedTimePeriods);
+      response += `🕐 **Timing Strategy:** ${timeStrategy}\n\n`;
+    }
+    
+    // Budget and location insights
+    if (updates.rentRange) {
+      const budgetStrategy = analyzeBudgetStrategy(updates.rentRange);
+      response += `💰 **Location Budget:** ${budgetStrategy}\n\n`;
+    }
+    
+    response += `⚡ **Searching for optimized locations...**`;
+    
+    return response;
+  };
+
+  // ✅ FIXED: Wrapped in useCallback to prevent dependency changes
+  const generateResultsMessage = useCallback((): string => {
+    console.log('🔍 [ChatInputPanel] Generating results message:', {
+      hasSearchResults: !!searchResults,
+      zonesLength: searchResults?.zones?.length,
+      searchResults: searchResults
+    });
+    
+    if (!searchResults?.zones?.length) {
+      console.log('❌ [ChatInputPanel] No search results available for message generation');
+      return "❌ No locations found matching your criteria. Try adjusting your filters or ask me to broaden the search.";
+    }
+
+    const topZone = searchResults.zones[0];
+    const averageScore = searchResults.zones.reduce((sum, zone) => sum + zone.custom_score, 0) / searchResults.zones.length;
+    
+    let response = `✅ **Found ${searchResults.zones.length} Perfect Locations!**\n\n`;
+    
+    // Top recommendation
+    response += `🏆 **Top Recommendation:**\n`;
+    response += `📍 ${topZone.display_name || topZone.tract_name}\n`;
+    response += `⭐ Score: ${topZone.custom_score.toFixed(1)}/100\n`;
+    
+    if (topZone.demographic_match_pct) {
+      response += `👥 Customer Match: ${topZone.demographic_match_pct.toFixed(1)}%\n`;
+    }
+    if (topZone.foot_traffic_score) {
+      response += `🚶 Foot Traffic: ${topZone.foot_traffic_score.toFixed(1)}/100\n`;
+    }
+    if (topZone.avg_rent) {
+      response += `💵 Avg Rent: ${topZone.avg_rent}/sqft\n`;
+    }
+    
+    response += `\n📊 **Results Summary:**\n`;
+    response += `• ${searchResults.zones.length} locations analyzed\n`;
+    response += `• Average quality score: ${averageScore.toFixed(1)}/100\n`;
+    response += `• Showing top ${searchResults.top_percentage}% of matches\n\n`;
+    
+    // Demographic insights
+    if (demographicScoring.reasoning) {
+      response += `🎯 **Why These Locations:**\n${demographicScoring.reasoning}\n\n`;
+    }
+    
+    // Strategy explanation
+    const currentState = useFilterStore.getState();
+    if (currentState.weights?.length) {
+      const topWeight = currentState.weights.reduce((max, w) => w.value > max.value ? w : max);
+      response += `⚖️ **Strategy Focus:** Prioritizing ${topWeight.label.toLowerCase()} (${topWeight.value}%)\n\n`;
+    }
+    
+    response += `💡 **Want me to:**\n`;
+    response += `• Analyze different customer segments?\n`;
+    response += `• Adjust age/income targeting?\n`;
+    response += `• Explore different neighborhoods?\n`;
+    response += `• Focus on specific business factors?`;
+    
+    console.log('✅ [ChatInputPanel] Generated results message successfully');
+    return response;
+  }, [searchResults, demographicScoring.reasoning]);
+
+  // ✅ NEW: Business type detection
+  const detectBusinessType = (query: string): { type: string; strategy: string } | null => {
+    const q = query.toLowerCase();
+    
+    if (q.includes('cocktail') || q.includes('bar') || q.includes('speakeasy')) {
+      return {
+        type: "Nightlife/Bar",
+        strategy: "Evening-focused with young professional targeting"
+      };
+    }
+    if (q.includes('coffee') || q.includes('cafe')) {
+      return {
+        type: "Cafe/Coffee Shop", 
+        strategy: "Morning/afternoon focus with diverse age appeal"
+      };
+    }
+    if (q.includes('restaurant') || q.includes('trattoria')) {
+      return {
+        type: "Restaurant",
+        strategy: "Lunch/dinner periods with cultural demographic matching"
+      };
+    }
+    if (q.includes('boutique') || q.includes('fashion') || q.includes('clothing')) {
+      return {
+        type: "Retail/Fashion",
+        strategy: "Demographic-focused with lifestyle targeting"
+      };
+    }
+    if (q.includes('consignment') || q.includes('luxury')) {
+      return {
+        type: "Luxury Retail",
+        strategy: "High-income targeting with premium location focus"
+      };
+    }
+    
+    return null;
+  };
+
+  // ✅ NEW: Customer profile analysis
+  const analyzeCustomerProfile = (updates: FilterUpdates): { demographics: string } => {
+    let demographics = "";
+    
+    if (updates.ageRange) {
+      const [min, max] = updates.ageRange;
+      if (max <= 30) {
+        demographics += "• Young adults & students (Gen Z/Millennial)\n";
+      } else if (min >= 45) {
+        demographics += "• Mature professionals & empty nesters (Gen X+)\n";
+      } else {
+        demographics += `• Working-age population (${min}-${max} years)\n`;
+      }
+    }
+    
+    if (updates.incomeRange) {
+      const [min, max] = updates.incomeRange;
+      const minK = Math.round(min/1000);
+      const maxK = Math.round(max/1000);
+      
+      if (maxK <= 50) {
+        demographics += `• Budget-conscious customers ($${minK}K-${maxK}K)\n`;
+      } else if (minK >= 100) {
+        demographics += `• Affluent customers with high spending power ($${minK}K-${maxK}K)\n`;
+      } else {
+        demographics += `• Middle-income range ($${minK}K-${maxK}K)\n`;
+      }
+    }
+    
+    if (updates.selectedEthnicities?.length) {
+      demographics += `• Cultural focus: ${updates.selectedEthnicities.join(', ')} communities\n`;
+    }
+    
+    return { demographics };
+  };
+
+  // ✅ NEW: Time strategy analysis
+  const analyzeTimeStrategy = (timePeriods: string[]): string => {
+    if (timePeriods.includes('evening') && timePeriods.length === 1) {
+      return "Evening-only focus for nightlife and social dining";
+    }
+    if (timePeriods.includes('morning') && timePeriods.includes('afternoon')) {
+      return "Daytime business model (breakfast, lunch, coffee culture)";
+    }
+    if (timePeriods.length === 3) {
+      return "All-day operation maximizing foot traffic across time periods";
+    }
+    return `Selected periods: ${timePeriods.join(', ')}`;
+  };
+
+  // ✅ NEW: Budget strategy analysis
+  const analyzeBudgetStrategy = (rentRange: [number, number]): string => {
+    const [min, max] = rentRange;
+    if (min <= 40) {
+      return `Budget-conscious location strategy ($${min}-${max} PSF) - maximizing value`;
+    } else if (max >= 120) {
+      return `Premium location strategy ($${min}-${max} PSF) - targeting high-visibility areas`;
+    } else {
+      return `Mid-tier location strategy ($${min}-${max} PSF) - balanced approach`;
+    }
   };
 
   // Enhanced filter context creation with age/income focus
@@ -118,121 +341,32 @@ export default function ChatInputPanel({
         reset();
         setMessages([...messages, 
           { role: 'user' as const, content: userMsg }, 
-          { role: 'assistant' as const, content: '🔄 Reset all filters to defaults. Refreshing results...' }
+          { role: 'assistant' as const, content: '🔄 **Reset Complete!**\n\nAll filters have been reset to defaults. I\'m ready to help you find the perfect business location with fresh customer targeting analysis!\n\n💡 **Try asking me about:**\n• Specific business types\n• Target customer demographics\n• Age and income preferences\n• Neighborhood characteristics' }
         ]);
         setTimeout(() => {
           const formattedFilters = formatFiltersForSubmission();
           onSearchSubmit(formattedFilters);
         }, 300);
       } else if (parsed.weights || parsed.selectedEthnicities || parsed.selectedTimePeriods || parsed.rentRange || parsed.ageRange || parsed.incomeRange || parsed.selectedGenders) {
-        // Enhanced filter updates with age/income intelligence descriptions
+        // ✅ UPDATED: Generate rich justification message
         const updates: FilterUpdates = {};
-        let changeDescription = '';
         
-        if (parsed.weights) {
-          updates.weights = parsed.weights;
-          const topWeight = parsed.weights.reduce((max, w) => w.value > max.value ? w : max, parsed.weights[0]);
-          const secondWeight = parsed.weights.filter(w => w.id !== topWeight.id).reduce((max, w) => w.value > max.value ? w : max, {value: 0, label: ''});
-          
-          if (secondWeight.value > 0) {
-            changeDescription += `Balancing ${topWeight.label.toLowerCase()} (${topWeight.value}%) with ${secondWeight.label.toLowerCase()} (${secondWeight.value}%). `;
-          } else {
-            changeDescription += `Focusing on ${topWeight.label.toLowerCase()} (${topWeight.value}%). `;
-          }
-        }
-        
-        // Enhanced age descriptions with lifecycle context
-        if (parsed.ageRange) {
-          updates.ageRange = parsed.ageRange;
-          const [min, max] = parsed.ageRange;
-          
-          let ageContext = '';
-          if (max <= 30) {
-            ageContext = 'young adults & students';
-          } else if (min >= 45) {
-            ageContext = 'mature professionals & empty nesters';
-          } else if (min <= 25 && max >= 45) {
-            ageContext = 'broad working-age population';
-          } else if (min >= 25 && max <= 40) {
-            ageContext = 'young professionals & early families';
-          } else {
-            ageContext = 'family-building age group';
-          }
-          
-          changeDescription += `Targeting ${ageContext} (${min}-${max} years). `;
-        }
-        
-        // Enhanced income descriptions with spending power context
-        if (parsed.incomeRange) {
-          updates.incomeRange = parsed.incomeRange;
-          const [min, max] = parsed.incomeRange;
-          const minK = Math.round(min/1000);
-          const maxK = Math.round(max/1000);
-          
-          let incomeContext = '';
-          if (maxK <= 50) {
-            incomeContext = 'budget-conscious customers';
-          } else if (minK >= 100) {
-            incomeContext = 'affluent customers with high spending power';
-          } else if (maxK <= 80) {
-            incomeContext = 'working-class to lower-middle income';
-          } else if (minK >= 60 && maxK <= 150) {
-            incomeContext = 'middle to upper-middle class';
-          } else {
-            incomeContext = 'broad middle-income range';
-          }
-          
-          changeDescription += `${incomeContext} ($${minK}K-${maxK}K). `;
-        }
-        
-        // Enhanced time period descriptions
-        if (parsed.selectedTimePeriods) {
-          updates.selectedTimePeriods = parsed.selectedTimePeriods;
-          const timeDescriptions = {
-            'morning': 'morning rush & opening hours',
-            'afternoon': 'lunch crowds & peak business', 
-            'evening': 'dinner & social hours'
-          };
-          const timeStr = parsed.selectedTimePeriods.map(t => timeDescriptions[t as keyof typeof timeDescriptions] || t).join(', ');
-          changeDescription += `Operating focus: ${timeStr}. `;
-        }
-        
-        // Enhanced demographic descriptions
-        if (parsed.selectedEthnicities) {
-          updates.selectedEthnicities = resolveEthnicities(parsed.selectedEthnicities);
-          const ethnicityNames = parsed.selectedEthnicities.join(', ');
-          if (parsed.selectedEthnicities.length > 1) {
-            changeDescription += `Multi-cultural customer base: ${ethnicityNames}. `;
-          } else {
-            changeDescription += `Community focus: ${ethnicityNames}. `;
-          }
-        }
-        
-        if (parsed.rentRange) {
-          updates.rentRange = parsed.rentRange;
-          const [min, max] = parsed.rentRange;
-          if (min <= 40) {
-            changeDescription += `Budget-friendly location ($${min}-${max} PSF). `;
-          } else if (max >= 120) {
-            changeDescription += `Premium location ($${min}-${max} PSF). `;
-          } else {
-            changeDescription += `Mid-tier location ($${min}-${max} PSF). `;
-          }
-        }
-        
-        if (parsed.selectedGenders) {
-          updates.selectedGenders = parsed.selectedGenders;
-          if (parsed.selectedGenders.length === 1) {
-            changeDescription += `${parsed.selectedGenders[0]}-focused strategy. `;
-          }
-        }
+        if (parsed.weights) updates.weights = parsed.weights;
+        if (parsed.ageRange) updates.ageRange = parsed.ageRange;
+        if (parsed.incomeRange) updates.incomeRange = parsed.incomeRange;
+        if (parsed.selectedTimePeriods) updates.selectedTimePeriods = parsed.selectedTimePeriods;
+        if (parsed.selectedEthnicities) updates.selectedEthnicities = resolveEthnicities(parsed.selectedEthnicities);
+        if (parsed.rentRange) updates.rentRange = parsed.rentRange;
+        if (parsed.selectedGenders) updates.selectedGenders = parsed.selectedGenders;
 
         setFilters(updates);
 
-        const enhancedMessage = `${changeDescription}🎯 Optimizing customer demographics...`;
+        // ✅ NEW: Generate rich justification message
+        const richMessage = generateJustificationMessage(userMsg, updates);
+        
         const newMessages = [...messages, 
           { role: 'user' as const, content: userMsg },
-          { role: 'assistant' as const, content: parsed.message ? `${parsed.message} ${enhancedMessage}` : enhancedMessage }
+          { role: 'assistant' as const, content: richMessage }
         ];
         setMessages(newMessages);
 
@@ -241,27 +375,25 @@ export default function ChatInputPanel({
           const formattedFilters = formatFiltersForSubmission();
           onSearchSubmit(formattedFilters);
           
-          // Add a follow-up message after search completes
-          setTimeout(() => {
-            setMessages([...newMessages, { 
-              role: 'assistant' as const, 
-              content: '✅ Customer-optimized results ready! Want me to adjust the age groups, income targeting, or explore different customer segments?'
-            }]);
-          }, 1500);
+          // ✅ FIXED: Don't try to show results immediately - wait for searchResults prop to update
+          // The results message will be triggered by useEffect when searchResults changes
         }, 300);
       } else {
-        // Handle general conversation with age/income context
+        // Handle general conversation with enhanced context
+        const enhancedMessage = parsed.message || 
+          "I'm Bricky, your Business Location AI! 🤖\n\nI specialize in:\n• 🎯 Customer demographic analysis\n• 💰 Income and spending pattern targeting\n• 👥 Age group optimization\n• 🏢 Business type intelligence\n• 📍 NYC neighborhood matching\n\nTell me about your business idea and I'll find the perfect locations with detailed reasoning!";
+        
         setMessages([...messages, 
           { role: 'user' as const, content: userMsg },
-          { role: 'assistant' as const, content: parsed.message || "I'm here to help you find the perfect business location with smart customer targeting! I analyze age groups, income levels, spending patterns, and lifestyle factors to optimize your business success in NYC." }
+          { role: 'assistant' as const, content: enhancedMessage }
         ]);
       }
     } catch (err: unknown) {
       console.error('❌ [ChatInputPanel] Error:', err);
       
-      let errorMessage = "Sorry, I had trouble with that request. Try asking me about specific customer types like 'young professional coffee shop' or 'family-friendly restaurant'.";
+      let errorMessage = "🚨 **Oops! Something went wrong.**\n\nI had trouble processing that request. Try asking me about:\n• Specific business types (e.g., 'coffee shop for students')\n• Customer demographics (e.g., 'young professionals')\n• Budget considerations (e.g., 'affordable restaurant location')";
       if (err instanceof Error) {
-        errorMessage = err.message;
+        errorMessage = `🚨 **Error:** ${err.message}\n\nPlease try again or ask me something different!`;
       }
       
       setMessages([...messages, 
@@ -292,6 +424,46 @@ export default function ChatInputPanel({
       inputRef.current?.focus();
     }, 150);
   }, []);
+
+  // ✅ FIXED: Moved generateResultsMessage inside useEffect dependencies
+  useEffect(() => {
+    const currentResultsCount = searchResults?.zones?.length || 0;
+    const currentTotalFound = searchResults?.total_zones_found || 0;
+    
+    // Only proceed if we have results and haven't shown them for this search yet
+    if (currentResultsCount > 0 && 
+        currentTotalFound !== lastResultsShown.current) {
+      
+      // Check if we have messages and the last one was an analysis message
+      const currentMessages = useGeminiStore.getState().messages;
+      if (currentMessages.length > 0) {
+        const lastMessage = currentMessages[currentMessages.length - 1];
+        
+        // Only add results if the last assistant message was an analysis (contains "Searching for optimized locations")
+        if (lastMessage?.role === 'assistant' && 
+            lastMessage.content.includes('⚡ **Searching for optimized locations...**')) {
+          
+          console.log('🔍 [ChatInputPanel] Search results received, generating results message:', {
+            zonesCount: currentResultsCount,
+            totalFound: currentTotalFound,
+            lastShown: lastResultsShown.current
+          });
+          
+          const resultsMessage = generateResultsMessage();
+          
+          // Use the store's setMessages directly to avoid stale closure
+          const currentState = useGeminiStore.getState();
+          currentState.setMessages([...currentState.messages, { 
+            role: 'assistant' as const, 
+            content: resultsMessage
+          }]);
+          
+          // Track that we've shown results for this search
+          lastResultsShown.current = currentTotalFound;
+        }
+      }
+    }
+  }, [searchResults?.zones?.length, searchResults?.total_zones_found, generateResultsMessage]);
 
   return (
     <Box bg="white" borderRadius="lg" overflow="hidden">
@@ -456,7 +628,16 @@ export default function ChatInputPanel({
                   borderWidth="1px"
                   borderColor={msg.role === 'user' ? '#FF492C' : 'gray.200'}
                 >
-                  <Text>{msg.content}</Text>
+                  {/* ✅ NEW: Format messages with markdown-style formatting */}
+                  <Text 
+                    whiteSpace="pre-line"
+                    sx={{
+                      '& strong': { fontWeight: 'bold' },
+                      '& em': { fontStyle: 'italic' }
+                    }}
+                  >
+                    {msg.content}
+                  </Text>
                 </Box>
               </Flex>
             ))}
@@ -465,6 +646,15 @@ export default function ChatInputPanel({
                 <Flex align="center" gap={3} bg="white" px={4} py={3} borderRadius="lg" boxShadow="sm" borderWidth="1px" borderColor="gray.200">
                   <Spinner size="sm" color="#FF492C" />
                   <Text fontSize="sm" color="gray.600">Bricky is analyzing customer demographics...</Text>
+                </Flex>
+              </Flex>
+            )}
+            {/* ✅ NEW: Show search loading state in chat */}
+            {isSearchLoading && (
+              <Flex justify="flex-start">
+                <Flex align="center" gap={3} bg="blue.50" px={4} py={3} borderRadius="lg" boxShadow="sm" borderWidth="1px" borderColor="blue.200">
+                  <Spinner size="sm" color="blue.500" />
+                  <Text fontSize="sm" color="blue.600">🔍 Finding optimized locations...</Text>
                 </Flex>
               </Flex>
             )}

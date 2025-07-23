@@ -60,7 +60,6 @@ interface SubmissionData extends FilterState {
   topN?: number;
 }
 
-// 🔧 FIX: Import the exact interface from page.tsx to avoid conflicts
 interface MapSearchResult {
   geoid: string;
   tract_name?: string;
@@ -114,9 +113,8 @@ interface MapSearchResult {
   [key: string]: unknown;
 }
 
-// 🔧 FIX: Match the exact EdgeFunctionResponse from page.tsx
 interface EdgeFunctionResponse {
-  zones: MapSearchResult[]; // Use MapSearchResult[], not TractResult[]
+  zones: MapSearchResult[];
   total_zones_found: number;
   top_zones_returned: number;
   top_percentage: number;
@@ -125,15 +123,17 @@ interface EdgeFunctionResponse {
   debug?: Record<string, unknown>;
 }
 
+// ✅ UPDATED: Added AI justification props
 interface TopLeftUIProps {
   onFilterUpdate: (filters: SubmissionData) => void;
   searchResults?: TractResult[];
   onMapTractSelect?: (tractId: string | null) => void;
   selectedTract?: TractResult;
   onClearSelectedTract?: () => void;
-  // 🔧 FIX: Match the exact type from page.tsx (EdgeFunctionResponse | null)
   fullSearchResponse?: EdgeFunctionResponse | null;
   isSearchLoading?: boolean;
+  lastQuery?: string;
+  aiReasoning?: string;
 }
 
 export default function TopLeftUI({ 
@@ -142,10 +142,10 @@ export default function TopLeftUI({
   onMapTractSelect,
   selectedTract,
   onClearSelectedTract,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fullSearchResponse: _fullSearchResponse,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  isSearchLoading: _isSearchLoading
+  isSearchLoading: _isSearchLoading,
+  lastQuery,
+  aiReasoning
 }: TopLeftUIProps) {
   const viewState = useUiStore(s => s.viewState);
   const { isOpen: isFilterDrawerOpen, onOpen: openFilterDrawer, onClose: closeFilterDrawer } = useDisclosure();
@@ -342,6 +342,10 @@ export default function TopLeftUI({
           <ChatInputPanel 
             onSearchSubmit={handleFilterSearch}
             onResetRequest={handleResetRequest}
+            searchResults={_fullSearchResponse}
+            lastQuery={lastQuery}
+            aiReasoning={aiReasoning}
+            isSearchLoading={_isSearchLoading}
           />
         </Box>
       </Box>
@@ -416,10 +420,14 @@ export default function TopLeftUI({
         </Box>
       )}
 
+      {/* ✅ UPDATED: Pass AI justification props to MyDrawer */}
       <MyDrawer
         isOpen={isFilterDrawerOpen}
         onClose={closeFilterDrawer}
         onSearchSubmit={handleFilterSearch}
+        searchResults={_fullSearchResponse}
+        lastQuery={lastQuery}
+        aiReasoning={aiReasoning}
       />
 
       <Portal>

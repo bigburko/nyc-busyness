@@ -5,7 +5,8 @@ import mapboxgl from 'mapbox-gl';
 import Map from '../components/features/Map/Map';
 import TopLeftUI from '../components/features/search/TopLeftUI';
 import { uiStore } from '@/stores/uiStore';
-import { useFilterStore } from '@/stores/filterStore'; // 🆕 ADDED: Import filterStore to get selectedTimePeriods
+import { useFilterStore } from '@/stores/filterStore';
+import { useGeminiStore } from '@/stores/geminiStore';
 
 interface Weighting {
   id: string;
@@ -18,7 +19,7 @@ interface MapFilters {
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
-  selectedTimePeriods?: string[]; // 🆕 ADDED: Add selectedTimePeriods to MapFilters
+  selectedTimePeriods?: string[];
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number;
@@ -55,7 +56,6 @@ interface TractResult {
     pred_2026?: number;
     pred_2027?: number;
   };
-  // ✅ ADDED: Missing timeline fields for foot traffic
   foot_traffic_timeline?: {
     '2019'?: number;
     '2020'?: number;
@@ -109,7 +109,6 @@ interface MapSearchResult {
     pred_2026?: number;
     pred_2027?: number;
   };
-  // ✅ ADDED: Missing timeline fields for foot traffic
   foot_traffic_timeline?: {
     '2019'?: number;
     '2020'?: number;
@@ -132,7 +131,6 @@ interface MapSearchResult {
   [key: string]: unknown;
 }
 
-// ✅ FIXED: Proper interface for debug info instead of any
 interface DebugInfo {
   received_ethnicities?: string[];
   received_genders?: string[];
@@ -150,7 +148,6 @@ interface DebugInfo {
   [key: string]: unknown;
 }
 
-// ✅ FIXED: Add interface for the full edge function response
 interface EdgeFunctionResponse {
   zones: MapSearchResult[];
   total_zones_found: number;
@@ -158,7 +155,7 @@ interface EdgeFunctionResponse {
   top_percentage: number;
   demographic_scoring_applied?: boolean;
   foot_traffic_periods_used?: string[];
-  debug?: DebugInfo; // ✅ FIXED: Use proper interface instead of any
+  debug?: DebugInfo;
 }
 
 interface FilterUpdate {
@@ -166,13 +163,12 @@ interface FilterUpdate {
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
-  selectedTimePeriods?: string[]; // 🆕 ADDED: Add selectedTimePeriods to FilterUpdate
+  selectedTimePeriods?: string[];
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number;
 }
 
-// ✅ FIXED: Proper error interface instead of any
 interface SearchError {
   message?: string;
   status?: number;
@@ -184,23 +180,45 @@ declare global {
   interface Window {
     selectTractFromResultsPanel?: (tractId: string) => void;
     openResultsPanel?: () => void;
-    resetToInitialView?: () => void; // NEW: Add reset function
+    resetToInitialView?: () => void;
     _brickwyzeMapRef?: mapboxgl.Map;
   }
 }
 
 export default function Page() {
-  // 🆕 ADDED: Get selectedTimePeriods from filterStore
   const { selectedTimePeriods } = useFilterStore();
+  const { messages } = useGeminiStore();
   
   const [currentFilters, setCurrentFilters] = useState<MapFilters>({});
   const [searchResults, setSearchResults] = useState<TractResult[]>([]);
   const [selectedTractId, setSelectedTractId] = useState<string | null>(null);
   const [selectedTract, setSelectedTract] = useState<TractResult | undefined>(undefined);
-  
-  // ✅ FIXED: Add state for full search response (for MyDrawer)
   const [fullSearchResponse, setFullSearchResponse] = useState<EdgeFunctionResponse | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
+  
+  // ✅ NEW: AI Justification state
+  const [lastQuery, setLastQuery] = useState<string>('');
+  const [aiReasoning, setAiReasoning] = useState<string>('');
+
+  // ✅ NEW: Auto-track AI queries and reasoning
+  useEffect(() => {
+    // Get the last user message as the query
+    const lastUserMessage = messages
+      .filter(msg => msg.role === 'user')
+      .slice(-1)[0];
+    
+    if (lastUserMessage?.content) {
+      setLastQuery(lastUserMessage.content);
+    }
+    
+    // Extract AI reasoning from demographic scoring if available
+    const currentFilters = useFilterStore.getState();
+    if (currentFilters.demographicScoring?.reasoning) {
+      setAiReasoning(currentFilters.demographicScoring.reasoning);
+    } else if (currentFilters.lastDemographicReasoning?.summary) {
+      setAiReasoning(currentFilters.lastDemographicReasoning.summary);
+    }
+  }, [messages]);
 
   const handleFilterUpdate = useCallback((filters: FilterUpdate) => {
     console.log('🔄 [Page] Updating map filters - topN:', filters.topN);
@@ -210,32 +228,29 @@ export default function Page() {
       rentRange: filters.rentRange || [26, 160],
       selectedEthnicities: filters.selectedEthnicities || [],
       selectedGenders: filters.selectedGenders || ['male', 'female'],
-      selectedTimePeriods: filters.selectedTimePeriods || selectedTimePeriods, // 🆕 ADDED: Include selectedTimePeriods
+      selectedTimePeriods: filters.selectedTimePeriods || selectedTimePeriods,
       ageRange: filters.ageRange || [0, 100],
       incomeRange: filters.incomeRange || [0, 250000],
       topN: filters.topN || 10,
     };
 
     console.log('🔄 [Page] Setting current filters with topN:', mapFilters.topN);
-    console.log('🕐 [Page] Setting current filters with timePeriods:', mapFilters.selectedTimePeriods); // 🆕 ADDED: Debug log for time periods
+    console.log('🕐 [Page] Setting current filters with timePeriods:', mapFilters.selectedTimePeriods);
     setCurrentFilters(mapFilters);
-  }, [selectedTimePeriods]); // 🆕 ADDED: Add selectedTimePeriods to dependency array
+  }, [selectedTimePeriods]);
 
-  // ✅ FIXED: Enhanced handleSearchResults to store full response AND preserve timeline data
   const handleSearchResults = useCallback((results: MapSearchResult[], fullResponse?: EdgeFunctionResponse) => {
     console.log('📊 [Page] Received search results:', results.length, 'tracts');
     
-    // Store the full edge function response for MyDrawer
     if (fullResponse) {
       console.log('📊 [Page] Storing full search response:', {
         zones_returned: fullResponse.zones?.length || 0,
         total_zones_found: fullResponse.total_zones_found || 0,
         top_percentage: fullResponse.top_percentage || 0,
-        foot_traffic_periods_used: fullResponse.foot_traffic_periods_used || [] // 🆕 ADDED: Log time periods used
+        foot_traffic_periods_used: fullResponse.foot_traffic_periods_used || []
       });
       setFullSearchResponse(fullResponse);
     } else {
-      // Fallback: create a response object from just the results
       setFullSearchResponse({
         zones: results,
         total_zones_found: results.length,
@@ -244,7 +259,6 @@ export default function Page() {
       });
     }
     
-    // ✅ CRITICAL FIX: Include ALL timeline fields in transformation
     const transformedResults: TractResult[] = results.map(r => ({
       geoid: r.geoid || '',
       tract_name: r.tract_name || `Tract ${r.geoid || ''}`,
@@ -267,7 +281,6 @@ export default function Page() {
       age_match_pct: r.age_match_pct,
       income_match_pct: r.income_match_pct,
       crime_timeline: r.crime_timeline,
-      // ✅ CRITICAL: Include the missing timeline fields that were being stripped out!
       foot_traffic_timeline: r.foot_traffic_timeline,
       foot_traffic_by_period: r.foot_traffic_by_period,
       foot_traffic_timeline_metadata: r.foot_traffic_timeline_metadata,
@@ -275,7 +288,6 @@ export default function Page() {
       foot_traffic_periods_used: r.foot_traffic_periods_used,
     }));
     
-    // ✅ DEBUG: Log timeline data preservation in transformation
     if (transformedResults.length > 0) {
       const firstResult = transformedResults[0];
       console.log('🔍 [Page] Timeline data transformation check:', {
@@ -291,7 +303,6 @@ export default function Page() {
     setSearchResults(transformedResults);
   }, [currentFilters.topN]);
 
-  // ✅ FIXED: Add search loading state handlers
   const handleSearchStart = useCallback(() => {
     console.log('🔄 [Page] Search started');
     setIsSearchLoading(true);
@@ -302,26 +313,22 @@ export default function Page() {
     setIsSearchLoading(false);
   }, []);
 
-  // ✅ FIXED: Use proper error interface instead of any
   const handleSearchError = useCallback((error: SearchError) => {
     console.error('❌ [Page] Search error:', error);
     setIsSearchLoading(false);
     setFullSearchResponse(null);
   }, []);
 
-  // 🔧 FIX: Simplified handleMapTractSelect (back to original)
   const handleMapTractSelect = useCallback((tractId: string | null) => {
     console.log('🗺️ [Page] Highlighting tract on map:', tractId);
     setSelectedTractId(tractId);
   }, []);
 
-  // 🔧 NEW: Add callback to clear selectedTract state
   const handleClearSelectedTract = useCallback(() => {
     console.log('🔄 [Page] Clearing parent selectedTract state');
     setSelectedTract(undefined);
   }, []);
 
-  // 🔧 FIX: Enhanced useEffect with resetToInitialView function
   useEffect(() => {
     console.log('🔧 [Page] Setting up global functions for map communication');
     
@@ -330,7 +337,6 @@ export default function Page() {
       
       const tractIdStr = String(tractIdParam);
       
-      // 🔧 CRITICAL DEBUG: Log current state before condition check
       console.log('🔍 [Page] Current state check:', {
         selectedTractId: selectedTractId,
         tractIdStr: tractIdStr,
@@ -340,8 +346,6 @@ export default function Page() {
         willSkip: selectedTractId === tractIdStr && selectedTract
       });
       
-      // 🔧 IMPROVED FIX: Only skip if tract is selected AND detail panel is open
-      // If detail panel was closed (selectedTract is undefined), allow re-selection
       if (selectedTractId === tractIdStr && selectedTract) {
         console.log('🚫 [Page] Tract already selected and detail panel open, skipping state update');
         return;
@@ -382,18 +386,15 @@ export default function Page() {
       uiStore.setState({ viewState: 'results' });
     };
     
-    // NEW: Add resetToInitialView function that ONLY closes chat input
     window.resetToInitialView = () => {
       const currentState = uiStore.getState().viewState;
       console.log('🔄 [Page] resetToInitialView called - current state:', currentState);
       
       if (currentState === 'typing') {
-        // ONLY close chat input by switching to results state
         console.log('🔄 [Page] Closing chat input only - switching typing → results');
         uiStore.setState({ viewState: 'results' });
         console.log('✅ [Page] Chat input closed, results panel kept open');
       } else {
-        // For any other state (results/initial), do absolutely nothing
         console.log('🚫 [Page] Not in typing state, doing nothing to preserve current UI');
       }
     };
@@ -402,17 +403,16 @@ export default function Page() {
       console.log('🧹 [Page] Cleaning up global functions');
       delete window.selectTractFromResultsPanel;
       delete window.openResultsPanel;
-      delete window.resetToInitialView; // NEW: Clean up reset function
+      delete window.resetToInitialView;
     };
-  }, [searchResults, selectedTractId, selectedTract]); // 🔧 CRITICAL: Add selectedTract to deps
+  }, [searchResults, selectedTractId, selectedTract]);
 
-  // 🔧 FIX: Enhanced mapProps with search handlers and selectedTimePeriods
   const mapProps = useMemo(() => ({
     weights: currentFilters.weights || [],
     rentRange: currentFilters.rentRange || [26, 160] as [number, number],
     selectedEthnicities: currentFilters.selectedEthnicities || [],
     selectedGenders: currentFilters.selectedGenders || [],
-    selectedTimePeriods: selectedTimePeriods, // 🆕 ADDED: Pass selectedTimePeriods to Map component
+    selectedTimePeriods: selectedTimePeriods,
     ageRange: currentFilters.ageRange || [0, 100] as [number, number],
     incomeRange: currentFilters.incomeRange || [0, 250000] as [number, number],
     topN: currentFilters.topN || 10,
@@ -423,7 +423,7 @@ export default function Page() {
     selectedTractId: selectedTractId,
   }), [
     currentFilters, 
-    selectedTimePeriods, // 🆕 ADDED: Add selectedTimePeriods to dependency array
+    selectedTimePeriods,
     handleSearchResults, 
     handleSearchStart, 
     handleSearchComplete, 
@@ -431,25 +431,27 @@ export default function Page() {
     selectedTractId
   ]);
 
-  // ✅ FIXED: Enhanced TopLeftUI props with search results for MyDrawer and clear callback
+  // ✅ UPDATED: Include AI justification props
   const topLeftUIProps = useMemo(() => ({
     onFilterUpdate: handleFilterUpdate,
     searchResults: searchResults,
     onMapTractSelect: handleMapTractSelect,
     selectedTract: selectedTract,
-    // 🔧 NEW: Pass the clear callback
     onClearSelectedTract: handleClearSelectedTract,
-    // ✅ NEW: Pass full search response and loading state for MyDrawer
     fullSearchResponse: fullSearchResponse,
     isSearchLoading: isSearchLoading,
+    lastQuery: lastQuery,
+    aiReasoning: aiReasoning,
   }), [
     handleFilterUpdate,
     searchResults,
     handleMapTractSelect,
     selectedTract,
-    handleClearSelectedTract, // 🔧 NEW: Add to dependencies
+    handleClearSelectedTract,
     fullSearchResponse,
-    isSearchLoading
+    isSearchLoading,
+    lastQuery,
+    aiReasoning
   ]);
 
   return (
@@ -467,7 +469,6 @@ export default function Page() {
         pointerEvents: 'none' 
       }}>
         <div style={{ pointerEvents: 'auto' }}>
-          {/* ✅ FIXED: Pass enhanced props including search response for MyDrawer and clear callback */}
           <TopLeftUI {...topLeftUIProps} />
         </div>
       </div>
