@@ -1,3 +1,4 @@
+// Clean MySlider.tsx with debug logs removed
 'use client';
 
 import {
@@ -10,14 +11,14 @@ import {
   Text,
   CloseButton,
 } from '@chakra-ui/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface Props {
   label: string;
   icon: string;
   filledTrack: string;
-  value: number; // The "canonical" value from the parent
-  onChangeEnd: (val: number) => void; // Notifies parent when dragging stops
+  value: number;
+  onChangeEnd: (val: number) => void;
   onRemove: () => void;
   canBeRemoved: boolean;
   boxSize?: number;
@@ -33,13 +34,33 @@ export default function MySlider({
   canBeRemoved,
   boxSize = 6,
 }: Props) {
-  // Internal state provides a smooth dragging experience without re-rendering the whole page
   const [internalValue, setInternalValue] = useState(value);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Syncs the slider if its value is changed externally (e.g., by another slider)
+  // Sync internal value with external value ONLY when not dragging
   useEffect(() => {
-    setInternalValue(value);
-  }, [value]);
+    if (!isDragging) {
+      setInternalValue(value);
+    }
+  }, [value, isDragging]);
+
+  // Handle drag start
+  const handleChangeStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
+  // Handle drag end - this triggers redistribution
+  const handleChangeEnd = useCallback((val: number) => {
+    setIsDragging(false);
+    const roundedValue = Math.round(val);
+    setInternalValue(roundedValue);
+    onChangeEnd(roundedValue);
+  }, [onChangeEnd]);
+
+  // Handle ongoing drag - only update internal state
+  const handleChange = useCallback((val: number) => {
+    setInternalValue(val);
+  }, []);
 
   return (
     <Box bg="white" borderRadius="md" p={3} boxShadow="sm" w="100%">
@@ -68,8 +89,9 @@ export default function MySlider({
       </Flex>
       <Slider
         value={internalValue}
-        onChange={setInternalValue}
-        onChangeEnd={onChangeEnd}
+        onChange={handleChange}
+        onChangeStart={handleChangeStart}
+        onChangeEnd={handleChangeEnd}
         min={0}
         max={100}
         step={1}
@@ -77,7 +99,7 @@ export default function MySlider({
         <SliderTrack bg="gray.200">
           <SliderFilledTrack bg={filledTrack} />
         </SliderTrack>
-        <SliderThumb tabIndex={-1} /> {/* Prevents focus jumps */}
+        <SliderThumb tabIndex={-1} />
       </Slider>
     </Box>
   );

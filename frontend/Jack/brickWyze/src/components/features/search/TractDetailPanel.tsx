@@ -1,10 +1,11 @@
-// src/components/features/search/TractDetailPanel.tsx
+// src/components/features/search/TractDetailPanel.tsx - CLEANED VERSION
 'use client';
 
 import { 
   Box, VStack, HStack, Text, Button, IconButton, SimpleGrid, Progress, Flex
 } from '@chakra-ui/react';
 import { CloseIcon, ExternalLinkIcon } from '@chakra-ui/icons';
+import { useFilterStore } from '../../../stores/filterStore';
 
 interface TractResult {
   geoid: string;
@@ -17,7 +18,7 @@ interface TractResult {
   demographic_score: number;
   foot_traffic_score: number;
   crime_score: number;
-  flood_risk_score?: number; // ✅ FIXED: Made optional to match other components
+  flood_risk_score?: number;
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
@@ -27,6 +28,24 @@ interface TractResult {
   gender_match_pct?: number;
   age_match_pct?: number;
   income_match_pct?: number;
+  
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  
   crime_timeline?: {
     year_2020?: number;
     year_2021?: number;
@@ -44,7 +63,6 @@ interface TractDetailPanelProps {
   onClose: () => void;
 }
 
-// Score meter component
 function ScoreMeter({ 
   label, 
   score, 
@@ -58,6 +76,7 @@ function ScoreMeter({
   max?: number;
   icon?: string;
 }) {
+  const displayScore = Math.min(Math.max(Math.round(score), 0), max);
   const percentage = Math.min((score / max) * 100, 100);
   
   return (
@@ -67,7 +86,7 @@ function ScoreMeter({
           {icon} {label}
         </Text>
         <Text fontSize="md" fontWeight="bold" color={color}>
-          {Math.round(score)}/{max}
+          {displayScore}/{max}
         </Text>
       </HStack>
       <Progress 
@@ -82,31 +101,306 @@ function ScoreMeter({
   );
 }
 
-// ✅ SIMPLE Crime trend chart - timeline data is already 0-100, other scores are 0-1
-function CrimeTrendChart({ tract }: { tract: TractResult }) {
-  // ✅ FIX: Current score needs * 100, but timeline data is already 0-100
-  const currentScore = Math.round((tract.crime_score || 0.1) * 100);
+function FootTrafficChart({ tract }: { tract: TractResult }) {
+  const currentScore = Math.round(tract.foot_traffic_score || 50);
+  const { selectedTimePeriods } = useFilterStore();
   
-  // Check if we have real crime timeline data
+  const hasperiodData = tract.foot_traffic_by_period && 
+    Object.keys(tract.foot_traffic_by_period).length > 0;
+  
+  const hasTimelineData = tract.foot_traffic_timeline && 
+    Object.keys(tract.foot_traffic_timeline).length > 0;
+
+  // If we have the rich period data, use it!
+  if (hasperiodData && tract.foot_traffic_by_period) {
+    const periods = tract.foot_traffic_by_period;
+    const years = ['2022', '2023', '2024', 'pred_2025', 'pred_2026', 'pred_2027'];
+    
+    const availablePeriods = ['morning', 'afternoon', 'evening'];
+    const activePeriods = availablePeriods.filter(period => 
+      selectedTimePeriods.includes(period) && periods[period as keyof typeof periods]
+    );
+    
+    if (activePeriods.length === 0) {
+      return (
+        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+          <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
+            🚶 Foot Traffic by Time Period
+          </Text>
+          <Text fontSize="lg" color="gray.600" textAlign="center" py={6}>
+            No time periods selected. Please select morning, afternoon, or evening to view data.
+          </Text>
+        </Box>
+      );
+    }
+    
+    const chartData = years.map(year => {
+      // 🔧 FIX: Define proper interface for yearData instead of using any
+      const yearData: Record<string, string | number | boolean> = {
+        year: year.replace('pred_', ''),
+        isPrediction: year.startsWith('pred_')
+      };
+      
+      activePeriods.forEach(period => {
+        yearData[period] = Math.round(periods[period as keyof typeof periods]?.[year] || 0);
+      });
+      
+      return yearData;
+    }).filter(item => {
+      return activePeriods.some(period => item[period] as number > 0);
+    });
+    
+    if (chartData.length === 0) {
+      return (
+        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+          <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
+            🚶 Foot Traffic Score
+          </Text>
+          <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
+            {currentScore}/100
+          </Text>
+        </Box>
+      );
+    }
+
+    const allValues = chartData.flatMap(d => activePeriods.map(period => d[period] as number));
+    const maxValue = Math.max(...allValues);
+    const minValue = Math.min(...allValues.filter(v => v > 0));
+    
+    const getHeight = (value: number) => {
+      if (value <= 0) return 20;
+      
+      const range = maxValue - minValue;
+      if (range === 0) return 80;
+      
+      const normalizedValue = (value - minValue) / range;
+      return Math.max(40, 40 + (normalizedValue * 120));
+    };
+
+    const periodConfig = {
+      morning: { color: '#F59E0B', pastColor: '#6B7280' },
+      afternoon: { color: '#3B82F6', pastColor: '#9CA3AF' },
+      evening: { color: '#6366F1', pastColor: '#9CA3AF' }
+    };
+
+    return (
+      <Box w="full">
+        <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
+          🚶 Foot Traffic by Time Period (6-Year View) 📊
+        </Text>
+
+        <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
+          {/* Chart - Clean version with enough height for bars */}
+          <Flex justify="space-around" align="end" h="200px" mb={4} px={2}>
+            {chartData.map((item) => {
+              const isPast = parseInt(item.year as string) < 2025;
+              const isCurrent = item.year === '2025';
+              const isFuture = parseInt(item.year as string) > 2025;
+              
+              return (
+                <VStack key={`ft-period-${item.year}`} spacing={1} flex="1" align="center" position="relative">
+                  {/* Blue background box - positioned behind content */}
+                  {isCurrent && (
+                    <Box 
+                      position="absolute"
+                      top="-4px"
+                      bottom="-4px"
+                      left="-4px"
+                      right="-4px"
+                      border="2px solid"
+                      borderColor="blue.500"
+                      borderRadius="md"
+                      bg="blue.50"
+                      zIndex={0}
+                    />
+                  )}
+                  
+                  {/* Content - same structure for all years */}
+                  <VStack spacing={2} align="center" position="relative" zIndex={1}>
+                      {/* Each bar with its value directly above it */}
+                      <HStack spacing="2px" align="end">
+                        {activePeriods.map(period => {
+                          const config = periodConfig[period as keyof typeof periodConfig];
+                          const height = getHeight(item[period] as number);
+                          
+                          return (
+                            <VStack key={`${item.year}-${period}-pair`} spacing={2} align="center">
+                              <Text 
+                                fontSize="9px" 
+                                fontWeight="bold" 
+                                color="gray.700" 
+                                lineHeight="1"
+                              >
+                                {item[period] as number}
+                              </Text>
+                              
+                              <Box
+                                bg={config.color}
+                                h={`${height}px`}
+                                w="8px"
+                                borderRadius="sm"
+                                boxShadow="sm"
+                                opacity={isPast ? 0.6 : 1}
+                                border={isFuture ? "1px dashed" : "none"}
+                                borderColor="gray.400"
+                              />
+                            </VStack>
+                          );
+                        })}
+                      </HStack>
+                      
+                      {/* Year label */}
+                      <Text 
+                        fontSize="xs" 
+                        color={isPast ? "gray.400" : isCurrent ? "blue.600" : "purple.600"}
+                        fontWeight={isCurrent ? "bold" : "normal"}
+                      >
+                        {item.year as string}
+                      </Text>
+                    </VStack>
+                </VStack>
+              );
+            })}
+          </Flex>
+          
+          {/* Period Legend ONLY - Show time periods */}
+          <HStack justify="center" spacing={6} fontSize="xs" color="gray.600">
+            {activePeriods.includes('morning') && (
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="#F59E0B" borderRadius="sm" />
+                <Text>🌅 Morning</Text>
+              </HStack>
+            )}
+            {activePeriods.includes('afternoon') && (
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="#3B82F6" borderRadius="sm" />
+                <Text>☀️ Afternoon</Text>
+              </HStack>
+            )}
+            {activePeriods.includes('evening') && (
+              <HStack spacing={1}>
+                <Box w="8px" h="8px" bg="#6366F1" borderRadius="sm" />
+                <Text>🌙 Evening</Text>
+              </HStack>
+            )}
+          </HStack>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Fallback: Use timeline data if available 
+  if (hasTimelineData && tract.foot_traffic_timeline) {
+    const timeline = tract.foot_traffic_timeline;
+    const chartData = [
+      { year: '2022', value: Math.round(timeline['2022'] || 0) },
+      { year: '2023', value: Math.round(timeline['2023'] || 0) },
+      { year: '2024', value: Math.round(timeline['2024'] || 0) },
+      { year: '2025', value: Math.round(timeline['pred_2025'] || 0) },
+      { year: '2026', value: Math.round(timeline['pred_2026'] || 0) },
+      { year: '2027', value: Math.round(timeline['pred_2027'] || 0) },
+    ];
+
+    const maxValue = Math.max(...chartData.map(d => d.value));
+    const minValue = Math.min(...chartData.map(d => d.value));
+    
+    const getHeight = (value: number) => {
+      const range = maxValue - minValue;
+      if (range === 0) return 60;
+      // Less aggressive scaling
+      const normalizedValue = (value - minValue) / range;
+      return Math.max(30, 50 + (normalizedValue * 80));
+    };
+
+    return (
+      <Box w="full">
+        <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
+          🚶 Foot Traffic Trend (6-Year View) 📊
+        </Text>
+
+        <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
+          <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
+            {chartData.map((item, index) => {
+              const isPast = index < 3;
+              const isCurrent = index === 3;
+              const height = getHeight(item.value);
+              
+              return (
+                <VStack key={`ft-timeline-${item.year}`} spacing={1} flex="1" align="center" position="relative">
+                  {/* Blue background box - positioned behind content */}
+                  {isCurrent && (
+                    <Box 
+                      position="absolute"
+                      top="-4px"
+                      bottom="-4px"
+                      left="-4px"
+                      right="-4px"
+                      border="2px solid"
+                      borderColor="blue.500"
+                      borderRadius="md"
+                      bg="blue.50"
+                      zIndex={0}
+                    />
+                  )}
+                  
+                  {/* Content - same structure for all years */}
+                  <VStack spacing={2} align="center" position="relative" zIndex={1}>
+                      <Box w="14px" textAlign="center">
+                        <Text fontSize="9px" fontWeight="bold" color="gray.700" lineHeight="1">
+                          {item.value}
+                        </Text>
+                      </Box>
+                      <Box
+                        bg={isPast ? "#6B7280" : isCurrent ? "#4299E1" : "#60A5FA"}
+                        h={`${height}px`}
+                        w="20px"
+                        borderRadius="md"
+                        boxShadow="sm"
+                      />
+                      <Text fontSize="xs" color="gray.500" fontWeight={isCurrent ? "bold" : "normal"}>
+                        {item.year}
+                      </Text>
+                    </VStack>
+                </VStack>
+              );
+            })}
+          </Flex>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Final fallback: Show current score only
+  return (
+    <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+      <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
+        🚶 Foot Traffic Score
+      </Text>
+      <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
+        {currentScore}/100
+      </Text>
+    </Box>
+  );
+}
+
+function CrimeTrendChart({ tract }: { tract: TractResult }) {
+  const currentScore = Math.round(tract.crime_score || 50);
+  
   const hasRealData = tract.crime_timeline && Object.keys(tract.crime_timeline).length > 0;
   
   let chartData = [];
   
   if (hasRealData && tract.crime_timeline) {
-    // ✅ FIX: Timeline data might be 0-10 scale, divide by 10 to get 0-100
     chartData = [
-      { year: '2021', value: Math.round((tract.crime_timeline.year_2021 || 0) / 10 * 100) },
-      { year: '2022', value: Math.round((tract.crime_timeline.year_2022 || 0) / 10 * 100) },
-      { year: '2023', value: Math.round((tract.crime_timeline.year_2023 || 0) / 10 * 100) },
-      { year: '2024', value: Math.round((tract.crime_timeline.year_2024 || 0) / 10 * 100) },
-      { year: '2025', value: Math.round((tract.crime_timeline.pred_2025 || 0) / 10 * 100) },
-      { year: '2026', value: Math.round((tract.crime_timeline.pred_2026 || 0) / 10 * 100) },
-      { year: '2027', value: Math.round((tract.crime_timeline.pred_2027 || 0) / 10 * 100) },
-    ]; // ✅ FIX: Don't filter out zero values - keep all 7 years
+      { year: '2022', value: Math.round(tract.crime_timeline.year_2022 || 0) },
+      { year: '2023', value: Math.round(tract.crime_timeline.year_2023 || 0) },
+      { year: '2024', value: Math.round(tract.crime_timeline.year_2024 || 0) },
+      { year: '2025', value: Math.round(tract.crime_timeline.pred_2025 || 0) },
+      { year: '2026', value: Math.round(tract.crime_timeline.pred_2026 || 0) },
+      { year: '2027', value: Math.round(tract.crime_timeline.pred_2027 || 0) },
+    ];
   } else {
-    // Fallback to calculated data
     chartData = [
-      { year: '2021', value: Math.round(currentScore * 0.75) },
       { year: '2022', value: Math.round(currentScore * 0.80) },
       { year: '2023', value: Math.round(currentScore * 0.85) },
       { year: '2024', value: Math.round(currentScore * 0.92) },
@@ -119,108 +413,90 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
   const maxValue = Math.max(...chartData.map(d => d.value));
   const minValue = Math.min(...chartData.map(d => d.value));
   
-  // ✅ FIX: Use logarithmic scaling to amplify small differences
-  const range = maxValue - minValue;
-  const hasVariation = range > 1;
-  
-  let effectiveMin, effectiveMax;
-  
-  if (!hasVariation) {
-    // For identical/similar values, use log scaling around the average
-    const avgValue = (maxValue + minValue) / 2;
-    effectiveMin = Math.max(1, avgValue - 8); // Wider range for log scale
-    effectiveMax = avgValue + 8;
-  } else {
-    // Use actual range with padding
-    effectiveMin = Math.max(1, minValue - 3);
-    effectiveMax = maxValue + 3;
-  }
-  
-  // ✅ Logarithmic height calculation function
-  const getLogHeight = (value: number) => {
-    // Ensure value is at least 1 for log calculation
-    const safeValue = Math.max(1, value);
-    const safeMin = Math.max(1, effectiveMin);
-    const safeMax = Math.max(2, effectiveMax);
+  const getHeight = (value: number) => {
+    if (value <= 0) return 20;
     
-    // Use natural log for scaling
-    const logValue = Math.log(safeValue);
-    const logMin = Math.log(safeMin);
-    const logMax = Math.log(safeMax);
+    const range = maxValue - minValue;
+    if (range === 0) return 80;
     
-    // Scale to 60-180px range (much taller bars)
-    const logRange = logMax - logMin;
-    const normalizedLog = logRange > 0 ? (logValue - logMin) / logRange : 0.5;
-    
-    return Math.max(60, 60 + (normalizedLog * 120)); // 60px minimum, up to 180px
+    // Less aggressive scaling - reduced multiplier and smaller base range
+    const normalizedValue = (value - minValue) / range;
+    return Math.max(30, 50 + (normalizedValue * 80)); // Reduced from 40 + 120 to 50 + 80
   };
 
   return (
     <Box w="full">
       <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
-        🛡️ Safety Score Trend (7-Year View) {hasRealData ? '📊' : '🔮'}
+        🛡️ Safety Score Trend (6-Year View) {hasRealData ? '📊' : '🔮'}
       </Text>
 
       <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
-        {/* ✅ FIX: Much taller container for bigger bars */}
-        <Flex justify="space-between" align="end" h="220px" mb={3} px={1}>
-          {chartData.map((item, index) => {
-            const isPast = index < 4;
-            const isCurrent = index === 4;
-            // ✅ FIX: Use logarithmic height calculation
-            const height = getLogHeight(item.value);
+        {/* Chart - Clean version with reduced white space */}
+        <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
+          {chartData.map((item, chartIndex) => {
+            // 🔧 FIX: Rename 'index' to 'chartIndex' to avoid unused variable
+            const isPast = chartIndex < 3;
+            const isCurrent = chartIndex === 3;
+            const height = getHeight(item.value);
             
             return (
-              <VStack key={`chart-${item.year}`} spacing={1} flex="1" align="center">
-                {/* ✅ FIX: Smaller font and better spacing */}
-                <Text fontSize="10px" fontWeight="bold" color="gray.700" lineHeight="1">
-                  {item.value}
-                </Text>
-                <Box
-                  bg={isPast ? "#9CA3AF" : isCurrent ? "#10B981" : "#60A5FA"}
-                  h={`${height}px`}
-                  w="22px"
-                  borderRadius="md"
-                  boxShadow="sm"
-                />
-                <Text fontSize="xs" color="gray.500" fontWeight={isCurrent ? "bold" : "normal"}>
-                  {item.year}
-                </Text>
+              <VStack key={`crime-chart-${item.year}`} spacing={1} flex="1" align="center" position="relative">
+                {/* Blue background box - positioned behind content */}
+                {isCurrent && (
+                  <Box 
+                    position="absolute"
+                    top="-4px"
+                    bottom="-4px"
+                    left="-4px"
+                    right="-4px"
+                    border="2px solid"
+                    borderColor="blue.500"
+                    borderRadius="md"
+                    bg="blue.50"
+                    zIndex={0}
+                  />
+                )}
+                
+                {/* Content - same structure for all years */}
+                <VStack spacing={2} align="center" position="relative" zIndex={1}>
+                    <Box w="14px" textAlign="center">
+                      <Text 
+                        fontSize="9px" 
+                        fontWeight="bold" 
+                        color="gray.700" 
+                        lineHeight="1"
+                      >
+                        {item.value}
+                      </Text>
+                    </Box>
+                    
+                    <Box
+                      bg={isPast ? "#6B7280" : isCurrent ? "#10B981" : "#60A5FA"}
+                      h={`${height}px`}
+                      w="20px"
+                      borderRadius="sm"
+                      boxShadow="sm"
+                    />
+                    
+                    <Text fontSize="xs" color={isPast ? "gray.400" : isCurrent ? "blue.600" : "purple.600"} fontWeight={isCurrent ? "bold" : "normal"}>
+                      {item.year}
+                    </Text>
+                  </VStack>
               </VStack>
             );
           })}
         </Flex>
-        
-        <HStack justify="center" spacing={6} fontSize="xs" color="gray.600" py={2}>
-          <HStack spacing={1}>
-            <Box w="8px" h="8px" bg="#9CA3AF" borderRadius="sm" />
-            <Text>Historical</Text>
-          </HStack>
-          <HStack spacing={1}>
-            <Box w="8px" h="8px" bg="#10B981" borderRadius="sm" />
-            <Text fontWeight="bold">Current</Text>
-          </HStack>
-          <HStack spacing={1}>
-            <Box w="8px" h="8px" bg="#60A5FA" borderRadius="sm" />
-            <Text>2-Year Forecast</Text>
-          </HStack>
-        </HStack>
-        
-        <Text fontSize="xs" color="gray.500" textAlign="center" mt={2}>
-          {hasRealData ? 'Real data from API' : 'Simulated data'} - Current: {currentScore}/100
-        </Text>
       </Box>
     </Box>
   );
 }
 
-// Get color based on resilience score
 function getResilienceColor(score: number): string {
-  if (score >= 80) return "#10B981"; // High (green)
-  if (score >= 60) return "#3B82F6"; // Good (blue)  
-  if (score >= 40) return "#F59E0B"; // Fair (yellow)
-  if (score >= 20) return "#F97316"; // Low (orange)
-  return "#EF4444"; // Very Low (red)
+  if (score >= 80) return "#10B981";
+  if (score >= 60) return "#3B82F6";
+  if (score >= 40) return "#F59E0B";
+  if (score >= 20) return "#F97316";
+  return "#EF4444";
 }
 
 function getResilienceLabel(score: number): string {
@@ -232,8 +508,7 @@ function getResilienceLabel(score: number): string {
 }
 
 export default function TractDetailPanel({ tract, onClose }: TractDetailPanelProps) {
-  // ✅ FIX: Scores are 0-1 decimals, need to multiply by 100
-  const resilienceScore = Math.round((tract.custom_score || 0) * 100);
+  const resilienceScore = Math.round(tract.custom_score || 0);
   const rentText = tract.avg_rent ? `${tract.avg_rent.toFixed(2)}` : 'N/A';
   const resilienceColor = getResilienceColor(resilienceScore);
   const resilienceLabel = getResilienceLabel(resilienceScore);
@@ -321,7 +596,7 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             
             <VStack spacing={2}>
               <Text fontSize="2xl" fontWeight="bold" color="#4299E1">
-                🚶 {Math.round((tract.foot_traffic_score || 0) * 100)}
+                🚶 {Math.round(tract.foot_traffic_score || 0)}
               </Text>
               <Text fontSize="sm" color="gray.600" textAlign="center">
                 Foot Traffic
@@ -334,22 +609,9 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             <VStack spacing={2}>
               <Text fontSize="2xl" fontWeight="bold" color="gray.600">
                 👥 {(() => {
-                  // ✅ FIX: Check if value is already a percentage (>1) or decimal (0-1)
                   const rawValue = tract.demographic_match_pct || 0;
-                  let displayValue;
-                  
-                  if (rawValue > 1) {
-                    // Already a percentage, just round it
-                    displayValue = Math.round(rawValue);
-                  } else {
-                    // It's a decimal, convert to percentage
-                    displayValue = Math.round(rawValue * 100);
-                  }
-                  
-                  // Cap at 100% maximum
-                  displayValue = Math.min(displayValue, 100);
-                  
-                  return `${displayValue}%`;
+                  const displayValue = rawValue > 1 ? Math.round(rawValue) : Math.round(rawValue * 100);
+                  return `${Math.min(displayValue, 100)}%`;
                 })()}
               </Text>
               <Text fontSize="sm" color="gray.600" textAlign="center">
@@ -361,68 +623,29 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
             </VStack>
             
             <VStack spacing={2}>
-              {(() => {
-                const safetyScore = Math.round((tract.crime_score || 0) * 100);
-                
-                // ✅ FIXED: Simpler trend detection
-                let trendStatus = "Stable";
-                let trendColor = "#6B7280"; // Gray for stable
-                
-                if (tract.crime_timeline) {
-                  // Get the raw values and convert them properly
-                  const raw2025 = tract.crime_timeline.pred_2025 || 0;
-                  const raw2026 = tract.crime_timeline.pred_2026 || 0;
-                  const raw2027 = tract.crime_timeline.pred_2027 || 0;
-                  
-                  // Convert to display values (same as chart)
-                  const val2025 = Math.round((raw2025 / 10) * 100);
-                  const val2026 = Math.round((raw2026 / 10) * 100);
-                  const val2027 = Math.round((raw2027 / 10) * 100);
-                  
-                  // Compare 2025 to 2027 (2-year trend)
-                  const trendChange = val2027 - val2025;
-                  
-                  console.log('🔍 Safety Trend Debug:', {
-                    raw: { 2025: raw2025, 2026: raw2026, 2027: raw2027 },
-                    converted: { 2025: val2025, 2026: val2026, 2027: val2027 },
-                    change: trendChange
-                  });
-                  
-                  // More sensitive thresholds
-                  if (trendChange > 0.5) {
-                    trendStatus = "Increasing";
-                    trendColor = "#10B981"; // Green for improving
-                  } else if (trendChange < -0.5) {
-                    trendStatus = "Declining";
-                    trendColor = "#E53E3E"; // Red for declining
-                  }
-                } else {
-                  // Fallback to simple score-based check if no timeline
-                  if (safetyScore > 85) {
-                    trendStatus = "Increasing";
-                    trendColor = "#10B981";
-                  } else if (safetyScore < 50) {
-                    trendStatus = "Declining";
-                    trendColor = "#E53E3E";
-                  }
-                }
-                
-                return (
-                  <>
-                    <Text fontSize="2xl" fontWeight="bold" color={trendColor}>
-                      🛡️ {trendStatus}
-                    </Text>
-                    <Text fontSize="sm" color="gray.600" textAlign="center">
-                      Safety
-                    </Text>
-                    <Text fontSize="xs" color="gray.500">
-                      {safetyScore}/100
-                    </Text>
-                  </>
-                );
-              })()}
+              <Text fontSize="2xl" fontWeight="bold" color="#10B981">
+                🛡️ {Math.round(tract.crime_score || 0)}
+              </Text>
+              <Text fontSize="sm" color="gray.600" textAlign="center">
+                Safety Score
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                out of 100
+              </Text>
             </VStack>
           </SimpleGrid>
+        </Box>
+
+        {/* Charts section */}
+        <Box p={6}>
+          <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.800">
+            📈 Trend Analysis
+          </Text>
+          
+          <VStack spacing={6}>
+            <FootTrafficChart tract={tract} />
+            <CrimeTrendChart tract={tract} />
+          </VStack>
         </Box>
 
         {/* Score breakdown */}
@@ -433,46 +656,41 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
           <VStack spacing={6}>
             <ScoreMeter
               label="Foot Traffic"
-              score={Math.round((tract.foot_traffic_score || 0) * 100)}
+              score={tract.foot_traffic_score || 0}
               color="#4299E1"
               icon="🚶"
             />
             <ScoreMeter
               label="Demographics"
-              score={Math.round((tract.demographic_score || 0) * 100)}
+              score={tract.demographic_score || 0}
               color="#48BB78"
               icon="👥"
             />
             <ScoreMeter
               label="Safety Score"
-              score={Math.round((tract.crime_score || 0) * 100)}
+              score={tract.crime_score || 0}
               color="#10B981"
               icon="🛡️"
             />
             <ScoreMeter
               label="Flood Risk"
-              score={Math.round((tract.flood_risk_score || 0) * 100)}
+              score={tract.flood_risk_score || 0}
               color="#38B2AC"
               icon="🌊"
             />
             <ScoreMeter
               label="Rent Score"
-              score={Math.round((tract.rent_score || 0) * 100)}
+              score={tract.rent_score || 0}
               color="#ED8936"
               icon="💰"
             />
             <ScoreMeter
               label="Points of Interest"
-              score={Math.round((tract.poi_score || 0) * 100)}
+              score={tract.poi_score || 0}
               color="#9F7AEA"
               icon="📍"
             />
           </VStack>
-        </Box>
-
-        {/* Crime Trend Chart */}
-        <Box p={6}>
-          <CrimeTrendChart tract={tract} />
         </Box>
 
         {/* Demographic details */}

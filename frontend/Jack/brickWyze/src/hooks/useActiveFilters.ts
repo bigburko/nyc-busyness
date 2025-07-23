@@ -1,6 +1,12 @@
-// src/hooks/useActiveFilters.ts
+// src/hooks/useActiveFilters.ts - FIXED: Proper typing instead of any
 
-import { useFilterStore, INITIAL_WEIGHTS } from '@/stores/filterStore';
+import { useFilterStore } from '@/stores/filterStore';
+
+// Define proper type for default weights
+interface DefaultWeight {
+  id: string;
+  value: number;
+}
 
 export function useActiveFilters() {
   const weights = useFilterStore(s => s.weights);
@@ -12,31 +18,75 @@ export function useActiveFilters() {
 
   let activeCount = 0;
 
-  // Check if weights are different from defaults
-  const weightsChanged = weights.length !== INITIAL_WEIGHTS.length || 
-    weights.some(w => {
-      const defaultWeight = INITIAL_WEIGHTS.find(d => d.id === w.id);
-      return !defaultWeight || defaultWeight.value !== w.value;
-    });
-  if (weightsChanged) activeCount++;
+  // ✅ DEBUG: Log current values to see what's different
+  console.log('🔍 [useActiveFilters] Current values:', {
+    weights: weights.map(w => ({ id: w.id, value: w.value })),
+    rentRange,
+    ageRange, 
+    incomeRange,
+    selectedEthnicities,
+    selectedGenders
+  });
 
-  // Check if rent range is different from default [26, 160]
-  if (rentRange[0] !== 26 || rentRange[1] !== 160) activeCount++;
+  // ✅ FIXED: Properly typed default weights array
+  const defaultWeights: DefaultWeight[] = [
+    { id: 'foot_traffic', value: 30 },
+    { id: 'crime', value: 25 },
+    { id: 'rent_score', value: 20 },
+    { id: 'poi', value: 15 },
+    { id: 'flood_risk', value: 10 }
+  ];
+
+  // Check if weights are different from defaults
+  const weightsChanged = weights.length !== defaultWeights.length || 
+    weights.some(w => {
+      const defaultWeight = defaultWeights.find((d: DefaultWeight) => d.id === w.id);
+      const expectedValue = defaultWeight ? defaultWeight.value : 0;
+      const changed = !defaultWeight || defaultWeight.value !== w.value;
+      if (changed) console.log(`🎚️ [useActiveFilters] Weight changed: ${w.id} = ${w.value} (expected ${expectedValue})`);
+      return changed;
+    });
+  if (weightsChanged) {
+    console.log('🎚️ [useActiveFilters] Weights are active (+1)');
+    activeCount++;
+  }
+
+  // Check if rent range is different from default [26, 160] 
+  const rentChanged = rentRange[0] !== 26 || rentRange[1] !== 160;
+  if (rentChanged) {
+    console.log(`🏠 [useActiveFilters] Rent range changed: [${rentRange[0]}, ${rentRange[1]}] (expected [26, 160]) (+1)`);
+    activeCount++;
+  }
 
   // Check if age range is different from default [0, 100]
-  if (ageRange[0] !== 0 || ageRange[1] !== 100) activeCount++;
+  const ageChanged = ageRange[0] !== 0 || ageRange[1] !== 100;
+  if (ageChanged) {
+    console.log(`👶 [useActiveFilters] Age range changed: [${ageRange[0]}, ${ageRange[1]}] (expected [0, 100]) (+1)`);
+    activeCount++;
+  }
 
   // Check if income range is different from default [0, 250000]
-  if (incomeRange[0] !== 0 || incomeRange[1] !== 250000) activeCount++;
+  const incomeChanged = incomeRange[0] !== 0 || incomeRange[1] !== 250000;
+  if (incomeChanged) {
+    console.log(`💰 [useActiveFilters] Income range changed: [${incomeRange[0]}, ${incomeRange[1]}] (expected [0, 250000]) (+1)`);
+    activeCount++;
+  }
 
   // Check if ethnicities are selected (default is empty)
-  if (selectedEthnicities.length > 0) activeCount++;
+  if (selectedEthnicities.length > 0) {
+    console.log(`🌍 [useActiveFilters] Ethnicities selected: ${selectedEthnicities.length} (+1)`);
+    activeCount++;
+  }
 
-  // Check if genders are different from default ['male', 'female']
+  // ✅ FIXED: Check if genders are different from default ['male', 'female'] (lowercase)
   const defaultGenders = ['male', 'female'];
   const gendersChanged = selectedGenders.length !== defaultGenders.length ||
     selectedGenders.some(g => !defaultGenders.includes(g));
-  if (gendersChanged) activeCount++;
+  if (gendersChanged) {
+    console.log(`👥 [useActiveFilters] Genders changed: [${selectedGenders.join(', ')}] (expected [male, female]) (+1)`);
+    activeCount++;
+  }
 
+  console.log(`🔢 [useActiveFilters] Total active count: ${activeCount}`);
   return activeCount;
 }

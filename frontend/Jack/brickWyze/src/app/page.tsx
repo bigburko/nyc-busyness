@@ -5,6 +5,8 @@ import mapboxgl from 'mapbox-gl';
 import Map from '../components/features/Map/Map';
 import TopLeftUI from '../components/features/search/TopLeftUI';
 import { uiStore } from '@/stores/uiStore';
+import { useFilterStore } from '@/stores/filterStore';
+import { useGeminiStore } from '@/stores/geminiStore';
 
 interface Weighting {
   id: string;
@@ -17,6 +19,7 @@ interface MapFilters {
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
+  selectedTimePeriods?: string[];
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number;
@@ -53,6 +56,25 @@ interface TractResult {
     pred_2026?: number;
     pred_2027?: number;
   };
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  foot_traffic_timeline_metadata?: Record<string, unknown>;
+  crime_timeline_metadata?: Record<string, unknown>;
+  foot_traffic_periods_used?: string[];
   [key: string]: unknown;
 }
 
@@ -87,7 +109,53 @@ interface MapSearchResult {
     pred_2026?: number;
     pred_2027?: number;
   };
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  foot_traffic_timeline_metadata?: Record<string, unknown>;
+  crime_timeline_metadata?: Record<string, unknown>;
+  foot_traffic_periods_used?: string[];
   [key: string]: unknown;
+}
+
+interface DebugInfo {
+  received_ethnicities?: string[];
+  received_genders?: string[];
+  received_age_range?: [number, number];
+  received_income_range?: [number, number];
+  received_top_n?: number;
+  received_crime_years?: string[];
+  received_time_periods?: string[];
+  received_demographic_scoring?: Record<string, unknown>;
+  received_weights?: string[];
+  demographic_weight_detected?: number;
+  is_single_factor_request?: boolean;
+  has_ethnicity_filters?: boolean;
+  has_demographic_scoring?: boolean;
+  [key: string]: unknown;
+}
+
+interface EdgeFunctionResponse {
+  zones: MapSearchResult[];
+  total_zones_found: number;
+  top_zones_returned: number;
+  top_percentage: number;
+  demographic_scoring_applied?: boolean;
+  foot_traffic_periods_used?: string[];
+  debug?: DebugInfo;
 }
 
 interface FilterUpdate {
@@ -95,24 +163,62 @@ interface FilterUpdate {
   rentRange?: [number, number];
   selectedEthnicities?: string[];
   selectedGenders?: string[];
+  selectedTimePeriods?: string[];
   ageRange?: [number, number];
   incomeRange?: [number, number];
   topN?: number;
+}
+
+interface SearchError {
+  message?: string;
+  status?: number;
+  code?: string;
+  [key: string]: unknown;
 }
 
 declare global {
   interface Window {
     selectTractFromResultsPanel?: (tractId: string) => void;
     openResultsPanel?: () => void;
+    resetToInitialView?: () => void;
     _brickwyzeMapRef?: mapboxgl.Map;
   }
 }
 
 export default function Page() {
+  const { selectedTimePeriods } = useFilterStore();
+  const { messages } = useGeminiStore();
+  
   const [currentFilters, setCurrentFilters] = useState<MapFilters>({});
   const [searchResults, setSearchResults] = useState<TractResult[]>([]);
   const [selectedTractId, setSelectedTractId] = useState<string | null>(null);
   const [selectedTract, setSelectedTract] = useState<TractResult | undefined>(undefined);
+  const [fullSearchResponse, setFullSearchResponse] = useState<EdgeFunctionResponse | null>(null);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  
+  // ✅ NEW: AI Justification state
+  const [lastQuery, setLastQuery] = useState<string>('');
+  const [aiReasoning, setAiReasoning] = useState<string>('');
+
+  // ✅ NEW: Auto-track AI queries and reasoning
+  useEffect(() => {
+    // Get the last user message as the query
+    const lastUserMessage = messages
+      .filter(msg => msg.role === 'user')
+      .slice(-1)[0];
+    
+    if (lastUserMessage?.content) {
+      setLastQuery(lastUserMessage.content);
+    }
+    
+    // Extract AI reasoning from demographic scoring if available
+    const currentFilters = useFilterStore.getState();
+    if (currentFilters.demographicScoring?.reasoning) {
+      setAiReasoning(currentFilters.demographicScoring.reasoning);
+    } else if (currentFilters.lastDemographicReasoning?.summary) {
+      setAiReasoning(currentFilters.lastDemographicReasoning.summary);
+    }
+  }, [messages]);
 
   const handleFilterUpdate = useCallback((filters: FilterUpdate) => {
     console.log('🔄 [Page] Updating map filters - topN:', filters.topN);
@@ -122,17 +228,36 @@ export default function Page() {
       rentRange: filters.rentRange || [26, 160],
       selectedEthnicities: filters.selectedEthnicities || [],
       selectedGenders: filters.selectedGenders || ['male', 'female'],
+      selectedTimePeriods: filters.selectedTimePeriods || selectedTimePeriods,
       ageRange: filters.ageRange || [0, 100],
       incomeRange: filters.incomeRange || [0, 250000],
       topN: filters.topN || 10,
     };
 
     console.log('🔄 [Page] Setting current filters with topN:', mapFilters.topN);
+    console.log('🕐 [Page] Setting current filters with timePeriods:', mapFilters.selectedTimePeriods);
     setCurrentFilters(mapFilters);
-  }, []);
+  }, [selectedTimePeriods]);
 
-  const handleSearchResults = useCallback((results: MapSearchResult[]) => {
+  const handleSearchResults = useCallback((results: MapSearchResult[], fullResponse?: EdgeFunctionResponse) => {
     console.log('📊 [Page] Received search results:', results.length, 'tracts');
+    
+    if (fullResponse) {
+      console.log('📊 [Page] Storing full search response:', {
+        zones_returned: fullResponse.zones?.length || 0,
+        total_zones_found: fullResponse.total_zones_found || 0,
+        top_percentage: fullResponse.top_percentage || 0,
+        foot_traffic_periods_used: fullResponse.foot_traffic_periods_used || []
+      });
+      setFullSearchResponse(fullResponse);
+    } else {
+      setFullSearchResponse({
+        zones: results,
+        total_zones_found: results.length,
+        top_zones_returned: results.length,
+        top_percentage: currentFilters.topN || 10
+      });
+    }
     
     const transformedResults: TractResult[] = results.map(r => ({
       geoid: r.geoid || '',
@@ -155,10 +280,43 @@ export default function Page() {
       gender_match_pct: r.gender_match_pct,
       age_match_pct: r.age_match_pct,
       income_match_pct: r.income_match_pct,
-      crime_timeline: r.crime_timeline
+      crime_timeline: r.crime_timeline,
+      foot_traffic_timeline: r.foot_traffic_timeline,
+      foot_traffic_by_period: r.foot_traffic_by_period,
+      foot_traffic_timeline_metadata: r.foot_traffic_timeline_metadata,
+      crime_timeline_metadata: r.crime_timeline_metadata,
+      foot_traffic_periods_used: r.foot_traffic_periods_used,
     }));
     
+    if (transformedResults.length > 0) {
+      const firstResult = transformedResults[0];
+      console.log('🔍 [Page] Timeline data transformation check:', {
+        tract_geoid: firstResult.geoid,
+        has_foot_traffic_timeline: !!firstResult.foot_traffic_timeline,
+        has_foot_traffic_by_period: !!firstResult.foot_traffic_by_period,
+        has_crime_timeline: !!firstResult.crime_timeline,
+        foot_traffic_timeline_keys: firstResult.foot_traffic_timeline ? Object.keys(firstResult.foot_traffic_timeline) : 'none',
+        foot_traffic_by_period_keys: firstResult.foot_traffic_by_period ? Object.keys(firstResult.foot_traffic_by_period) : 'none'
+      });
+    }
+    
     setSearchResults(transformedResults);
+  }, [currentFilters.topN]);
+
+  const handleSearchStart = useCallback(() => {
+    console.log('🔄 [Page] Search started');
+    setIsSearchLoading(true);
+  }, []);
+
+  const handleSearchComplete = useCallback(() => {
+    console.log('✅ [Page] Search completed');
+    setIsSearchLoading(false);
+  }, []);
+
+  const handleSearchError = useCallback((error: SearchError) => {
+    console.error('❌ [Page] Search error:', error);
+    setIsSearchLoading(false);
+    setFullSearchResponse(null);
   }, []);
 
   const handleMapTractSelect = useCallback((tractId: string | null) => {
@@ -166,13 +324,32 @@ export default function Page() {
     setSelectedTractId(tractId);
   }, []);
 
+  const handleClearSelectedTract = useCallback(() => {
+    console.log('🔄 [Page] Clearing parent selectedTract state');
+    setSelectedTract(undefined);
+  }, []);
+
   useEffect(() => {
     console.log('🔧 [Page] Setting up global functions for map communication');
     
     window.selectTractFromResultsPanel = (tractIdParam: string) => {
-      console.log('🗺️ [Page] Map clicked tract with score:', tractIdParam);
+      console.log('🗺️ [Page] Map clicked tract with ID:', tractIdParam);
       
       const tractIdStr = String(tractIdParam);
+      
+      console.log('🔍 [Page] Current state check:', {
+        selectedTractId: selectedTractId,
+        tractIdStr: tractIdStr,
+        selectedTract: selectedTract ? selectedTract.geoid : 'undefined',
+        idsMatch: selectedTractId === tractIdStr,
+        hasSelectedTract: !!selectedTract,
+        willSkip: selectedTractId === tractIdStr && selectedTract
+      });
+      
+      if (selectedTractId === tractIdStr && selectedTract) {
+        console.log('🚫 [Page] Tract already selected and detail panel open, skipping state update');
+        return;
+      }
       
       let tract = searchResults.find(t => String(t.geoid) === tractIdStr);
       
@@ -188,6 +365,14 @@ export default function Page() {
       
       if (tract) {
         console.log('✅ [Page] Found tract in results, setting both ID and tract object:', tract.display_name || tract.tract_name);
+        console.log('🔍 [Page] Tract object timeline check:', {
+          has_foot_traffic_timeline: !!tract.foot_traffic_timeline,
+          has_foot_traffic_by_period: !!tract.foot_traffic_by_period,
+          has_crime_timeline: !!tract.crime_timeline
+        });
+        console.log('🔍 [Page] Setting selectedTractId to:', tractIdStr);
+        console.log('🔍 [Page] Setting selectedTract to tract with geoid:', tract.geoid);
+        
         setSelectedTractId(tractIdStr);
         setSelectedTract(tract);
       } else {
@@ -201,24 +386,73 @@ export default function Page() {
       uiStore.setState({ viewState: 'results' });
     };
     
+    window.resetToInitialView = () => {
+      const currentState = uiStore.getState().viewState;
+      console.log('🔄 [Page] resetToInitialView called - current state:', currentState);
+      
+      if (currentState === 'typing') {
+        console.log('🔄 [Page] Closing chat input only - switching typing → results');
+        uiStore.setState({ viewState: 'results' });
+        console.log('✅ [Page] Chat input closed, results panel kept open');
+      } else {
+        console.log('🚫 [Page] Not in typing state, doing nothing to preserve current UI');
+      }
+    };
+    
     return () => {
       console.log('🧹 [Page] Cleaning up global functions');
       delete window.selectTractFromResultsPanel;
       delete window.openResultsPanel;
+      delete window.resetToInitialView;
     };
-  }, [searchResults]);
+  }, [searchResults, selectedTractId, selectedTract]);
 
   const mapProps = useMemo(() => ({
     weights: currentFilters.weights || [],
     rentRange: currentFilters.rentRange || [26, 160] as [number, number],
     selectedEthnicities: currentFilters.selectedEthnicities || [],
     selectedGenders: currentFilters.selectedGenders || [],
+    selectedTimePeriods: selectedTimePeriods,
     ageRange: currentFilters.ageRange || [0, 100] as [number, number],
     incomeRange: currentFilters.incomeRange || [0, 250000] as [number, number],
     topN: currentFilters.topN || 10,
     onSearchResults: handleSearchResults,
+    onSearchStart: handleSearchStart,
+    onSearchComplete: handleSearchComplete,
+    onSearchError: handleSearchError,
     selectedTractId: selectedTractId,
-  }), [currentFilters, handleSearchResults, selectedTractId]);
+  }), [
+    currentFilters, 
+    selectedTimePeriods,
+    handleSearchResults, 
+    handleSearchStart, 
+    handleSearchComplete, 
+    handleSearchError, 
+    selectedTractId
+  ]);
+
+  // ✅ UPDATED: Include AI justification props
+  const topLeftUIProps = useMemo(() => ({
+    onFilterUpdate: handleFilterUpdate,
+    searchResults: searchResults,
+    onMapTractSelect: handleMapTractSelect,
+    selectedTract: selectedTract,
+    onClearSelectedTract: handleClearSelectedTract,
+    fullSearchResponse: fullSearchResponse,
+    isSearchLoading: isSearchLoading,
+    lastQuery: lastQuery,
+    aiReasoning: aiReasoning,
+  }), [
+    handleFilterUpdate,
+    searchResults,
+    handleMapTractSelect,
+    selectedTract,
+    handleClearSelectedTract,
+    fullSearchResponse,
+    isSearchLoading,
+    lastQuery,
+    aiReasoning
+  ]);
 
   return (
     <main style={{ height: '100vh', width: '100vw', position: 'relative' }}>
@@ -235,12 +469,7 @@ export default function Page() {
         pointerEvents: 'none' 
       }}>
         <div style={{ pointerEvents: 'auto' }}>
-          <TopLeftUI 
-            onFilterUpdate={handleFilterUpdate}
-            searchResults={searchResults}
-            onMapTractSelect={handleMapTractSelect}
-            selectedTract={selectedTract}
-          />
+          <TopLeftUI {...topLeftUIProps} />
         </div>
       </div>
     </main>
