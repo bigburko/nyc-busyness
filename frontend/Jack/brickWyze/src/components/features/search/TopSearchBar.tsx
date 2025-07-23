@@ -11,6 +11,13 @@ interface TopSearchBarProps {
 
 export default function TopSearchBar({ onFilterClick }: TopSearchBarProps) {
   const handleInputClick = () => {
+    // NEW: Close tract detail panel when user starts searching
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [TopSearchBar] Closed tract detail panel - user started searching');
+    }
+    
+    // Existing functionality
     uiStore.setState({ viewState: 'typing' });
   };
 

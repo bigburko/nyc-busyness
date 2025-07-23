@@ -33,12 +33,13 @@ export const addTractLayers = (map: mapboxgl.Map) => {
               'interpolate',
               ['linear'],
               ['get', 'custom_score'],
-              0, '#d73027',
-              0.2, '#fc8d59',
-              0.4, '#fee08b',
-              0.6, '#d9ef8b',
-              0.8, '#91bfdb',
-              1, '#1a9850',
+              // ✅ FIXED: Updated to handle 0-100 scale instead of 0-1
+              0, '#d73027',    // Very Low (0-20)
+              20, '#fc8d59',   // Low (20-40)
+              40, '#fee08b',   // Fair (40-60)
+              60, '#d9ef8b',   // Good (60-80)
+              80, '#91bfdb',   // High (80-100)
+              100, '#1a9850',  // Excellent (100)
             ],
             'transparent',
           ],
@@ -62,8 +63,7 @@ export const addTractLayers = (map: mapboxgl.Map) => {
     });
   }
 
-  // ✅ BACK TO BASICS: Simple score numbers for all tracts
-  // Shows actual resilience scores (84, 91, 77, etc.) - much clearer for users
+  // ✅ UPDATED: Simple score numbers for all tracts (0-100 scale)
   if (!map.getLayer('tracts-labels')) {
     map.addLayer({
       id: 'tracts-labels',
@@ -77,10 +77,10 @@ export const addTractLayers = (map: mapboxgl.Map) => {
             ['==', ['typeof', ['get', 'hasScore']], 'boolean'],
             ['get', 'hasScore']
           ],
-          // ✅ Show actual resilience score as whole number out of 100 (e.g., "84", "91")
+          // ✅ FIXED: Scores are now 0-100, so just round them (no multiplication)
           [
             'to-string',
-            ['round', ['*', ['get', 'custom_score'], 100]]
+            ['round', ['get', 'custom_score']]
           ],
           '' // Empty string for tracts without scores
         ],

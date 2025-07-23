@@ -75,7 +75,14 @@ export default function ResultsView() {
         </Flex>
         <Flex justify="space-between">
           <Text fontWeight="bold">Resilience Score:</Text>
-          <Text>{data.resilience_score?.toFixed(2) || 'N/A'}</Text>
+          <Text>
+            {/* ✅ FIXED: Handle both 0-1 and 0-100 scales */}
+            {data.resilience_score ? (
+              data.resilience_score > 1 
+                ? Math.round(data.resilience_score) 
+                : Math.round(data.resilience_score * 100)
+            ) : 'N/A'}
+          </Text>
         </Flex>
         <Flex justify="space-between">
           <Text fontWeight="bold">Population:</Text>

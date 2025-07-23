@@ -1,5 +1,4 @@
-// src/components/WeightingPanel.tsx
-
+// Clean WeightingPanel.tsx with debug logs removed
 import { Box, Text, VStack, IconButton, HStack } from '@chakra-ui/react';
 import MySlider from './MySlider'; 
 import { AddIcon } from '@chakra-ui/icons';
@@ -35,11 +34,11 @@ export default function WeightingPanel({
       <VStack spacing={4}>
         {activeWeights.map((weight) => (
           <MySlider
-            key={`${weight.id}-${weight.value}`} // ✅ Add value to key to force re-render
+            key={weight.id}
             label={weight.label}
             icon={weight.icon}
             filledTrack={weight.color}
-            value={weight.value} // ✅ This should update when reset happens
+            value={weight.value}
             onChangeEnd={(val: number) => {
               onSliderChangeEnd(weight.id, val);
             }}
@@ -47,7 +46,6 @@ export default function WeightingPanel({
             onRemove={() => {
               onRemove(weight.id);
             }}
-            // ✅ Tooltips are now automatically generated in MySlider based on label
           />
         ))}
         {inactiveLayers.length > 0 && (
