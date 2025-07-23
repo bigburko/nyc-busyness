@@ -1,4 +1,4 @@
-// src/components/features/search/MyDrawer.tsx - FULLY UPDATED: Fixed interfaces and removed unused props
+// src/components/features/search/MyDrawer.tsx - FIXED: Updated to use EdgeFunctionResponse interface
 
 'use client';
 
@@ -33,39 +33,81 @@ interface SubmissionData extends FilterState {
   topN: number;
 }
 
-// ✅ FIXED: Match the interfaces from OverallJustificationDisplay exactly
-interface SearchZone {
+// ✅ FIXED: Use the exact same interfaces as TopLeftUI.tsx to avoid type conflicts
+interface MapSearchResult {
   geoid: string;
-  tract_name: string;
-  display_name: string;
-  nta_name: string;
+  tract_name?: string;
+  display_name?: string;
+  nta_name?: string;
   custom_score: number;
+  resilience_score?: number;
   avg_rent?: number;
   demographic_score?: number;
-  foot_traffic_score: number;
-  crime_score: number;
-  flood_risk_score: number;
-  rent_score: number;
-  poi_score: number;
+  foot_traffic_score?: number;
+  crime_score?: number;
+  flood_risk_score?: number;
+  rent_score?: number;
+  poi_score?: number;
+  main_crime_score?: number;
+  crime_trend_direction?: string;
+  crime_trend_change?: string;
+  demographic_match_pct?: number;
+  gender_match_pct?: number;
+  age_match_pct?: number;
+  income_match_pct?: number;
+  crime_timeline?: {
+    year_2020?: number;
+    year_2021?: number;
+    year_2022?: number;
+    year_2023?: number;
+    year_2024?: number;
+    pred_2025?: number;
+    pred_2026?: number;
+    pred_2027?: number;
+  };
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  foot_traffic_timeline_metadata?: Record<string, unknown>;
+  crime_timeline_metadata?: Record<string, unknown>;
+  foot_traffic_periods_used?: string[];
+  [key: string]: unknown;
 }
 
-// ✅ FIXED: Match the interface from OverallJustificationDisplay exactly
-interface SearchResults {
-  zones: SearchZone[];
+// ✅ FIXED: Use EdgeFunctionResponse interface exactly as defined in TopLeftUI.tsx
+interface EdgeFunctionResponse {
+  zones: MapSearchResult[];
   total_zones_found: number;
   top_zones_returned: number;
   top_percentage: number;
+  demographic_scoring_applied?: boolean;
+  foot_traffic_periods_used?: string[];
+  debug?: Record<string, unknown>;
 }
 
 interface MyDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onSearchSubmit: (filters: SubmissionData) => void;
-  // ✅ FIXED: Add search results props
-  searchResults?: SearchResults | null;
+  // ✅ FIXED: Change to EdgeFunctionResponse to match what TopLeftUI passes
+  searchResults?: EdgeFunctionResponse | null;
   isSearchLoading?: boolean;
-  // ✅ FIXED: Removed unused aiReasoning prop
+  // ✅ FIXED: Add back aiReasoning prop to match TopLeftUI interface
   lastQuery?: string;
+  aiReasoning?: string;
 }
 
 const ALL_AVAILABLE_LAYERS: Layer[] = [
@@ -77,13 +119,27 @@ const ALL_AVAILABLE_LAYERS: Layer[] = [
   { id: 'poi', label: 'Points of Interest', icon: '📍', color: '#9F7AEA' },
 ];
 
+// ✅ FIXED: Helper function to check if ranges are equal
+const arraysEqual = (a: [number, number], b: [number, number]): boolean => {
+  return a[0] === b[0] && a[1] === b[1];
+};
+
+// ✅ FIXED: Helper function to check if gender arrays are equal
+const genderArraysEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((val, idx) => val === sortedB[idx]);
+};
+
 export default function MyDrawer({ 
   isOpen, 
   onClose, 
   onSearchSubmit, 
   searchResults, 
   isSearchLoading = false,
-  lastQuery
+  lastQuery,
+  aiReasoning: _aiReasoning // eslint-disable-line @typescript-eslint/no-unused-vars
 }: MyDrawerProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const ethnicityRef = useRef<HTMLDivElement>(null);
@@ -211,14 +267,47 @@ export default function MyDrawer({
   // ✅ Calculate total weight for debugging
   const totalWeight = activeWeights.reduce((sum, w) => sum + w.value, 0);
 
-  // ✅ NEW: Check if AI has set custom demographic scoring (for persistent display)
-  const hasAIDemographicStrategy = demographicScoring.reasoning || 
-                                   demographicScoring.thresholdBonuses.length > 0 ||
-                                   demographicScoring.penalties.length > 0 ||
-                                   (demographicScoring.weights.ethnicity !== 0.25 ||
-                                    demographicScoring.weights.age !== 0.25 ||
-                                    demographicScoring.weights.income !== 0.25 ||
-                                    demographicScoring.weights.gender !== 0.25);
+  // ✅ Note: _aiReasoning prop is available but not currently used in MyDrawer
+  // It's passed from TopLeftUI for potential future use
+
+  // ✅ FIXED: Correct counting logic based on defaults from filterStore
+  const calculateDemographicChangeCount = (): number => {
+    let count = 0;
+    
+    // Default values from filterStore.ts:
+    const DEFAULT_AGE_RANGE: [number, number] = [0, 100];
+    const DEFAULT_INCOME_RANGE: [number, number] = [0, 250000];
+    const DEFAULT_GENDERS: string[] = ['male', 'female'];
+    
+    // Count age range if different from default [0, 100]
+    if (!arraysEqual(ageRange, DEFAULT_AGE_RANGE)) {
+      count += 1;
+      console.log('🔢 [Demographics Count] Age range changed from default:', ageRange);
+    }
+    
+    // Count income range if different from default [0, 250000]
+    if (!arraysEqual(incomeRange, DEFAULT_INCOME_RANGE)) {
+      count += 1;
+      console.log('🔢 [Demographics Count] Income range changed from default:', incomeRange);
+    }
+    
+    // Count ethnicities as 1 if any are selected, 0 if none (empty array is default)
+    if (selectedEthnicities.length > 0) {
+      count += 1;
+      console.log('🔢 [Demographics Count] Ethnicities selected:', selectedEthnicities.length);
+    }
+    
+    // Count genders if different from default ['male', 'female']
+    if (!genderArraysEqual(selectedGenders, DEFAULT_GENDERS)) {
+      count += 1;
+      console.log('🔢 [Demographics Count] Gender selection changed from default:', selectedGenders);
+    }
+    
+    console.log('🔢 [Demographics Count] Total count:', count);
+    return count;
+  };
+
+  const demographicChangeCount = calculateDemographicChangeCount();
 
   return (
     <main>
@@ -271,9 +360,27 @@ export default function MyDrawer({
           >
             <VStack spacing={4} p={2} align="stretch">
               
-              {/* ✅ Overall AI Justification */}
+              {/* ✅ Overall AI Justification - Updated to handle EdgeFunctionResponse */}
               <OverallJustificationDisplay
-                searchResults={searchResults}
+                searchResults={searchResults ? {
+                  zones: searchResults.zones.map(zone => ({
+                    geoid: zone.geoid,
+                    tract_name: zone.tract_name || '',
+                    display_name: zone.display_name || '',
+                    nta_name: zone.nta_name || '',
+                    custom_score: zone.custom_score,
+                    avg_rent: zone.avg_rent,
+                    demographic_score: zone.demographic_score,
+                    foot_traffic_score: zone.foot_traffic_score || 0,
+                    crime_score: zone.crime_score || 0,
+                    flood_risk_score: zone.flood_risk_score || 0,
+                    rent_score: zone.rent_score || 0,
+                    poi_score: zone.poi_score || 0
+                  })),
+                  total_zones_found: searchResults.total_zones_found,
+                  top_zones_returned: searchResults.top_zones_returned,
+                  top_percentage: searchResults.top_percentage
+                } : null}
                 lastQuery={lastQuery}
                 isVisible={!!searchResults?.zones?.length}
               />
@@ -362,7 +469,7 @@ export default function MyDrawer({
                 />
               </Box>
               
-              {/* Demographics - COLLAPSIBLE with Updated Chevron Style */}
+              {/* Demographics - COLLAPSIBLE with Updated Chevron Style and Fixed Counting */}
               <Box 
                 bg="rgba(255, 255, 255, 0.8)" 
                 borderRadius="2xl" 
@@ -387,17 +494,13 @@ export default function MyDrawer({
                     <Text fontSize="lg" fontWeight="bold" color="gray.800">
                       👥 Demographics
                     </Text>
-                    {(selectedEthnicities?.length || 0) > 0 && (
+                    {/* ✅ FIXED: Only show count badge if there are actual changes from defaults */}
+                    {demographicChangeCount > 0 && (
                       <Badge bg="#FF492C" color="white" borderRadius="full">
-                        {selectedEthnicities?.length}
+                        {demographicChangeCount}
                       </Badge>
                     )}
-                    {/* ✅ NEW: Show AI optimization badge */}
-                    {hasAIDemographicStrategy && (
-                      <Badge bg="#48BB78" color="white" borderRadius="full">
-                        AI Optimized
-                      </Badge>
-                    )}
+                    {/* ✅ REMOVED: AI Optimized badge as requested */}
                   </HStack>
                   
                   {/* ✅ UPDATED: Use same chevron style as other components */}

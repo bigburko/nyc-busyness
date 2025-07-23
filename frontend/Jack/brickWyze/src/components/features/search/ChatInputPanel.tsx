@@ -31,37 +31,89 @@ interface FilterUpdates {
   selectedGenders?: string[];
 }
 
-// ✅ NEW: Search results interface for rich responses
-interface SearchZone {
+// ✅ FIXED: Match the EdgeFunctionResponse interface from TopLeftUI
+interface MapSearchResult {
   geoid: string;
   tract_name?: string;
   display_name?: string;
   nta_name?: string;
   custom_score: number;
-  demographic_match_pct?: number;
+  resilience_score?: number;
+  avg_rent?: number;
+  demographic_score?: number;
   foot_traffic_score?: number;
   crime_score?: number;
-  avg_rent?: number;
+  flood_risk_score?: number;
+  rent_score?: number;
+  poi_score?: number;
+  main_crime_score?: number;
+  crime_trend_direction?: string;
+  crime_trend_change?: string;
+  demographic_match_pct?: number;
+  gender_match_pct?: number;
+  age_match_pct?: number;
+  income_match_pct?: number;
+  crime_timeline?: {
+    year_2020?: number;
+    year_2021?: number;
+    year_2022?: number;
+    year_2023?: number;
+    year_2024?: number;
+    pred_2025?: number;
+    pred_2026?: number;
+    pred_2027?: number;
+  };
+  foot_traffic_timeline?: {
+    '2019'?: number;
+    '2020'?: number;
+    '2021'?: number;
+    '2022'?: number;
+    '2023'?: number;
+    '2024'?: number;
+    'pred_2025'?: number;
+    'pred_2026'?: number;
+    'pred_2027'?: number;
+  };
+  foot_traffic_by_period?: {
+    morning?: Record<string, number>;
+    afternoon?: Record<string, number>;
+    evening?: Record<string, number>;
+  };
+  foot_traffic_timeline_metadata?: Record<string, unknown>;
+  crime_timeline_metadata?: Record<string, unknown>;
+  foot_traffic_periods_used?: string[];
   [key: string]: unknown;
 }
 
-interface SearchResults {
-  zones: SearchZone[];
+interface EdgeFunctionResponse {
+  zones: MapSearchResult[];
   total_zones_found: number;
   top_zones_returned: number;
   top_percentage: number;
+  demographic_scoring_applied?: boolean;
+  foot_traffic_periods_used?: string[];
+  debug?: Record<string, unknown>;
 }
 
-// ✅ UPDATED: Removed unused lastQuery and aiReasoning props
+// ✅ FIXED: SubmissionData interface to match what TopLeftUI expects
+interface SubmissionData extends FilterState {
+  topN?: number;
+}
+
+// ✅ FIXED: Update props interface to match exactly what TopLeftUI is passing
 export default function ChatInputPanel({
   onSearchSubmit,
   onResetRequest,
   searchResults,
+  lastQuery: _lastQuery, // eslint-disable-line @typescript-eslint/no-unused-vars
+  aiReasoning: _aiReasoning,
   isSearchLoading = false
 }: {
-  onSearchSubmit: (filters: FilterState) => void;
+  onSearchSubmit: (filters: SubmissionData) => void; // ✅ FIXED: TopLeftUI passes SubmissionData
   onResetRequest: () => void;
-  searchResults?: SearchResults | null;
+  searchResults?: EdgeFunctionResponse | null; // ✅ FIXED: TopLeftUI passes EdgeFunctionResponse
+  lastQuery?: string; // ✅ FIXED: TopLeftUI tries to pass this
+  aiReasoning?: string; // ✅ FIXED: TopLeftUI tries to pass this
   isSearchLoading?: boolean;
 }) {
   const messages = useGeminiStore((s) => s.messages);
@@ -83,8 +135,13 @@ export default function ChatInputPanel({
     console.log('🔍 [ChatInputPanel] Chat input focused - keeping tract panel open for now');
   };
 
-  const formatFiltersForSubmission = (): FilterState => {
-    return useFilterStore.getState();
+  // ✅ FIXED: Return SubmissionData instead of FilterState
+  const formatFiltersForSubmission = (): SubmissionData => {
+    const currentState = useFilterStore.getState();
+    return {
+      ...currentState,
+      topN: 10 // Default topN value
+    };
   };
 
   // ✅ NEW: Generate rich justification message based on search results
@@ -117,12 +174,17 @@ export default function ChatInputPanel({
       response += `💰 **Location Budget:** ${budgetStrategy}\n\n`;
     }
     
+    // Add AI reasoning if available
+    if (_aiReasoning) {
+      response += `🧠 **AI Reasoning:** ${_aiReasoning}\n\n`;
+    }
+    
     response += `⚡ **Searching for optimized locations...**`;
     
     return response;
   };
 
-  // ✅ FIXED: Wrapped in useCallback to prevent dependency changes
+  // ✅ FIXED: Wrapped in useCallback to prevent dependency changes and handle EdgeFunctionResponse
   const generateResultsMessage = useCallback((): string => {
     console.log('🔍 [ChatInputPanel] Generating results message:', {
       hasSearchResults: !!searchResults,
@@ -425,7 +487,7 @@ export default function ChatInputPanel({
     }, 150);
   }, []);
 
-  // ✅ FIXED: Moved generateResultsMessage inside useEffect dependencies
+  // ✅ FIXED: Moved generateResultsMessage inside useEffect dependencies and handle EdgeFunctionResponse
   useEffect(() => {
     const currentResultsCount = searchResults?.zones?.length || 0;
     const currentTotalFound = searchResults?.total_zones_found || 0;
