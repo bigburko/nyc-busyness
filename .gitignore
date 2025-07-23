@@ -138,3 +138,10 @@ dist
 
 # MapPluto files
 MapPLUTO25v1_1.gdb
+
+
+# Large Data files
+2020_Yellow_Taxi_Trip_Data.csv
+2021_Yellow_Taxi_Trip_Data.csv
+2022_Yellow_Taxi_Trip_Data.csv
+2023_Yellow_Taxi_Trip_Data.csv
