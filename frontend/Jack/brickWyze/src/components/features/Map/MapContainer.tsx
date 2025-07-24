@@ -23,10 +23,11 @@ const MapContainer = ({ children }: Props) => {
       style: 'mapbox://styles/mapbox/light-v11',
       center: [-73.9712, 40.7831], // Manhattan
       zoom: 12,
+      attributionControl: false // ✅ This removes the Mapbox attribution
     });
 
     mapRef.current.on('load', () => {
-      console.log('🗺️ Map loaded');
+      console.log('🗺️ Map loaded without attribution');
     });
 
     return () => {

@@ -28,6 +28,7 @@ export const useMapState = (containerRef: React.RefObject<HTMLDivElement | null>
       bearing: 29,
       antialias: true,
       style: 'mapbox://styles/mapbox/light-v11',
+      attributionControl: false // ✅ This removes the Mapbox attribution
     });
     mapRef.current = map;
     
@@ -53,6 +54,7 @@ export const useMapState = (containerRef: React.RefObject<HTMLDivElement | null>
       addHighlightLayers(map);
       
       setIsMapLoaded(true);
+      console.log('🗺️ Map loaded without attribution (useMapState)');
     });
 
     return () => {
