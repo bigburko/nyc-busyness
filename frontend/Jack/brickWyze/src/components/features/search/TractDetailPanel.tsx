@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel.tsx - CLEANED VERSION
+// src/components/features/search/TractDetailPanel.tsx - UPDATED VERSION
 'use client';
 
 import { 
@@ -6,6 +6,7 @@ import {
 } from '@chakra-ui/react';
 import { CloseIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import { useFilterStore } from '../../../stores/filterStore';
+import MyToolTip from '../../ui/MyToolTip';
 
 interface TractResult {
   geoid: string;
@@ -61,6 +62,15 @@ interface TractResult {
 interface TractDetailPanelProps {
   tract: TractResult;
   onClose: () => void;
+}
+
+interface WeightConfig {
+  id: string;
+  label: string;
+  icon: string;
+  getValue: (tract: TractResult) => number;
+  color: string;
+  unit?: string;
 }
 
 function ScoreMeter({ 
@@ -125,7 +135,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
       return (
         <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
           <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
-            🚶 Foot Traffic by Time Period
+            Foot Traffic by Time Period
           </Text>
           <Text fontSize="lg" color="gray.600" textAlign="center" py={6}>
             No time periods selected. Please select morning, afternoon, or evening to view data.
@@ -154,7 +164,7 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
       return (
         <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
           <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
-            🚶 Foot Traffic Score
+            Foot Traffic Score
           </Text>
           <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
             {currentScore}/100
@@ -185,9 +195,14 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
 
     return (
       <Box w="full">
-        <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
-          🚶 Foot Traffic by Time Period (6-Year View) 📊
-        </Text>
+        <HStack mb={4} align="center" spacing={3}>
+          <Text fontSize="lg" fontWeight="bold" color="gray.800">
+            Foot Traffic by Time Period
+          </Text>
+          <MyToolTip label="Foot Traffic by Time Period">
+            Shows pedestrian activity patterns across different times of day over multiple years, helping identify peak traffic periods and trends
+          </MyToolTip>
+        </HStack>
 
         <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
           {/* Chart - Clean version with enough height for bars */}
@@ -268,19 +283,19 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
             {activePeriods.includes('morning') && (
               <HStack spacing={1}>
                 <Box w="8px" h="8px" bg="#F59E0B" borderRadius="sm" />
-                <Text>🌅 Morning</Text>
+                <Text>Morning</Text>
               </HStack>
             )}
             {activePeriods.includes('afternoon') && (
               <HStack spacing={1}>
                 <Box w="8px" h="8px" bg="#3B82F6" borderRadius="sm" />
-                <Text>☀️ Afternoon</Text>
+                <Text>Afternoon</Text>
               </HStack>
             )}
             {activePeriods.includes('evening') && (
               <HStack spacing={1}>
                 <Box w="8px" h="8px" bg="#6366F1" borderRadius="sm" />
-                <Text>🌙 Evening</Text>
+                <Text>Evening</Text>
               </HStack>
             )}
           </HStack>
@@ -314,9 +329,14 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
 
     return (
       <Box w="full">
-        <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
-          🚶 Foot Traffic Trend (6-Year View) 📊
-        </Text>
+        <HStack mb={4} align="center" spacing={3}>
+          <Text fontSize="lg" fontWeight="bold" color="gray.800">
+            Foot Traffic Trend
+          </Text>
+          <MyToolTip label="Foot Traffic Trend">
+            Shows overall pedestrian activity trends over time, combining all time periods into a single trend line
+          </MyToolTip>
+        </HStack>
 
         <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
           <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
@@ -373,15 +393,19 @@ function FootTrafficChart({ tract }: { tract: TractResult }) {
   // Final fallback: Show current score only
   return (
     <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
-      <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
-        🚶 Foot Traffic Score
-      </Text>
+      <HStack mb={2} align="center" spacing={3}>
+        <Text fontSize="lg" fontWeight="bold" color="gray.800">
+          Foot Traffic Score
+        </Text>
+        <MyToolTip label="Foot Traffic Score">
+          Current foot traffic score for this area based on pedestrian activity data
+        </MyToolTip>
+      </HStack>
       <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
         {currentScore}/100
       </Text>
     </Box>
-  );
-}
+  );}
 
 function CrimeTrendChart({ tract }: { tract: TractResult }) {
   const currentScore = Math.round(tract.crime_score || 50);
@@ -426,9 +450,14 @@ function CrimeTrendChart({ tract }: { tract: TractResult }) {
 
   return (
     <Box w="full">
-      <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
-        🛡️ Safety Score Trend (6-Year View) {hasRealData ? '📊' : '🔮'}
-      </Text>
+      <HStack mb={4} align="center" spacing={3}>
+        <Text fontSize="lg" fontWeight="bold" color="gray.800">
+          Safety Score Trend
+        </Text>
+        <MyToolTip label="Safety Score Trend">
+          Shows how safe this area is trending over time, with higher scores indicating better safety conditions
+        </MyToolTip>
+      </HStack>
 
       <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
         {/* Chart - Clean version with reduced white space */}
@@ -507,11 +536,97 @@ function getResilienceLabel(score: number): string {
   return "Very Low";
 }
 
+function getScoreColor(score: number): string {
+  if (score >= 80) return "#10B981"; // Green
+  if (score >= 60) return "#3B82F6"; // Blue  
+  if (score >= 40) return "#F59E0B"; // Orange
+  if (score >= 20) return "#F97316"; // Dark Orange
+  return "#EF4444"; // Red
+}
+
+// Define all possible weight configurations
+const WEIGHT_CONFIGS: WeightConfig[] = [
+  {
+    id: 'foot_traffic',
+    label: 'Foot Traffic',
+    icon: '🚶',
+    getValue: (tract) => tract.foot_traffic_score || 0,
+    color: '#4299E1'
+  },
+  {
+    id: 'demographic',
+    label: 'Demographics',
+    icon: '👥',
+    getValue: (tract) => tract.demographic_score || 0,
+    color: '#48BB78'
+  },
+  {
+    id: 'crime',
+    label: 'Safety Score',
+    icon: '🛡️',
+    getValue: (tract) => tract.crime_score || 0,
+    color: '#10B981'
+  },
+  {
+    id: 'flood_risk',
+    label: 'Flood Risk',
+    icon: '🌊',
+    getValue: (tract) => tract.flood_risk_score || 0,
+    color: '#38B2AC'
+  },
+  {
+    id: 'rent_score',
+    label: 'Rent Score',
+    icon: '💰',
+    getValue: (tract) => tract.rent_score || 0,
+    color: '#ED8936'
+  },
+  {
+    id: 'poi',
+    label: 'Points of Interest',
+    icon: '📍',
+    getValue: (tract) => tract.poi_score || 0,
+    color: '#9F7AEA'
+  }
+];
+
 export default function TractDetailPanel({ tract, onClose }: TractDetailPanelProps) {
   const resilienceScore = Math.round(tract.custom_score || 0);
   const rentText = tract.avg_rent ? `${tract.avg_rent.toFixed(2)}` : 'N/A';
   const resilienceColor = getResilienceColor(resilienceScore);
   const resilienceLabel = getResilienceLabel(resilienceScore);
+  
+  // Get weights from filter store - assuming it has a weights array with {id, value} objects
+  const filterStore = useFilterStore();
+  const weights = (filterStore as any).weights || []; // Type assertion since we don't have the exact interface
+  
+  // Get top 3 weighted metrics, or use defaults
+  const getTopMetrics = () => {
+    // Filter and sort weights by value (highest first)
+    const activeWeights = weights
+      .filter((w: any) => w.value > 0)
+      .sort((a: any, b: any) => b.value - a.value)
+      .slice(0, 3);
+    
+    // If no weights are set, use defaults
+    if (activeWeights.length === 0) {
+      return WEIGHT_CONFIGS.filter(config => 
+        ['foot_traffic', 'demographic', 'crime'].includes(config.id)
+      );
+    }
+    
+    // Map active weights to configs
+    return activeWeights
+      .map((weight: any) => WEIGHT_CONFIGS.find(config => config.id === weight.id))
+      .filter(Boolean) // Remove any undefined configs
+      .slice(0, 3); // Ensure we only have 3
+  };
+  
+  const topMetrics = getTopMetrics();
+  
+  // Clean tract name (remove MN prefix) and format header
+  const cleanTractName = tract.tract_name.replace(/^MN/, '');
+  const tractNumber = tract.geoid;
   
   return (
     <Flex direction="column" h="100%" bg="white" position="relative">
@@ -564,27 +679,25 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
           </VStack>
         </Box>
 
-        {/* Tract info section */}
+        {/* Tract info section - UPDATED */}
         <Box p={4} bg="white" borderBottom="1px solid" borderColor="gray.200">
           <VStack align="start" spacing={1}>
             <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-              🏘️ {tract.tract_name}
-            </Text>
-            <Text fontSize="lg" color="gray.600" fontWeight="medium">
-              {tract.nta_name}
+               {tract.nta_name}
             </Text>
             <Text fontSize="sm" color="gray.500">
-              Census Tract {tract.geoid}
+              Census Tract {tractNumber}
             </Text>
           </VStack>
         </Box>
 
-        {/* Quick stats grid */}
+        {/* Dynamic Quick stats grid - UPDATED */}
         <Box p={6} bg="gray.50" borderBottom="1px solid" borderColor="gray.200">
           <SimpleGrid columns={2} spacing={6}>
+            {/* Always show rent first */}
             <VStack spacing={2}>
               <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                🏠 ${rentText}
+                ${rentText}
               </Text>
               <Text fontSize="sm" color="gray.600" textAlign="center">
                 Rent PSF
@@ -594,45 +707,38 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
               </Text>
             </VStack>
             
-            <VStack spacing={2}>
-              <Text fontSize="2xl" fontWeight="bold" color="#4299E1">
-                🚶 {Math.round(tract.foot_traffic_score || 0)}
-              </Text>
-              <Text fontSize="sm" color="gray.600" textAlign="center">
-                Foot Traffic
-              </Text>
-              <Text fontSize="xs" color="gray.500">
-                out of 100
-              </Text>
-            </VStack>
-            
-            <VStack spacing={2}>
-              <Text fontSize="2xl" fontWeight="bold" color="gray.600">
-                👥 {(() => {
-                  const rawValue = tract.demographic_match_pct || 0;
-                  const displayValue = rawValue > 1 ? Math.round(rawValue) : Math.round(rawValue * 100);
-                  return `${Math.min(displayValue, 100)}%`;
-                })()}
-              </Text>
-              <Text fontSize="sm" color="gray.600" textAlign="center">
-                Ethnicity Fit
-              </Text>
-              <Text fontSize="xs" color="gray.500">
-                match rate
-              </Text>
-            </VStack>
-            
-            <VStack spacing={2}>
-              <Text fontSize="2xl" fontWeight="bold" color="#10B981">
-                🛡️ {Math.round(tract.crime_score || 0)}
-              </Text>
-              <Text fontSize="sm" color="gray.600" textAlign="center">
-                Safety Score
-              </Text>
-              <Text fontSize="xs" color="gray.500">
-                out of 100
-              </Text>
-            </VStack>
+            {/* Show top 3 weighted metrics dynamically */}
+            {topMetrics.slice(0, 3).map((metric: WeightConfig, index: number) => {
+              const value = Math.round(metric.getValue(tract));
+              const isPercentage = metric.id === 'demographic' && tract.demographic_match_pct;
+              const displayValue = isPercentage 
+                ? (() => {
+                    const rawValue = tract.demographic_match_pct || 0;
+                    const displayValue = rawValue > 1 ? Math.round(rawValue) : Math.round(rawValue * 100);
+                    return `${Math.min(displayValue, 100)}%`;
+                  })()
+                : value;
+              
+              // Use consistent color scheme based on score value
+              const scoreForColor = isPercentage 
+                ? ((tract.demographic_match_pct || 0) > 1 ? (tract.demographic_match_pct || 0) : (tract.demographic_match_pct || 0) * 100)
+                : value;
+              const scoreColor = getScoreColor(scoreForColor);
+              
+              return (
+                <VStack key={`${metric.id}-${index}`} spacing={2}>
+                  <Text fontSize="2xl" fontWeight="bold" color={scoreColor}>
+                    {metric.icon} {displayValue}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600" textAlign="center">
+                    {metric.label}
+                  </Text>
+                  <Text fontSize="xs" color="gray.500">
+                    {isPercentage ? "match rate" : "out of 100"}
+                  </Text>
+                </VStack>
+              );
+            })}
           </SimpleGrid>
         </Box>
 
