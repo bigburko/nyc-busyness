@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel.tsx - UPDATED VERSION
+// src/components/features/search/TractDetailPanel.tsx - COMPLETE UPDATED VERSION
 'use client';
 
 import { 
@@ -754,49 +754,247 @@ export default function TractDetailPanel({ tract, onClose }: TractDetailPanelPro
           </VStack>
         </Box>
 
-        {/* Score breakdown */}
+        {/* Smart Score Breakdown */}
         <Box p={6}>
-          <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.800">
-            📊 Score Breakdown
-          </Text>
-          <VStack spacing={6}>
-            <ScoreMeter
-              label="Foot Traffic"
-              score={tract.foot_traffic_score || 0}
-              color="#4299E1"
-              icon="🚶"
-            />
-            <ScoreMeter
-              label="Demographics"
-              score={tract.demographic_score || 0}
-              color="#48BB78"
-              icon="👥"
-            />
-            <ScoreMeter
-              label="Safety Score"
-              score={tract.crime_score || 0}
-              color="#10B981"
-              icon="🛡️"
-            />
-            <ScoreMeter
-              label="Flood Risk"
-              score={tract.flood_risk_score || 0}
-              color="#38B2AC"
-              icon="🌊"
-            />
-            <ScoreMeter
-              label="Rent Score"
-              score={tract.rent_score || 0}
-              color="#ED8936"
-              icon="💰"
-            />
-            <ScoreMeter
-              label="Points of Interest"
-              score={tract.poi_score || 0}
-              color="#9F7AEA"
-              icon="📍"
-            />
-          </VStack>
+          <HStack mb={6} align="center" spacing={3}>
+            <Text fontSize="xl" fontWeight="bold" color="gray.800">
+              📊 Score Calculation
+            </Text>
+            <MyToolTip label="Score Calculation">
+              Shows how your current weights contribute to the final resilience score, with exact calculations
+            </MyToolTip>
+          </HStack>
+          
+          {(() => {
+            // Get current weights from filter store
+            const currentWeights = weights.filter((w: any) => w.value > 0);
+            
+            // Default weights when none are set
+            const DEFAULT_WEIGHTS = [
+              { id: 'foot_traffic', value: 45 },
+              { id: 'crime', value: 25 },
+              { id: 'flood_risk', value: 15 },
+              { id: 'rent_score', value: 10 },
+              { id: 'poi', value: 5 }
+            ];
+            
+            // Use current weights or defaults
+            const activeWeights = currentWeights.length > 0 ? currentWeights : DEFAULT_WEIGHTS;
+            
+            // Calculate contributions
+            const contributions = activeWeights.map((weight: any) => {
+              const config = WEIGHT_CONFIGS.find(c => c.id === weight.id);
+              if (!config) return null;
+              
+              const score = Math.round(config.getValue(tract));
+              const weightPercent = weight.value;
+              const contribution = Math.round((score * weightPercent) / 100);
+              
+              return {
+                ...config,
+                score,
+                weight: weightPercent,
+                contribution,
+                contributionPercent: Math.round((contribution / resilienceScore) * 100)
+              };
+            }).filter(Boolean);
+            
+            // Sort by contribution (highest first)
+            contributions.sort((a: any, b: any) => b.contribution - a.contribution);
+            
+            if (currentWeights.length === 0) {
+              return (
+                <VStack spacing={6}>
+                  <Box 
+                    p={4} 
+                    bg="blue.50" 
+                    borderRadius="lg" 
+                    border="1px solid" 
+                    borderColor="blue.200"
+                    w="full"
+                  >
+                    <VStack spacing={2}>
+                      <Text fontSize="md" fontWeight="semibold" color="blue.700" textAlign="center">
+                        🎯 Using Default Scoring
+                      </Text>
+                      <Text fontSize="sm" color="blue.600" textAlign="center">
+                        No custom weights set. Using our research-backed default formula.
+                      </Text>
+                    </VStack>
+                  </Box>
+                  
+                  <VStack spacing={4} w="full">
+                    {contributions.map((item: any, index: number) => (
+                      <Box 
+                        key={`default-${item.id}-${index}`}
+                        p={4} 
+                        bg="white" 
+                        borderRadius="lg" 
+                        border="1px solid" 
+                        borderColor="gray.200"
+                        boxShadow="sm"
+                        w="full"
+                      >
+                        <HStack justify="space-between" mb={3}>
+                          <HStack spacing={2}>
+                            <Text fontSize="lg">{item.icon}</Text>
+                            <VStack align="start" spacing={0}>
+                              <Text fontSize="md" fontWeight="semibold" color="gray.700">
+                                {item.label}
+                              </Text>
+                              <Text fontSize="xs" color="gray.500">
+                                {item.weight}% weight (default)
+                              </Text>
+                            </VStack>
+                          </HStack>
+                          
+                          <VStack align="end" spacing={0}>
+                            <Text fontSize="lg" fontWeight="bold" color={getScoreColor(item.score)}>
+                              +{item.contribution}
+                            </Text>
+                            <Text fontSize="xs" color="gray.500">
+                              {item.contributionPercent}% of final
+                            </Text>
+                          </VStack>
+                        </HStack>
+                        
+                        <HStack fontSize="xs" color="gray.600" spacing={1}>
+                          <Text>{item.score} × {item.weight}% = {item.contribution} points</Text>
+                        </HStack>
+                        
+                        <Progress 
+                          value={(item.contribution / resilienceScore) * 100} 
+                          size="sm" 
+                          colorScheme="blue" 
+                          bg="gray.100" 
+                          borderRadius="full"
+                          mt={2}
+                        />
+                      </Box>
+                    ))}
+                  </VStack>
+                </VStack>
+              );
+            }
+            
+            return (
+              <VStack spacing={6}>
+                <Box 
+                  p={4} 
+                  bg="green.50" 
+                  borderRadius="lg" 
+                  border="1px solid" 
+                  borderColor="green.200"
+                  w="full"
+                >
+                  <VStack spacing={2}>
+                    <Text fontSize="md" fontWeight="semibold" color="green.700" textAlign="center">
+                      ⚖️ Custom Weighted Scoring
+                    </Text>
+                    <Text fontSize="sm" color="green.600" textAlign="center">
+                      Score calculated using your custom weights from the filter panel
+                    </Text>
+                  </VStack>
+                </Box>
+                
+                <VStack spacing={4} w="full">
+                  {contributions.map((item: any, index: number) => (
+                    <Box 
+                      key={`weighted-${item.id}-${index}`}
+                      p={4} 
+                      bg="white" 
+                      borderRadius="lg" 
+                      border="1px solid" 
+                      borderColor="gray.200"
+                      boxShadow="sm"
+                      w="full"
+                    >
+                      <HStack justify="space-between" mb={3}>
+                        <HStack spacing={2}>
+                          <Text fontSize="lg">{item.icon}</Text>
+                          <VStack align="start" spacing={0}>
+                            <Text fontSize="md" fontWeight="semibold" color="gray.700">
+                              {item.label}
+                            </Text>
+                            <Text fontSize="xs" color="gray.500">
+                              {item.weight}% weight (custom)
+                            </Text>
+                          </VStack>
+                        </HStack>
+                        
+                        <VStack align="end" spacing={0}>
+                          <Text fontSize="lg" fontWeight="bold" color={getScoreColor(item.score)}>
+                            +{item.contribution}
+                          </Text>
+                          <Text fontSize="xs" color="gray.500">
+                            {item.contributionPercent}% of final
+                          </Text>
+                        </VStack>
+                      </HStack>
+                      
+                      <HStack fontSize="xs" color="gray.600" spacing={1}>
+                        <Text>{item.score} × {item.weight}% = {item.contribution} points</Text>
+                      </HStack>
+                      
+                      <Progress 
+                        value={(item.contribution / resilienceScore) * 100} 
+                        size="sm" 
+                        colorScheme="orange" 
+                        bg="gray.100" 
+                        borderRadius="full"
+                        mt={2}
+                      />
+                    </Box>
+                  ))}
+                </VStack>
+                
+                {/* Show unweighted factors in collapsed section */}
+                {(() => {
+                  const unweightedFactors = WEIGHT_CONFIGS.filter(config => 
+                    !activeWeights.some((w: any) => w.id === config.id)
+                  );
+                  
+                  if (unweightedFactors.length === 0) return null;
+                  
+                  return (
+                    <Box w="full" mt={4}>
+                      <Text fontSize="sm" color="gray.500" mb={3} textAlign="center">
+                        💡 Other available factors (not currently weighted)
+                      </Text>
+                      <SimpleGrid columns={2} spacing={3}>
+                        {unweightedFactors.map((factor, index) => {
+                          const score = Math.round(factor.getValue(tract));
+                          return (
+                            <Box 
+                              key={`unweighted-${factor.id}-${index}`}
+                              p={3} 
+                              bg="gray.50" 
+                              borderRadius="md" 
+                              border="1px solid" 
+                              borderColor="gray.200"
+                            >
+                              <VStack spacing={1}>
+                                <Text fontSize="sm">{factor.icon}</Text>
+                                <Text fontSize="xs" fontWeight="semibold" color="gray.600" textAlign="center">
+                                  {factor.label}
+                                </Text>
+                                <Text fontSize="sm" fontWeight="bold" color={getScoreColor(score)}>
+                                  {score}/100
+                                </Text>
+                                <Text fontSize="xs" color="gray.500">
+                                  0% weight
+                                </Text>
+                              </VStack>
+                            </Box>
+                          );
+                        })}
+                      </SimpleGrid>
+                    </Box>
+                  );
+                })()}
+              </VStack>
+            );
+          })()}
         </Box>
 
         {/* Demographic details */}
