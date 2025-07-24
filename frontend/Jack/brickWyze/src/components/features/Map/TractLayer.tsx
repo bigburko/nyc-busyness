@@ -1,12 +1,47 @@
-// components/MapGroup/TractLayer.tsx
-
 import mapboxgl from 'mapbox-gl';
 import { FeatureCollection } from 'geojson';
+
+/**
+ * Adds a bright background layer specifically under tract areas
+ * This makes tract data pop against the normal map background
+ */
+const addTractBackgroundLayer = (map: mapboxgl.Map) => {
+  // Only add if not already present
+  if (map.getLayer('tract-bright-background')) {
+    return;
+  }
+
+  // Add bright background layer using the same source as tracts
+  map.addLayer({
+    id: 'tract-bright-background',
+    type: 'fill',
+    source: 'tracts',
+    paint: {
+      'fill-color': '#ffffff', // Bright white background
+      'fill-opacity': [
+        'case',
+        ['==', ['typeof', ['get', 'hasScore']], 'boolean'],
+        [
+          'case',
+          ['get', 'hasScore'],
+          0.8, // Bright background only where there's data
+          0    // Transparent where no data
+        ],
+        0
+      ]
+    }
+  }, 'tracts-fill'); // Position right before tract fill layer
+  
+  console.log('✨ [TractLayer] Added bright background layer under tract data');
+};
+
+
 
 /**
  * Adds the fill and outline layers for census tracts on initial map load.
  */
 export const addTractLayers = (map: mapboxgl.Map) => {
+  // Add the tracts source if it doesn't exist
   if (!map.getSource('tracts')) {
     map.addSource('tracts', {
       type: 'geojson',
@@ -17,6 +52,7 @@ export const addTractLayers = (map: mapboxgl.Map) => {
     });
   }
 
+  // Add tract fill layer with proper resilience score colors FIRST
   if (!map.getLayer('tracts-fill')) {
     map.addLayer({
       id: 'tracts-fill',
@@ -31,44 +67,46 @@ export const addTractLayers = (map: mapboxgl.Map) => {
             ['get', 'hasScore'],
             [
               'case',
-              // ✅ FIXED: Exact thresholds matching the legend
               ['>=', ['get', 'custom_score'], 80],
               [
-                // Extra dark green as it approaches 100
                 'interpolate',
                 ['linear'],
                 ['get', 'custom_score'],
-                80, '#22c55e',   // Green at 80
-                100, '#16a34a'   // Darker green at 100
+                80, '#22c55e',  // Green
+                100, '#16a34a'  // Darker green at 100
               ],
-              ['>=', ['get', 'custom_score'], 60], '#7dd3fc',  // Good (60-80) - Light Blue
-              ['>=', ['get', 'custom_score'], 40], '#fbbf24',  // Fair (40-60) - Yellow  
-              ['>=', ['get', 'custom_score'], 20], '#fb923c',  // Low (20-40) - Orange
-              '#ef4444'  // Very Low (0-20) - Red
+              ['>=', ['get', 'custom_score'], 60], '#7dd3fc', // Light Blue
+              ['>=', ['get', 'custom_score'], 40], '#fbbf24', // Yellow
+              ['>=', ['get', 'custom_score'], 20], '#fb923c', // Orange
+              '#ef4444' // Red for 0-20
             ],
             'transparent',
           ],
           'transparent',
         ],
-        'fill-opacity': 0,
+        'fill-opacity': 0.85, // Slightly higher opacity for better contrast against bright background
       },
     });
   }
 
+  // ✅ Add bright background layer AFTER tracts-fill exists, positioned before it
+  addTractBackgroundLayer(map);
+
+  // Add tract outline layer - KEEP BLACK outlines as requested
   if (!map.getLayer('tracts-outline')) {
     map.addLayer({
       id: 'tracts-outline',
       type: 'line',
       source: 'tracts',
       paint: {
-        'line-color': '#666',
+        'line-color': '#333', // Slightly darker for better contrast against bright background
         'line-width': 1,
-        'line-opacity': 0.8,
+        'line-opacity': 0.9,
       },
     });
   }
 
-  // ✅ UPDATED: Simple score numbers for all tracts (0-100 scale)
+  // Add tract labels layer
   if (!map.getLayer('tracts-labels')) {
     map.addLayer({
       id: 'tracts-labels',
@@ -77,27 +115,25 @@ export const addTractLayers = (map: mapboxgl.Map) => {
       layout: {
         'text-field': [
           'case',
-          // Only show labels for tracts that have scores
           ['all', 
             ['==', ['typeof', ['get', 'hasScore']], 'boolean'],
             ['get', 'hasScore']
           ],
-          // ✅ FIXED: Scores are now 0-100, so just round them (no multiplication)
           [
             'to-string',
             ['round', ['get', 'custom_score']]
           ],
-          '' // Empty string for tracts without scores
+          ''
         ],
         'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
         'text-size': [
           'interpolate',
           ['linear'],
           ['zoom'],
-          10, 8,   // Small text at low zoom
-          12, 12,  // Medium text at medium zoom  
-          14, 16,  // Larger text when zoomed in
-          16, 20   // Large text when very close
+          10, 8,
+          12, 12,
+          14, 16,
+          16, 20
         ],
         'text-anchor': 'center',
         'text-allow-overlap': false,
@@ -105,18 +141,17 @@ export const addTractLayers = (map: mapboxgl.Map) => {
         'symbol-placement': 'point'
       },
       paint: {
-        // ✅ CONSISTENT STYLING: All numbers get same white text with black outline
-        'text-color': '#ffffff', // Clean white text for all scores
-        'text-halo-color': '#000000', // Black outline for readability
-        'text-halo-width': 1.5, // Good outline thickness
+        'text-color': '#333333', // Darker text for better contrast against bright background
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 2,
         'text-opacity': [
           'case',
           ['all', 
             ['==', ['typeof', ['get', 'hasScore']], 'boolean'],
             ['get', 'hasScore']
           ],
-          0.9, // Good visibility
-          0    // Invisible for tracts without scores
+          0.9,
+          0
         ]
       }
     });
@@ -131,12 +166,15 @@ export const updateTractData = (
   geojson: FeatureCollection
 ) => {
   if (!map || !map.getSource('tracts')) return;
+  
   const source = map.getSource('tracts');
   if (source && 'setData' in source) {
     (source as mapboxgl.GeoJSONSource).setData(geojson);
+    
+    // Maintain proper opacity
     map.setPaintProperty('tracts-fill', 'fill-opacity', 0.7);
     
-    // ✅ Ensure labels are visible when data updates
+    // Update label opacity
     if (map.getLayer('tracts-labels')) {
       map.setPaintProperty('tracts-labels', 'text-opacity', [
         'case',
