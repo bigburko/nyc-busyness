@@ -30,16 +30,21 @@ export const addTractLayers = (map: mapboxgl.Map) => {
             'case',
             ['get', 'hasScore'],
             [
-              'interpolate',
-              ['linear'],
-              ['get', 'custom_score'],
-              // ✅ FIXED: Updated to handle 0-100 scale instead of 0-1
-              0, '#d73027',    // Very Low (0-20)
-              20, '#fc8d59',   // Low (20-40)
-              40, '#fee08b',   // Fair (40-60)
-              60, '#d9ef8b',   // Good (60-80)
-              80, '#91bfdb',   // High (80-100)
-              100, '#1a9850',  // Excellent (100)
+              'case',
+              // ✅ FIXED: Exact thresholds matching the legend
+              ['>=', ['get', 'custom_score'], 80],
+              [
+                // Extra dark green as it approaches 100
+                'interpolate',
+                ['linear'],
+                ['get', 'custom_score'],
+                80, '#22c55e',   // Green at 80
+                100, '#16a34a'   // Darker green at 100
+              ],
+              ['>=', ['get', 'custom_score'], 60], '#7dd3fc',  // Good (60-80) - Light Blue
+              ['>=', ['get', 'custom_score'], 40], '#fbbf24',  // Fair (40-60) - Yellow  
+              ['>=', ['get', 'custom_score'], 20], '#fb923c',  // Low (20-40) - Orange
+              '#ef4444'  // Very Low (0-20) - Red
             ],
             'transparent',
           ],
