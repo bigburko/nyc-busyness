@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel/TractDetailPanel.tsx - Updated with extracted LoopNet Integration
+// src/components/features/search/TractDetailPanel/TractDetailPanel.tsx - Updated with AI Summary Integration
 'use client';
 
 import { 
@@ -8,12 +8,13 @@ import { CloseIcon, ArrowBackIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
 import { useFilterStore } from '../../../../stores/filterStore';
 import { TractResult } from '../../../../types/TractTypes';
-import { FilterStore } from '../../../../types/WeightTypes';
+import { FilterStore, Weight } from '../../../../types/WeightTypes';
 import { TrendAnalysis } from './TrendAnalysis';
 import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
 import { DemographicCharts } from './DemographicCharts';
 import { QuickStats } from './QuickStats';
+import { AISummary } from './AISummary'; // 🧠 NEW: Import AI Summary
 import GoogleMapsImage from './GoogleMapsImage';
 import { LoopNetButton } from './LoopNetIntegration';
 
@@ -42,7 +43,7 @@ export default function TractDetailPanel({
   rawDemographicData 
 }: TractDetailPanelProps) {
   const filterStore = useFilterStore() as FilterStore;
-  const weights = filterStore.weights || [];
+  const weights = (filterStore.weights || []) as Weight[];
   
   const resilienceScore = Math.round(tract.custom_score || 0);
   const [scrollY, setScrollY] = useState(0);
@@ -107,6 +108,7 @@ export default function TractDetailPanel({
   // Log when detail panel opens (for debugging)
   useEffect(() => {
     console.log(`📋 [TractDetailPanel] Opened for tract ${tract.geoid} (${tract.nta_name})`);
+    console.log('🧠 [TractDetailPanel] AI Summary will generate for this tract');
   }, [tract.geoid, tract.nta_name]);
 
   const renderTabContent = () => {
@@ -216,13 +218,21 @@ export default function TractDetailPanel({
                 tract={tract}
                 rentText={tract.avg_rent ? tract.avg_rent.toLocaleString() : 'N/A'}
                 weights={weights}
-                rentRange={[26, 160]} // TODO: Get from filterStore.rentRange
+                rentRange={[26, 160]} // Default rent range - QuickStats component should handle this
               />
 
-              {/* Location Summary */}
+              {/* 🧠 AI SUMMARY - NEW: Real AI business analysis */}
+              <Box mt={6}>
+                <AISummary 
+                  tract={tract}
+                  weights={weights}
+                />
+              </Box>
+
+              {/* Location Summary - Keep as fallback content */}
               <Box p={6} bg="white" borderRadius="lg" w="full" boxShadow="sm" mt={6}>
                 <Text fontSize="lg" fontWeight="semibold" mb={4}>
-                  Location Summary
+                  📍 Location Summary
                 </Text>
                 <Text color="gray.600" lineHeight="1.6">
                   This area shows strong potential for business development with good foot traffic and accessible transportation. 
@@ -457,7 +467,7 @@ export default function TractDetailPanel({
         {renderTabContent()}
       </Box>
 
-      {/* Action Buttons - Simplified to Commercial Properties and Download Report */}
+      {/* Action Buttons - Properties and Report Download */}
       <Box 
         position="fixed"
         bottom="0"
@@ -473,7 +483,7 @@ export default function TractDetailPanel({
         pointerEvents="auto"
       >
         <HStack spacing={4} w="full">
-          {/* Primary LoopNet Button */}
+          {/* Properties Search Button */}
           <LoopNetButton tract={tract} flex="1" />
           
           {/* Download Report Button */}
