@@ -2,7 +2,7 @@
 'use client';
 
 import { Box, VStack, Text } from '@chakra-ui/react';
-import { TractResult } from '../types/TractTypes';
+import { TractResult } from '../../../../types/TractTypes';
 import { FootTrafficChart } from './FootTrafficChart';
 import { CrimeTrendChart } from './CrimeTrendChart';
 

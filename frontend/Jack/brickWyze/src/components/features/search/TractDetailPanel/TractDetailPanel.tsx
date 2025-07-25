@@ -13,6 +13,7 @@ import { TrendAnalysis } from './TrendAnalysis';
 import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
 import { DemographicCharts } from './DemographicCharts';
+import { QuickStats } from './QuickStats';
 import GoogleMapsImage from './GoogleMapsImage';
 import { LoopNetButton } from './LoopNetIntegration';
 
@@ -210,32 +211,16 @@ export default function TractDetailPanel({
 
             {/* Overview Content */}
             <Box bg="gray.50" px={headerPadding} py={6}>
-              {/* Quick Stats Cards */}
-              <HStack spacing={4} w="full" justify="center" mb={6}>
-                <Box bg="white" p={4} borderRadius="lg" boxShadow="sm" textAlign="center" minW="120px">
-                  <Text fontSize="2xl" fontWeight="bold" color="green.600">
-                    {tract.foot_traffic_score ? Math.round(tract.foot_traffic_score) : 'N/A'}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Foot Traffic</Text>
-                </Box>
-                
-                <Box bg="white" p={4} borderRadius="lg" boxShadow="sm" textAlign="center" minW="120px">
-                  <Text fontSize="2xl" fontWeight="bold" color="blue.600">
-                    {tract.crime_score ? Math.round(tract.crime_score) : 'N/A'}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Safety Score</Text>
-                </Box>
-                
-                <Box bg="white" p={4} borderRadius="lg" boxShadow="sm" textAlign="center" minW="120px">
-                  <Text fontSize="2xl" fontWeight="bold" color="purple.600">
-                    {tract.demographic_score ? Math.round(tract.demographic_score) : 'N/A'}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">Demographics</Text>
-                </Box>
-              </HStack>
+              {/* QuickStats - Modern metrics display with rent positioning */}
+              <QuickStats 
+                tract={tract}
+                rentText={tract.avg_rent ? tract.avg_rent.toLocaleString() : 'N/A'}
+                weights={weights}
+                rentRange={[26, 160]} // TODO: Get from filterStore.rentRange
+              />
 
               {/* Location Summary */}
-              <Box p={6} bg="white" borderRadius="lg" w="full" boxShadow="sm">
+              <Box p={6} bg="white" borderRadius="lg" w="full" boxShadow="sm" mt={6}>
                 <Text fontSize="lg" fontWeight="semibold" mb={4}>
                   Location Summary
                 </Text>
