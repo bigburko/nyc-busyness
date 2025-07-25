@@ -6,6 +6,17 @@ import { useState, useEffect, useCallback } from 'react';
 import TractResultsList from './TractResultsList';
 import TractDetailPanel from './TractDetailPanel/TractDetailPanel';
 
+interface CrimeTimeline {
+  year_2020?: number;
+  year_2021?: number;
+  year_2022?: number;
+  year_2023?: number;
+  year_2024?: number;
+  pred_2025?: number;
+  pred_2026?: number;
+  pred_2027?: number;
+}
+
 interface TractResult {
   geoid: string;
   tract_name: string;
@@ -27,16 +38,21 @@ interface TractResult {
   gender_match_pct?: number;
   age_match_pct?: number;
   income_match_pct?: number;
-  crime_timeline?: {
-    year_2020?: number;
-    year_2021?: number;
-    year_2022?: number;
-    year_2023?: number;
-    year_2024?: number;
-    pred_2025?: number;
-    pred_2026?: number;
-    pred_2027?: number;
-  };
+  crime_timeline?: CrimeTimeline;
+  foot_traffic_timeline?: Record<string, number>;
+}
+
+// Define proper demographic data types
+interface DemographicDataItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface RawDemographicData {
+  ethnicityData: DemographicDataItem[] | null;
+  demographicsData: DemographicDataItem[] | null;
+  incomeData: DemographicDataItem[] | null;
 }
 
 interface TractResultsContainerProps {
@@ -54,7 +70,7 @@ declare global {
 }
 
 // 🚀 NEW: Extract REAL demographic data from tract results
-const extractRealDemographicData = (tract: TractResult) => {
+const extractRealDemographicData = (tract: TractResult): RawDemographicData | null => {
   console.log('📊 [TractResultsContainer] Extracting REAL demographic data for tract:', tract.geoid);
   
   // Check if we have real demographic data (non-null and greater than 0)
@@ -77,7 +93,7 @@ const extractRealDemographicData = (tract: TractResult) => {
   };
 
   // Transform real tract data into chart format
-  const realDemographicData = {
+  const realDemographicData: RawDemographicData = {
     ethnicityData: (tract.demographic_match_pct !== undefined && tract.demographic_match_pct !== null && tract.demographic_match_pct > 0) ? [
       { 
         name: 'Target Demographics', 
@@ -91,7 +107,7 @@ const extractRealDemographicData = (tract: TractResult) => {
       }
     ] : null,
 
-    demographicsData: [] as any[],
+    demographicsData: [],
 
     incomeData: (tract.income_match_pct !== undefined && tract.income_match_pct !== null && tract.income_match_pct > 0) ? [
       { 
@@ -173,11 +189,7 @@ export default function TractResultsContainer({
   const [isMobile, setIsMobile] = useState(false);
   
   // 🚀 FIXED: Real demographic data state (no sample data)
-  const [demographicData, setDemographicData] = useState<{
-    ethnicityData: any[] | null;
-    demographicsData: any[] | null;
-    incomeData: any[] | null;
-  } | null>(null);
+  const [demographicData, setDemographicData] = useState<RawDemographicData | null>(null);
 
   // Mobile detection
   useEffect(() => {

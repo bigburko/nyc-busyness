@@ -13,14 +13,6 @@ interface ScoreHeaderProps {
   };
 }
 
-function getResilienceColor(score: number): string {
-  if (score >= 80) return "#10B981"; // green
-  if (score >= 60) return "#3B82F6"; // blue
-  if (score >= 40) return "#F59E0B"; // yellow
-  if (score >= 20) return "#F97316"; // orange
-  return "#EF4444"; // red
-}
-
 function getResilienceLabel(score: number): string {
   if (score >= 80) return "Excellent";
   if (score >= 60) return "Good";
@@ -38,7 +30,6 @@ function getColorScheme(score: number): string {
 }
 
 export function ScoreHeader({ score, tractInfo }: ScoreHeaderProps) {
-  const resilienceColor = getResilienceColor(score);
   const resilienceLabel = getResilienceLabel(score);
   const colorScheme = getColorScheme(score);
   

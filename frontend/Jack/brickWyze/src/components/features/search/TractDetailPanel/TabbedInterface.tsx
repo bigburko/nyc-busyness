@@ -5,20 +5,10 @@ import React, { useState } from 'react';
 import { 
   Box, 
   Flex,
-  Button,
   Text, 
   VStack,
   Badge,
 } from '@chakra-ui/react';
-import { 
-  FaChartBar, 
-  FaChartLine, 
-  FaUsers, 
-  FaSearch,
-  FaBolt,
-  FaShieldAlt,
-  FaWalking
-} from 'react-icons/fa';
 import { TractResult } from '../../../../types/TractTypes';
 import { Weight } from '../../../../types/WeightTypes';
 
@@ -30,14 +20,23 @@ import { ScoreCalculation } from './ScoreCalculation';
 import { SmartInsights } from './SmartInsights';
 import { DemographicCharts } from './DemographicCharts';
 
+// Define proper demographic data types
+interface DemographicDataItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface RawDemographicData {
+  ethnicityData: DemographicDataItem[] | null;
+  demographicsData: DemographicDataItem[] | null;
+  incomeData: DemographicDataItem[] | null;
+}
+
 interface TabbedInterfaceProps {
   tract: TractResult;
   weights: Weight[];
-  rawDemographicData?: {
-    ethnicityData: any[] | null;
-    demographicsData: any[] | null;
-    incomeData: any[] | null;
-  };
+  rawDemographicData?: RawDemographicData;
 }
 
 // Helper function to get quick insights

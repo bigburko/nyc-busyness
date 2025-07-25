@@ -14,15 +14,25 @@ import { QuickStats } from './QuickStats';
 import { TrendAnalysis } from './TrendAnalysis';
 import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
+import { DemographicCharts } from './DemographicCharts';
+
+// Define proper demographic data types
+interface DemographicDataItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface RawDemographicData {
+  ethnicityData: DemographicDataItem[] | null;
+  demographicsData: DemographicDataItem[] | null;
+  incomeData: DemographicDataItem[] | null;
+}
 
 interface TractDetailPanelProps {
   tract: TractResult;
   onClose: () => void;
-  rawDemographicData?: {
-    ethnicityData: any[] | null;
-    demographicsData: any[] | null;
-    incomeData: any[] | null;
-  };
+  rawDemographicData?: RawDemographicData;
 }
 
 export default function TractDetailPanel({ 
@@ -186,7 +196,7 @@ export default function TractDetailPanel({
                       Business Insight {i + 1}
                     </Text>
                     <Text color="gray.600">
-                      Additional analysis and details about this location's business potential.
+                      Additional analysis and details about this location&apos;s business potential.
                     </Text>
                   </Box>
                 ))}
@@ -222,7 +232,10 @@ export default function TractDetailPanel({
         return (
           <Box p={headerPadding} bg="gray.50" minH="100vh">
             <Text fontSize="xl" fontWeight="bold" mb={6}>Demographics Analysis</Text>
-            <AdvancedDemographics tract={tract} />
+            <VStack spacing={6}>
+              <DemographicCharts tract={tract} rawDemographicData={rawDemographicData} />
+              <AdvancedDemographics tract={tract} />
+            </VStack>
             <Box h="160px" />
           </Box>
         );

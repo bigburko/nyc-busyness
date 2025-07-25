@@ -5,13 +5,22 @@ import { Box, VStack, HStack, Text, SimpleGrid, Badge } from '@chakra-ui/react';
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts';
 import { TractResult } from '../../../../types/TractTypes';
 
+// Define proper demographic data types
+interface DemographicDataItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface RawDemographicData {
+  ethnicityData: DemographicDataItem[] | null;
+  demographicsData: DemographicDataItem[] | null;
+  incomeData: DemographicDataItem[] | null;
+}
+
 interface DemographicChartsProps {
   tract: TractResult;
-  rawDemographicData?: {
-    ethnicityData: any[] | null;
-    demographicsData: any[] | null;
-    incomeData: any[] | null;
-  };
+  rawDemographicData?: RawDemographicData;
 }
 
 // 🔧 SAFE: Helper function to safely format percentages
@@ -22,16 +31,19 @@ const safeToFixed = (value: number | null | undefined, decimals: number = 1): st
   return Number(value).toFixed(decimals);
 };
 
-interface DemographicChartsProps {
-  tract: TractResult;
-  rawDemographicData?: {
-    ethnicityData: any[] | null;
-    demographicsData: any[] | null;
-    incomeData: any[] | null;
-  };
+// Custom tooltip component with proper typing
+interface TooltipPayloadItem {
+  payload: DemographicDataItem;
+  name: string;
+  value: number;
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+}
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -45,7 +57,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 // 🚀 NEW: Detect if we have real demographic data vs no data
-const hasRealDemographicData = (tract: TractResult) => {
+const hasRealDemographicData = (tract: TractResult): boolean => {
   return (
     (tract.demographic_match_pct !== undefined && tract.demographic_match_pct !== null && tract.demographic_match_pct > 0) ||
     (tract.gender_match_pct !== undefined && tract.gender_match_pct !== null && tract.gender_match_pct > 0) ||
@@ -55,7 +67,7 @@ const hasRealDemographicData = (tract: TractResult) => {
 };
 
 // 🚀 NEW: Check if data contains actual values or just placeholders
-const hasMeaningfulData = (data: any[] | null) => {
+const hasMeaningfulData = (data: DemographicDataItem[] | null): boolean => {
   if (!data || data.length === 0) return false;
   
   // Check if data has meaningful values (not just 0% or "No Data Available")
@@ -135,12 +147,11 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, value }) => `${name}: ${value}%`}
                 outerRadius={70}
                 fill="#8884d8"
                 dataKey="value"
               >
-                {ethnicityData.map((entry: any, index: number) => (
+                {ethnicityData.map((entry: DemographicDataItem, index: number) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -185,7 +196,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
               />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="value" fill="#8884d8">
-                {demographicsData.map((entry: any, index: number) => (
+                {demographicsData.map((entry: DemographicDataItem, index: number) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Bar>
@@ -224,12 +235,11 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, value }) => `${name}: ${value}%`}
                 outerRadius={70}
                 fill="#8884d8"
                 dataKey="value"
               >
-                {incomeData.map((entry: any, index: number) => (
+                {incomeData.map((entry: DemographicDataItem, index: number) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>

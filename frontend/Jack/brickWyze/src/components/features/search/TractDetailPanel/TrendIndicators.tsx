@@ -1,7 +1,7 @@
 // src/components/features/search/TractDetailPanel/TrendIndicators.tsx
 'use client';
 
-import { Box, VStack, HStack, Text, SimpleGrid, Flex } from '@chakra-ui/react';
+import { Box, VStack, HStack, Text, SimpleGrid } from '@chakra-ui/react';
 import { TractResult } from '../../../../types/TractTypes';
 
 interface TrendIndicatorsProps {
@@ -16,6 +16,26 @@ interface TrendData {
   icon: string;
   color: string;
   sparklineData: number[];
+}
+
+interface TimelineData {
+  [key: string]: number | undefined;
+  '2022'?: number;
+  '2023'?: number;
+  'pred_2025'?: number;
+  'pred_2026'?: number;
+  'pred_2027'?: number;
+}
+
+interface CrimeTimelineData {
+  year_2020?: number;
+  year_2021?: number;
+  year_2022?: number;
+  year_2023?: number;
+  year_2024?: number;
+  pred_2025?: number;
+  pred_2026?: number;
+  pred_2027?: number;
 }
 
 const getTrendIcon = (trend: string): string => {
@@ -77,11 +97,11 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
   // Foot Traffic Trend
   if (tract.foot_traffic_score) {
     let footTrafficSparkline: number[] = [];
-    let footTrafficTrend = 'unknown';
+    let footTrafficTrend: TrendData['trend'] = 'unknown';
     
     // Try to get real timeline data
     if (tract.foot_traffic_timeline) {
-      const timeline = tract.foot_traffic_timeline;
+      const timeline = tract.foot_traffic_timeline as TimelineData;
       footTrafficSparkline = [
         timeline['2022'] || 0,
         timeline['2023'] || 0,
@@ -114,7 +134,7 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
     trends.push({
       label: 'Foot Traffic',
       current: Math.round(tract.foot_traffic_score),
-      trend: footTrafficTrend as any,
+      trend: footTrafficTrend,
       change: '+5%',
       icon: '🚶',
       color: '#4299E1',
@@ -125,11 +145,11 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
   // Crime/Safety Trend
   if (tract.crime_score) {
     let crimeSparkline: number[] = [];
-    let crimeTrend = tract.crime_trend_direction || 'unknown';
+    let crimeTrend: TrendData['trend'] = tract.crime_trend_direction as TrendData['trend'] || 'unknown';
     
     // Try to get real timeline data
     if (tract.crime_timeline) {
-      const timeline = tract.crime_timeline;
+      const timeline = tract.crime_timeline as CrimeTimelineData;
       crimeSparkline = [
         timeline.year_2022 || 0,
         timeline.year_2023 || 0,
@@ -153,7 +173,7 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
     trends.push({
       label: 'Safety Score',
       current: Math.round(tract.crime_score),
-      trend: crimeTrend as any,
+      trend: crimeTrend,
       change: tract.crime_trend_change || '+2%',
       icon: '🛡️',
       color: '#10B981',
