@@ -4,7 +4,7 @@
 import { Box } from '@chakra-ui/react';
 import { useState, useEffect, useCallback } from 'react';
 import TractResultsList from './TractResultsList';
-import TractDetailPanel from './TractDetailPanel';
+import TractDetailPanel from './TractDetailPanel/TractDetailPanel';
 
 interface TractResult {
   geoid: string;
