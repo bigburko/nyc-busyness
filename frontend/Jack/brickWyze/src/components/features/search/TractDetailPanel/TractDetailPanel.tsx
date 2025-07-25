@@ -1,8 +1,8 @@
-// src/components/features/search/TractDetailPanel/TractDetailPanel.tsx - Google Maps Style with Smart Headers
+// src/components/features/search/TractDetailPanel/TractDetailPanel.tsx - Optimized with Separate GoogleMapsImage Component
 'use client';
 
 import { 
-  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text, Badge, Image, Flex
+  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text, Badge, Flex
 } from '@chakra-ui/react';
 import { CloseIcon, ExternalLinkIcon, ArrowBackIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
@@ -13,6 +13,10 @@ import { TrendAnalysis } from './TrendAnalysis';
 import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
 import { DemographicCharts } from './DemographicCharts';
+import GoogleMapsImage from './GoogleMapsImage';
+
+// Import the tract centroids JSON for coordinate lookup
+import tractCentroids from './tract_centroids.json';
 
 // Define proper demographic data types
 interface DemographicDataItem {
@@ -33,35 +37,25 @@ interface TractDetailPanelProps {
   rawDemographicData?: RawDemographicData;
 }
 
-// Google Maps static image generator with multiple map types
-const generateTractImages = (tract: TractResult) => {
-  // Use tract center coordinates or fallback to NYC center
-  const lat = 40.7589; // You can extract from tract.centroid if available
-  const lng = -73.9851;
+// Define types for the imported centroids
+interface TractCentroid {
+  lat: number;
+  lng: number;
+}
+
+type TractCentroids = Record<string, TractCentroid>;
+
+// Coordinate lookup helper for buttons
+const getTractCoordinates = (geoid: string): { lat: number; lng: number } => {
+  const centroids = tractCentroids as TractCentroids;
+  const coords = centroids[geoid];
   
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLEMAPS_API_KEY;
-  
-  if (!apiKey) {
-    console.warn('Google Maps API key not found, using fallback image');
-    return {
-      satellite: `https://tile.openstreetmap.org/15/${Math.floor((lng + 180) / 360 * Math.pow(2, 15))}/${Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, 15))}.png`,
-      hybrid: `https://tile.openstreetmap.org/15/${Math.floor((lng + 180) / 360 * Math.pow(2, 15))}/${Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, 15))}.png`
-    };
+  if (coords) {
+    return coords;
   }
   
-  const baseUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=600x300&key=${apiKey}`;
-  
-  return {
-    satellite: `${baseUrl}&maptype=satellite`, // Pure satellite view
-    hybrid: `${baseUrl}&maptype=hybrid`,       // Satellite + street labels  
-    roadmap: `${baseUrl}&maptype=roadmap`,     // Traditional street map
-    terrain: `${baseUrl}&maptype=terrain`      // Topographical view
-  };
-};
-
-// Simple function for current usage
-const generateTractImage = (tract: TractResult): string => {
-  return generateTractImages(tract).satellite; // Default to satellite view
+  console.warn(`⚠️ [Coordinates] No coordinates found for tract ${geoid}, using NYC center`);
+  return { lat: 40.7589, lng: -73.9851 }; // NYC center fallback
 };
 
 export default function TractDetailPanel({ 
@@ -106,7 +100,7 @@ export default function TractDetailPanel({
   }, [activeTab]);
 
   // Calculate if we should show compressed header (only for overview)
-  const COMPRESS_THRESHOLD = 150; // Halfway down the 300px image
+  const COMPRESS_THRESHOLD = 150;
   const isScrolled = activeTab === 'overview' && scrollY > COMPRESS_THRESHOLD;
 
   // Helper functions for scoring
@@ -132,51 +126,20 @@ export default function TractDetailPanel({
     { id: 'details', label: 'Details' }
   ];
 
+  // Log when detail panel opens (for debugging)
+  useEffect(() => {
+    console.log(`📋 [TractDetailPanel] Opened for tract ${tract.geoid} (${tract.nta_name})`);
+  }, [tract.geoid]);
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
         return (
           <Box>
-            {/* Hero Image Section - Google Maps Style */}
-            <Box position="relative" h="300px" w="100%" bg="gray.200">
-              <Image
-                src={generateTractImage(tract)}
-                alt={`Aerial view of ${tract.nta_name}`}
-                w="100%"
-                h="100%"
-                objectFit="cover"
-                fallback={
-                  <Box 
-                    w="100%" 
-                    h="100%" 
-                    bg="gray.300" 
-                    display="flex" 
-                    alignItems="center" 
-                    justifyContent="center"
-                  >
-                    <Text color="gray.600" fontSize="lg">📍 Loading area view...</Text>
-                  </Box>
-                }
-              />
-              
-              {/* Photo indicator overlay */}
-              <Box
-                position="absolute"
-                bottom="16px"
-                left="16px"
-                bg="blackAlpha.700"
-                color="white"
-                px={3}
-                py={2}
-                borderRadius="lg"
-                fontSize="sm"
-                fontWeight="medium"
-              >
-                📷 Aerial View
-              </Box>
-            </Box>
+            {/* Hero Image Section - Using Separate GoogleMapsImage Component */}
+            <GoogleMapsImage tract={tract} />
 
-            {/* Tract Name and Score - Google Maps Style */}
+            {/* Tract Name and Score */}
             <Box p={6} bg="white">
               <VStack spacing={4} align="stretch">
                 {/* Main Title Row */}
@@ -185,25 +148,33 @@ export default function TractDetailPanel({
                     <Text fontSize="2xl" fontWeight="bold" color="gray.800" lineHeight="1.2">
                       {tract.nta_name}
                     </Text>
+                    <Text fontSize="sm" color="gray.600">
+                      Census Tract {tract.geoid.slice(-6)}
+                    </Text>
                   </VStack>
                   
-                  {/* Resilience Score Badge - Green pill style */}
-                  <Box
-                    bg={getScoreColor(resilienceScore)}
-                    color="white"
-                    px={4}
-                    py={2}
-                    borderRadius="full"
-                    fontSize="xl"
-                    fontWeight="bold"
-                    minW="60px"
-                    textAlign="center"
-                  >
-                    {resilienceScore}
-                  </Box>
+                  {/* Resilience Score Badge */}
+                  <VStack align="end" spacing={1}>
+                    <Box
+                      bg={getScoreColor(resilienceScore)}
+                      color="white"
+                      px={4}
+                      py={2}
+                      borderRadius="full"
+                      fontSize="xl"
+                      fontWeight="bold"
+                      minW="60px"
+                      textAlign="center"
+                    >
+                      {resilienceScore}
+                    </Box>
+                    <Text fontSize="xs" color="gray.500">
+                      {getScoreLabel(resilienceScore)}
+                    </Text>
+                  </VStack>
                 </Flex>
 
-                {/* Rent Info Section - Where Google Maps shows reviews */}
+                {/* Rent Info Section */}
                 <Box py={4} borderY="1px solid" borderColor="gray.200">
                   <HStack spacing={6} justify="space-between">
                     <VStack align="start" spacing={1}>
@@ -231,7 +202,7 @@ export default function TractDetailPanel({
               </VStack>
             </Box>
 
-            {/* Tab Navigation for Overview */}
+            {/* Tab Navigation */}
             <Box px={headerPadding} py={4} bg="white" borderBottom="1px solid" borderColor="gray.200">
               <HStack spacing={1} w="full" justify="center">
                 {tabs.map((tab) => (
@@ -294,9 +265,6 @@ export default function TractDetailPanel({
                 <Text color="gray.600" lineHeight="1.6">
                   This area shows strong potential for business development with good foot traffic and accessible transportation. 
                   The neighborhood demographics align well with target customer profiles.
-                </Text>
-                <Text fontSize="xs" color="gray.400" mt={2}>
-                  Scroll: {Math.round(scrollY)}px | Header: {isScrolled ? 'Visible' : 'Hidden'} | Tab: {activeTab}
                 </Text>
               </Box>
 
@@ -366,7 +334,7 @@ export default function TractDetailPanel({
         position="fixed"
         top="16px"
         right="16px"
-        zIndex={200}
+        zIndex={300}
         bg="white"
         color="gray.600"
         borderRadius="full"
@@ -382,13 +350,13 @@ export default function TractDetailPanel({
         transition="all 0.2s"
       />
 
-      {/* Collapsing Header - Slides down when scrolled on Overview */}
+      {/* Collapsing Header */}
       <Box 
         position="fixed"
         top="0"
         left="0"
         right="0"
-        zIndex={120}
+        zIndex={100}
         bg="white"
         borderBottom="1px solid"
         borderColor="gray.200"
@@ -414,7 +382,6 @@ export default function TractDetailPanel({
               {tract.nta_name}
             </Text>
             
-            {/* Score pill in collapsing header */}
             <Box
               bg={getScoreColor(resilienceScore)}
               color="white"
@@ -458,7 +425,6 @@ export default function TractDetailPanel({
               </Text>
             </VStack>
             
-            {/* Score pill in static header */}
             <Box
               bg={getScoreColor(resilienceScore)}
               color="white"
@@ -474,7 +440,7 @@ export default function TractDetailPanel({
             </Box>
           </HStack>
           
-          {/* Tab Navigation for Other Tabs */}
+          {/* Tab Navigation */}
           <HStack spacing={1} w="full" justify="center">
             {tabs.map((tab) => (
               <Button
@@ -529,7 +495,7 @@ export default function TractDetailPanel({
         {renderTabContent()}
       </Box>
 
-      {/* Fixed Action Buttons - Google Maps Style */}
+      {/* Action Buttons */}
       <Box 
         position="fixed"
         bottom="0"
@@ -540,7 +506,7 @@ export default function TractDetailPanel({
         borderTop="1px solid" 
         borderColor="gray.200"
         boxShadow="0 -2px 10px rgba(0,0,0,0.1)"
-        zIndex={80}
+        zIndex={50}
         pointerEvents="auto"
       >
         {isMobile ? (
@@ -556,8 +522,9 @@ export default function TractDetailPanel({
               fontWeight="bold"
               h="48px"
               onClick={() => {
-                const coords = `40.7589,-73.9851`;
-                window.open(`https://www.google.com/maps/search/?api=1&query=${coords}`, '_blank');
+                const coords = getTractCoordinates(tract.geoid);
+                // Use the same method as GoogleMapsImage for consistency
+                window.open(`https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`, '_blank');
               }}
             >
               Directions
@@ -601,8 +568,9 @@ export default function TractDetailPanel({
               fontWeight="bold"
               h="48px"
               onClick={() => {
-                const coords = `40.7589,-73.9851`;
-                window.open(`https://www.google.com/maps/search/?api=1&query=${coords}`, '_blank');
+                const coords = getTractCoordinates(tract.geoid);
+                // Use Street View mode for consistency with GoogleMapsImage component
+                window.open(`https://maps.google.com/maps?layer=c&cbll=${coords.lat},${coords.lng}&cbp=11,0,0,0,5&hl=en`, '_blank');
               }}
             >
               Directions
