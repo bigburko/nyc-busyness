@@ -145,3 +145,11 @@ MapPLUTO25v1_1.gdb
 2021_Yellow_Taxi_Trip_Data.csv
 2022_Yellow_Taxi_Trip_Data.csv
 2023_Yellow_Taxi_Trip_Data.csv
+
+# Backend specific
+backend/node_modules/
+backend/.env
+backend/.env.local
+backend/coverage/
+backend/logs/
+backend/*.log
