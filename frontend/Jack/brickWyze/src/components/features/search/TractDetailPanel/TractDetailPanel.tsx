@@ -112,22 +112,26 @@ export default function TractDetailPanel({
             </Box>
 
             <Box px={headerPadding} py={4} bg="white" borderBottom="1px solid" borderColor="gray.200">
-              <HStack spacing={0} w="full">
+              <HStack spacing={1} w="full" justify="center">
                 {tabs.map((tab) => (
                   <Button
                     key={tab.id}
                     variant="ghost"
-                    flex="1"
+                    px={4}
                     py={3}
+                    minW="80px"
                     onClick={() => setActiveTab(tab.id)}
                     color={tab.id === activeTab ? "blue.600" : "gray.600"}
-                    borderBottom={tab.id === activeTab ? "2px solid" : "2px solid transparent"}
+                    borderBottom={tab.id === activeTab ? "3px solid" : "3px solid transparent"}
                     borderColor={tab.id === activeTab ? "blue.600" : "transparent"}
-                    borderRadius="0"
+                    borderRadius="8px 8px 0 0"
                     fontWeight={tab.id === activeTab ? "semibold" : "normal"}
+                    fontSize="sm"
                     _hover={{ 
-                      bg: tab.id === activeTab ? "transparent" : "gray.50" 
+                      bg: tab.id === activeTab ? "blue.50" : "gray.50",
+                      color: tab.id === activeTab ? "blue.700" : "gray.700"
                     }}
+                    transition="all 0.2s"
                   >
                     {tab.label}
                   </Button>
@@ -321,35 +325,48 @@ export default function TractDetailPanel({
 
       {activeTab !== 'overview' && (
         <Box px={headerPadding} py={4} bg="white" borderBottom="1px solid" borderColor="gray.200">
-          <HStack spacing={4} mb={4}>
+          <HStack spacing={4} mb={4} maxW="calc(100% - 80px)">
             <IconButton
               aria-label="Back to overview"
               icon={<ArrowBackIcon />}
               size="sm"
               variant="ghost"
               onClick={() => setActiveTab('overview')}
+              flexShrink={0}
             />
-            <Text fontSize="lg" fontWeight="bold" color="gray.800">
+            <Text 
+              fontSize="lg" 
+              fontWeight="bold" 
+              color="gray.800"
+              overflow="hidden"
+              textOverflow="ellipsis"
+              whiteSpace="nowrap"
+              maxW="250px"
+            >
               {tract.nta_name}
             </Text>
           </HStack>
           
-          <HStack spacing={0} w="full">
+          <HStack spacing={1} w="full" justify="center">
             {tabs.map((tab) => (
               <Button
                 key={tab.id}
                 variant="ghost"
-                flex="1"
+                px={4}
                 py={3}
+                minW="80px"
                 onClick={() => setActiveTab(tab.id)}
                 color={tab.id === activeTab ? "blue.600" : "gray.600"}
-                borderBottom={tab.id === activeTab ? "2px solid" : "2px solid transparent"}
+                borderBottom={tab.id === activeTab ? "3px solid" : "3px solid transparent"}
                 borderColor={tab.id === activeTab ? "blue.600" : "transparent"}
-                borderRadius="0"
+                borderRadius="8px 8px 0 0"
                 fontWeight={tab.id === activeTab ? "semibold" : "normal"}
+                fontSize="sm"
                 _hover={{ 
-                  bg: tab.id === activeTab ? "transparent" : "gray.50" 
+                  bg: tab.id === activeTab ? "blue.50" : "gray.50",
+                  color: tab.id === activeTab ? "blue.700" : "gray.700"
                 }}
+                transition="all 0.2s"
               >
                 {tab.label}
               </Button>
