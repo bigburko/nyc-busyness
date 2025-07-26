@@ -2,7 +2,7 @@
 'use client';
 
 import { Box, VStack, Text, HStack, Badge, Flex, Divider, Spinner } from '@chakra-ui/react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TractResult } from '../../../../types/TractTypes';
 import { useFilterStore } from '../../../../stores/filterStore';
 import { useGeminiStore } from '../../../../stores/geminiStore';
@@ -27,6 +27,7 @@ interface FilterStoreSlice {
 interface AISummaryProps {
   tract: TractResult;
   weights: Weight[];
+  isVisible?: boolean; // NEW: Only trigger when visible/scrolled
 }
 
 interface TrendInsight {
@@ -526,31 +527,46 @@ const parseAIResponse = (response: string, tract: TractResult): AIBusinessAnalys
   return analysis;
 };
 
-export function AISummary({ tract, weights }: AISummaryProps) {
+export function AISummary({ tract, weights, isVisible = false }: AISummaryProps) {
   const filterStore = useFilterStore();
   const sendToGemini = useGeminiStore((s) => s.sendToGemini);
   
   const [analysis, setAnalysis] = useState<AIBusinessAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasTriggered, setHasTriggered] = useState(false); // Prevent multiple API calls
+  
+  // Stable snapshot of filter data to prevent constant re-renders
+  const filterSnapshot = useRef<FilterStoreSlice | null>(null);
+  const weightsSnapshot = useRef<Weight[] | null>(null);
   
   const generateAIAnalysis = useCallback(async () => {
+    // Prevent multiple API calls for the same tract
+    if (loading || hasTriggered || !isVisible) {
+      return;
+    }
+    
     try {
       setLoading(true);
       setError(null);
+      setHasTriggered(true);
       
       console.log('🧠 [AI Summary] Starting analysis for tract:', tract.geoid);
+      
+      // Use snapshots to avoid dependency issues
+      const currentFilter = filterSnapshot.current || (filterStore as FilterStoreSlice);
+      const currentWeights = weightsSnapshot.current || weights;
       
       // Extract trend insights using TrendIndicators logic
       const trendInsights = extractTrendInsights(tract);
       
       // Build comprehensive business intelligence prompt
-      const businessPrompt = buildBusinessIntelligencePrompt(tract, weights, trendInsights, filterStore as FilterStoreSlice);
+      const businessPrompt = buildBusinessIntelligencePrompt(tract, currentWeights, trendInsights, currentFilter);
       
       console.log('📤 [AI Summary] Sending business intelligence prompt to Gemini');
       
       // Convert Weight[] to expected format for sendToGemini
-      const geminiWeights = weights.map(w => ({ 
+      const geminiWeights = currentWeights.map(w => ({ 
         id: w.id, 
         value: w.value, 
         label: getWeightLabel(w),
@@ -559,16 +575,15 @@ export function AISummary({ tract, weights }: AISummaryProps) {
       }));
       
       // Call Gemini API for real AI analysis
-      const filterStoreTyped = filterStore as FilterStoreSlice;
       const aiResponse = await sendToGemini(businessPrompt, {
         weights: geminiWeights,
-        selectedTimePeriods: filterStoreTyped.selectedTimePeriods,
-        selectedEthnicities: filterStoreTyped.selectedEthnicities,
-        selectedGenders: filterStoreTyped.selectedGenders,
-        ageRange: filterStoreTyped.ageRange,
-        incomeRange: filterStoreTyped.incomeRange,
-        rentRange: filterStoreTyped.rentRange || [26, 160],
-        demographicScoring: filterStoreTyped.demographicScoring
+        selectedTimePeriods: currentFilter.selectedTimePeriods,
+        selectedEthnicities: currentFilter.selectedEthnicities,
+        selectedGenders: currentFilter.selectedGenders,
+        ageRange: currentFilter.ageRange,
+        incomeRange: currentFilter.incomeRange,
+        rentRange: currentFilter.rentRange || [26, 160],
+        demographicScoring: currentFilter.demographicScoring
       });
       
       console.log('📥 [AI Summary] Received AI response length:', aiResponse.length);
@@ -582,15 +597,44 @@ export function AISummary({ tract, weights }: AISummaryProps) {
     } catch (err) {
       console.error('❌ [AI Summary] Error generating analysis:', err);
       setError('Failed to generate AI business analysis');
+      setHasTriggered(false); // Allow retry on error
     } finally {
       setLoading(false);
     }
-  }, [tract, weights, filterStore, sendToGemini]);
+  }, [tract.geoid, isVisible, loading, hasTriggered]); // Simplified dependencies
   
+  // Update snapshots when props change but only once
   useEffect(() => {
-    // Only generate when panel opens for this tract
-    generateAIAnalysis();
-  }, [generateAIAnalysis]);
+    filterSnapshot.current = filterStore as FilterStoreSlice;
+    weightsSnapshot.current = weights;
+  }, [filterStore, weights]);
+  
+  // Reset state when tract changes
+  useEffect(() => {
+    setHasTriggered(false);
+    setAnalysis(null);
+    setError(null);
+  }, [tract.geoid]);
+  
+  // Only trigger when becomes visible and hasn't been triggered yet
+  useEffect(() => {
+    if (isVisible && !hasTriggered && !loading && !analysis) {
+      generateAIAnalysis();
+    }
+  }, [isVisible, hasTriggered, loading, analysis, generateAIAnalysis]);
+  
+  // Show placeholder when not visible yet
+  if (!isVisible) {
+    return (
+      <Box bg="white" borderRadius="xl" p={6} boxShadow="sm" border="1px solid" borderColor="gray.100">
+        <VStack spacing={4} align="center" py={8}>
+          <Text fontSize="sm" color="gray.500" textAlign="center">
+            🧠 Scroll down to see Bricky's AI business analysis
+          </Text>
+        </VStack>
+      </Box>
+    );
+  }
   
   if (loading) {
     return (
@@ -644,154 +688,298 @@ export function AISummary({ tract, weights }: AISummaryProps) {
   };
   
   return (
-    <Box bg="white" borderRadius="xl" p={6} boxShadow="sm" border="1px solid" borderColor="gray.100">
-      <VStack spacing={5} align="stretch">
-        {/* Header - matching AdvancedDemographics style */}
-        <Flex justify="space-between" align="center">
-          <VStack align="start" spacing={1}>
-            <HStack spacing={2}>
-              <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                🧠 Bricky&apos;s Business Intelligence
-              </Text>
-              <Badge bg="#FF492C" color="white" fontSize="xs" borderRadius="full">
-                AI Analysis
-              </Badge>
-            </HStack>
-            <Text fontSize="xs" color="gray.500">
-              Market research & competitor analysis for {tract.nta_name}
-            </Text>
-          </VStack>
-          
-          <Badge 
-            colorScheme={getConfidenceColor(analysis.confidence)}
-            px={3}
-            py={1}
-            borderRadius="md"
-            textTransform="capitalize"
-            fontSize="xs"
-            fontWeight="semibold"
-          >
-            {analysis.confidence} confidence
-          </Badge>
-        </Flex>
-        
-        {/* Headline & Reasoning - matching AdvancedDemographics reasoning style */}
+    <Box bg="white" borderRadius="2xl" p={0} boxShadow="lg" border="1px solid" borderColor="gray.100" overflow="hidden">
+      <VStack spacing={0} align="stretch">
+        {/* Modern Header with gradient background */}
         <Box 
-          p={4} 
-          bg="rgba(255, 249, 240, 0.8)" 
-          borderRadius="xl" 
-          border="1px solid rgba(255, 73, 44, 0.1)"
-          w="full"
+          bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)" 
+          p={6} 
+          color="white"
         >
-          <Text fontSize="md" fontWeight="semibold" color="gray.800" mb={3}>
-            {analysis.headline}
-          </Text>
-          <Box 
-            bg="white" 
-            borderRadius="lg" 
-            p={3}
-            border="1px solid rgba(255, 73, 44, 0.1)"
-          >
-            <Text fontSize="sm" color="gray.700" lineHeight="1.6" fontStyle="italic">
-              &ldquo;{analysis.reasoning}&rdquo;
-            </Text>
-          </Box>
-        </Box>
-        
-        <Divider />
-        
-        {/* Key Business Insights */}
-        <VStack spacing={3} align="stretch">
-          <Text fontSize="sm" fontWeight="semibold" color="gray.700">
-            📊 Key Business Insights
-          </Text>
-          
-          {analysis.insights.map((insight, index) => (
-            <Box 
-              key={index}
-              p={4} 
-              bg={`${getInsightColor(insight.type)}.50`}
-              borderRadius="lg"
-              border="1px solid"
-              borderColor={`${getInsightColor(insight.type)}.200`}
-            >
-              <HStack spacing={3} align="start">
-                <Text fontSize="lg">{insight.icon}</Text>
-                <VStack align="start" spacing={2} flex="1">
-                  <Text fontSize="sm" fontWeight="semibold" color={`${getInsightColor(insight.type)}.800`}>
-                    {insight.title}
+          <Flex justify="space-between" align="center">
+            <VStack align="start" spacing={2}>
+              <HStack spacing={3}>
+                <Box bg="rgba(255,255,255,0.2)" p={2} borderRadius="lg">
+                  <Text fontSize="xl">🧠</Text>
+                </Box>
+                <VStack align="start" spacing={0}>
+                  <Text fontSize="xl" fontWeight="bold">
+                    Bricky's Business Intelligence
                   </Text>
-                  <Text 
-                    fontSize="sm" 
-                    color={`${getInsightColor(insight.type)}.700`}
-                    lineHeight="1.5"
-                  >
-                    {insight.description}
+                  <Text fontSize="sm" opacity={0.9}>
+                    AI-powered market analysis for {tract.nta_name}
                   </Text>
                 </VStack>
               </HStack>
+            </VStack>
+            
+            <Badge 
+              bg="rgba(255,255,255,0.2)"
+              color="white"
+              px={4}
+              py={2}
+              borderRadius="full"
+              textTransform="capitalize"
+              fontSize="sm"
+              fontWeight="bold"
+              border="1px solid rgba(255,255,255,0.3)"
+            >
+              {analysis.confidence} confidence
+            </Badge>
+          </Flex>
+        </Box>
+
+        <Box p={6}>
+          <VStack spacing={6} align="stretch">
+            {/* Headline & Reasoning - Enhanced design */}
+            <Box 
+              p={6} 
+              bg="linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)"
+              borderRadius="2xl" 
+              border="2px solid"
+              borderColor="purple.100"
+              position="relative"
+              overflow="hidden"
+            >
+              {/* Decorative background pattern */}
+              <Box 
+                position="absolute"
+                top="-50px"
+                right="-50px"
+                w="100px"
+                h="100px"
+                bg="linear-gradient(45deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1))"
+                borderRadius="full"
+                opacity={0.5}
+              />
+              
+              <VStack spacing={4} align="start" position="relative">
+                <Text fontSize="lg" fontWeight="bold" color="gray.800" lineHeight="1.3">
+                  {analysis.headline}
+                </Text>
+                <Box 
+                  bg="white" 
+                  borderRadius="xl" 
+                  p={4}
+                  border="1px solid"
+                  borderColor="purple.200"
+                  w="full"
+                  boxShadow="sm"
+                >
+                  <Text fontSize="sm" color="gray.700" lineHeight="1.6" fontStyle="italic">
+                    &ldquo;{analysis.reasoning}&rdquo;
+                  </Text>
+                </Box>
+              </VStack>
             </Box>
-          ))}
-        </VStack>
-        
-        {/* Business Types & Market Strategy */}
-        <HStack spacing={4} align="start">
-          {/* Business Types */}
-          <Box flex="1" p={4} bg="purple.50" borderRadius="lg" border="1px solid" borderColor="purple.200">
-            <VStack align="start" spacing={2}>
-              <Text fontSize="sm" fontWeight="semibold" color="purple.800">
-                🏪 Recommended Business Types
-              </Text>
-              <VStack align="start" spacing={1}>
-                {analysis.businessTypes.map((type, index) => (
-                  <Text key={index} fontSize="xs" color="purple.700">
-                    • {type}
-                  </Text>
+            
+            {/* Key Business Insights - Enhanced cards */}
+            <VStack spacing={4} align="stretch">
+              <HStack spacing={2} align="center">
+                <Box w="4px" h="6" bg="purple.500" borderRadius="full" />
+                <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                  Key Business Insights
+                </Text>
+              </HStack>
+              
+              <VStack spacing={3} align="stretch">
+                {analysis.insights.map((insight, index) => (
+                  <Box 
+                    key={index}
+                    p={5} 
+                    bg="white"
+                    borderRadius="xl"
+                    border="2px solid"
+                    borderColor={`${getInsightColor(insight.type)}.200`}
+                    boxShadow="md"
+                    position="relative"
+                    _hover={{
+                      transform: "translateY(-2px)",
+                      boxShadow: "lg"
+                    }}
+                    transition="all 0.2s"
+                  >
+                    {/* Insight type indicator */}
+                    <Box
+                      position="absolute"
+                      top="4"
+                      right="4"
+                      bg={`${getInsightColor(insight.type)}.100`}
+                      px={3}
+                      py={1}
+                      borderRadius="full"
+                      fontSize="xs"
+                      fontWeight="semibold"
+                      color={`${getInsightColor(insight.type)}.700`}
+                      textTransform="capitalize"
+                    >
+                      {insight.type}
+                    </Box>
+
+                    <HStack spacing={4} align="start">
+                      <Box
+                        bg={`${getInsightColor(insight.type)}.100`}
+                        p={3}
+                        borderRadius="xl"
+                        fontSize="xl"
+                      >
+                        {insight.icon}
+                      </Box>
+                      <VStack align="start" spacing={3} flex="1" pr={16}>
+                        <Text fontSize="md" fontWeight="bold" color="gray.800">
+                          {insight.title}
+                        </Text>
+                        <Text 
+                          fontSize="sm" 
+                          color="gray.600"
+                          lineHeight="1.6"
+                        >
+                          {insight.description}
+                        </Text>
+                      </VStack>
+                    </HStack>
+                  </Box>
                 ))}
               </VStack>
             </VStack>
-          </Box>
-          
-          {/* Market Strategy */}
-          <Box flex="1" p={4} bg="blue.50" borderRadius="lg" border="1px solid" borderColor="blue.200">
-            <VStack align="start" spacing={2}>
-              <Text fontSize="sm" fontWeight="semibold" color="blue.800">
-                📈 Market Strategy
-              </Text>
-              <Text fontSize="xs" color="blue.700" lineHeight="1.4">
-                {analysis.marketStrategy}
-              </Text>
+            
+            {/* Business Types & Market Strategy - Enhanced side-by-side */}
+            <VStack spacing={4} align="stretch">
+              <HStack spacing={2} align="center">
+                <Box w="4px" h="6" bg="blue.500" borderRadius="full" />
+                <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                  Recommendations
+                </Text>
+              </HStack>
+
+              <HStack spacing={6} align="start">
+                {/* Business Types */}
+                <Box 
+                  flex="1" 
+                  p={6} 
+                  bg="linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.05) 100%)"
+                  borderRadius="xl" 
+                  border="2px solid" 
+                  borderColor="purple.200"
+                  boxShadow="sm"
+                >
+                  <VStack align="start" spacing={4}>
+                    <HStack spacing={3}>
+                      <Box bg="purple.100" p={2} borderRadius="lg">
+                        <Text fontSize="lg">🏪</Text>
+                      </Box>
+                      <Text fontSize="md" fontWeight="bold" color="purple.800">
+                        Recommended Business Types
+                      </Text>
+                    </HStack>
+                    <VStack align="start" spacing={2}>
+                      {analysis.businessTypes.map((type, index) => (
+                        <HStack key={index} spacing={2}>
+                          <Box w="2" h="2" bg="purple.400" borderRadius="full" />
+                          <Text fontSize="sm" color="purple.700" fontWeight="medium">
+                            {type}
+                          </Text>
+                        </HStack>
+                      ))}
+                    </VStack>
+                  </VStack>
+                </Box>
+                
+                {/* Market Strategy */}
+                <Box 
+                  flex="1" 
+                  p={6} 
+                  bg="linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%)"
+                  borderRadius="xl" 
+                  border="2px solid" 
+                  borderColor="blue.200"
+                  boxShadow="sm"
+                >
+                  <VStack align="start" spacing={4}>
+                    <HStack spacing={3}>
+                      <Box bg="blue.100" p={2} borderRadius="lg">
+                        <Text fontSize="lg">📈</Text>
+                      </Box>
+                      <Text fontSize="md" fontWeight="bold" color="blue.800">
+                        Market Strategy
+                      </Text>
+                    </HStack>
+                    <Text fontSize="sm" color="blue.700" lineHeight="1.6">
+                      {analysis.marketStrategy}
+                    </Text>
+                  </VStack>
+                </Box>
+              </HStack>
             </VStack>
-          </Box>
-        </HStack>
-        
-        {/* Competitor Examples (if available) */}
-        {analysis.competitorExamples.length > 0 && (
-          <Box p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
-            <VStack align="start" spacing={2}>
-              <Text fontSize="sm" fontWeight="semibold" color="gray.800">
-                🏢 Similar Successful Businesses
-              </Text>
-              <VStack align="start" spacing={1}>
-                {analysis.competitorExamples.map((example, index) => (
-                  <Text key={index} fontSize="xs" color="gray.700">
-                    • {example}
+            
+            {/* Competitor Examples - Enhanced if available */}
+            {analysis.competitorExamples.length > 0 && (
+              <Box 
+                p={6} 
+                bg="linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)"
+                borderRadius="xl" 
+                border="2px solid" 
+                borderColor="emerald.200"
+                boxShadow="sm"
+              >
+                <VStack align="start" spacing={4}>
+                  <HStack spacing={3}>
+                    <Box bg="emerald.100" p={2} borderRadius="lg">
+                      <Text fontSize="lg">🏢</Text>
+                    </Box>
+                    <Text fontSize="md" fontWeight="bold" color="emerald.800">
+                      Similar Successful Businesses
+                    </Text>
+                  </HStack>
+                  <VStack align="start" spacing={2}>
+                    {analysis.competitorExamples.map((example, index) => (
+                      <HStack key={index} spacing={2}>
+                        <Box w="2" h="2" bg="emerald.400" borderRadius="full" />
+                        <Text fontSize="sm" color="emerald.700" fontWeight="medium">
+                          {example}
+                        </Text>
+                      </HStack>
+                    ))}
+                  </VStack>
+                </VStack>
+              </Box>
+            )}
+            
+            {/* Bottom Line - Enhanced final recommendation */}
+            <Box 
+              p={6} 
+              bg="linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)"
+              borderRadius="xl" 
+              border="2px solid" 
+              borderColor="amber.300"
+              boxShadow="lg"
+              position="relative"
+              overflow="hidden"
+            >
+              {/* Decorative accent */}
+              <Box 
+                position="absolute"
+                top="0"
+                left="0"
+                w="full"
+                h="1"
+                bg="linear-gradient(90deg, #F59E0B, #D97706)"
+              />
+              
+              <VStack align="start" spacing={4}>
+                <HStack spacing={3}>
+                  <Box bg="amber.100" p={2} borderRadius="lg">
+                    <Text fontSize="lg">🎯</Text>
+                  </Box>
+                  <Text fontSize="md" fontWeight="bold" color="amber.800">
+                    Bottom Line
                   </Text>
-                ))}
+                </HStack>
+                <Text fontSize="sm" color="amber.700" lineHeight="1.6" fontWeight="medium">
+                  {analysis.bottomLine}
+                </Text>
               </VStack>
-            </VStack>
-          </Box>
-        )}
-        
-        {/* Bottom Line */}
-        <Box p={4} bg="yellow.50" borderRadius="lg" border="1px solid" borderColor="yellow.200">
-          <VStack align="start" spacing={2}>
-            <Text fontSize="sm" fontWeight="semibold" color="yellow.800">
-              🎯 Bottom Line
-            </Text>
-            <Text fontSize="sm" color="yellow.700" lineHeight="1.5">
-              {analysis.bottomLine}
-            </Text>
+            </Box>
           </VStack>
         </Box>
       </VStack>

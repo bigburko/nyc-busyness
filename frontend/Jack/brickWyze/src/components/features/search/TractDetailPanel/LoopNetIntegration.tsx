@@ -235,12 +235,12 @@ export const LoopNetButton: React.FC<LoopNetButtonProps> = ({
   return (
     <Button
       size={size}
-      bg="linear-gradient(135deg, rgba(234, 88, 12, 0.9) 0%, rgba(249, 115, 22, 0.9) 100%)"
+      bg="linear-gradient(135deg, #FF492C 0%, #EA4335 100%)"
       color="white"
       _hover={{ 
-        bg: "linear-gradient(135deg, rgba(234, 88, 12, 1) 0%, rgba(249, 115, 22, 1) 100%)",
+        bg: "linear-gradient(135deg, #EA4335 0%, #DC3626 100%)",
         transform: "translateY(-2px)",
-        boxShadow: "0 12px 40px rgba(234, 88, 12, 0.4)"
+        boxShadow: "0 12px 40px rgba(255, 73, 44, 0.4)"
       }}
       _active={{ transform: "translateY(0)" }}
       flex={flex}
@@ -249,7 +249,7 @@ export const LoopNetButton: React.FC<LoopNetButtonProps> = ({
       h="56px"
       border="1px solid"
       borderColor="rgba(255, 255, 255, 0.3)"
-      boxShadow="0 8px 32px rgba(234, 88, 12, 0.2), inset 0 1px 0 rgba(255,255,255,0.3)"
+      boxShadow="0 8px 32px rgba(255, 73, 44, 0.2), inset 0 1px 0 rgba(255,255,255,0.3)"
       transition="all 0.3s ease"
       onClick={() => openLoopNetSearch(tract, propertyType, transactionType)}
     >

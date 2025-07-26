@@ -123,8 +123,8 @@ export default function TractDetailPanel({
             <Box p={6} bg="white">
               <VStack spacing={4} align="stretch">
                 {/* Main Title Row */}
-                <Flex justify="space-between" align="flex-start">
-                  <VStack align="start" spacing={1} flex="1">
+                <VStack align="start" spacing={3}>
+                  <VStack align="start" spacing={1}>
                     <Text fontSize="2xl" fontWeight="bold" color="gray.800" lineHeight="1.2">
                       {tract.nta_name}
                     </Text>
@@ -134,51 +134,21 @@ export default function TractDetailPanel({
                   </VStack>
                   
                   {/* Resilience Score Badge */}
-                  <VStack align="end" spacing={1}>
-                    <Box
-                      bg={getScoreColor(resilienceScore)}
-                      color="white"
-                      px={4}
-                      py={2}
-                      borderRadius="full"
-                      fontSize="xl"
-                      fontWeight="bold"
-                      minW="60px"
-                      textAlign="center"
-                    >
-                      {resilienceScore}
-                    </Box>
-                    <Text fontSize="xs" color="gray.500">
-                      {getScoreLabel(resilienceScore)}
-                    </Text>
-                  </VStack>
-                </Flex>
-
-                {/* Rent Info Section */}
-                <Box py={4} borderY="1px solid" borderColor="gray.200">
-                  <HStack spacing={6} justify="space-between">
-                    <VStack align="start" spacing={1}>
-                      <Text fontSize="lg" fontWeight="bold" color="blue.600">
-                        {tract.avg_rent ? `$${tract.avg_rent.toLocaleString()}` : 'Rent N/A'}
-                      </Text>
-                      <Text fontSize="sm" color="gray.600">Monthly rent per sq ft</Text>
-                    </VStack>
-                    
-                    <VStack align="end" spacing={1}>
-                      <Badge 
-                        colorScheme={tract.avg_rent && tract.avg_rent < 2000 ? 'green' : 
-                                   tract.avg_rent && tract.avg_rent < 3000 ? 'yellow' : 'red'}
-                        fontSize="sm" 
-                        px={3} 
-                        py={1}
-                      >
-                        {tract.avg_rent && tract.avg_rent < 2000 ? 'Affordable' : 
-                         tract.avg_rent && tract.avg_rent < 3000 ? 'Moderate' : 'Premium'}
-                      </Badge>
-                      <Text fontSize="xs" color="gray.500">Market rate</Text>
-                    </VStack>
-                  </HStack>
-                </Box>
+                  <Box
+                    bg={getScoreColor(resilienceScore)}
+                    color="white"
+                    px={4}
+                    py={2}
+                    borderRadius="full"
+                    fontSize="xl"
+                    fontWeight="bold"
+                    minW="60px"
+                    textAlign="center"
+                    alignSelf="start"
+                  >
+                    {resilienceScore}
+                  </Box>
+                </VStack>
               </VStack>
             </Box>
 
@@ -214,30 +184,22 @@ export default function TractDetailPanel({
             {/* Overview Content */}
             <Box bg="gray.50" px={headerPadding} py={6}>
               {/* QuickStats - Modern metrics display with rent positioning */}
-              <QuickStats 
-                tract={tract}
-                rentText={tract.avg_rent ? tract.avg_rent.toLocaleString() : 'N/A'}
-                weights={weights}
-                rentRange={[26, 160]} // Default rent range - QuickStats component should handle this
-              />
-
-              {/* 🧠 AI SUMMARY - NEW: Real AI business analysis */}
-              <Box mt={6}>
-                <AISummary 
+              <Box id="quickstats-section">
+                <QuickStats 
                   tract={tract}
+                  rentText={tract.avg_rent ? tract.avg_rent.toLocaleString() : 'N/A'}
                   weights={weights}
+                  rentRange={[26, 160]} // Default rent range - QuickStats component should handle this
                 />
               </Box>
 
-              {/* Location Summary - Keep as fallback content */}
-              <Box p={6} bg="white" borderRadius="lg" w="full" boxShadow="sm" mt={6}>
-                <Text fontSize="lg" fontWeight="semibold" mb={4}>
-                  📍 Location Summary
-                </Text>
-                <Text color="gray.600" lineHeight="1.6">
-                  This area shows strong potential for business development with good foot traffic and accessible transportation. 
-                  The neighborhood demographics align well with target customer profiles.
-                </Text>
+              {/* 🧠 AI SUMMARY - NEW: Real AI business analysis */}
+              <Box mt={6} id="ai-summary-section">
+                <AISummary 
+                  tract={tract}
+                  weights={weights}
+                  isVisible={scrollY > 200} // Only start AI analysis when scrolled past QuickStats
+                />
               </Box>
 
               <Box h="200px" />
