@@ -2,7 +2,7 @@
 'use client';
 
 import { 
-  Box, VStack, HStack, Text, Badge, Flex
+  Box, VStack, HStack, Text, Badge
 } from '@chakra-ui/react';
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell, Legend } from 'recharts';
 import { TractResult } from '../../../../types/TractTypes';
@@ -24,6 +24,13 @@ interface RawDemographicData {
 interface DemographicChartsProps {
   tract: TractResult;
   rawDemographicData?: RawDemographicData;
+}
+
+interface FilterStoreType {
+  selectedEthnicities?: string[];
+  selectedGenders?: string[];
+  ageRange?: [number, number];
+  incomeRange?: [number, number];
 }
 
 // Custom color palettes for charts
@@ -102,7 +109,7 @@ const hasMeaningfulData = (data: DemographicDataItem[] | null): boolean => {
 };
 
 // ✅ FIXED: Calculate combined demographic score using CORRECTED filter detection logic
-const calculateCombinedDemographicScore = (tract: TractResult, filterStore: any): { percentage: number; details: string; components: Array<{ name: string; percentage: number; active: boolean }> } => {
+const calculateCombinedDemographicScore = (tract: TractResult, filterStore: FilterStoreType): { percentage: number; details: string; components: Array<{ name: string; percentage: number; active: boolean }> } => {
   const components: Array<{ name: string; percentage: number; hasFilter: boolean }> = [];
   
   // Check each demographic component with CORRECTED filter detection
@@ -646,7 +653,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
           <Box bg="blue.50" p={4} borderRadius="lg" border="1px solid" borderColor="blue.200" w="full">
             <VStack spacing={3} align="stretch">
               <Text fontSize="md" fontWeight="bold" color="blue.700">
-                📋 Overall Demographic Assessment (Bricky's Analysis)
+                📋 Overall Demographic Assessment (Bricky&apos;s Analysis)
               </Text>
               
               {/* Combined Score - Same as Bricky */}

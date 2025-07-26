@@ -52,7 +52,7 @@ export default function WeightingPanel({
 
     // Calculate remaining percentage to distribute
     const remainingPercentage = 100 - newValue;
-    const otherWeights = updatedWeights.filter((_, index) => index !== changedIndex);
+    const otherWeights = updatedWeights.filter((_, weightIndex) => weightIndex !== changedIndex);
     
     if (otherWeights.length === 0) return;
 
@@ -62,7 +62,7 @@ export default function WeightingPanel({
     // Redistribute the remaining percentage proportionally
     if (currentOtherTotal > 0) {
       // Proportional redistribution
-      otherWeights.forEach((weight, index) => {
+      otherWeights.forEach((weight) => {
         const proportion = weight.value / currentOtherTotal;
         const newWeightValue = Math.round(remainingPercentage * proportion);
         
@@ -80,10 +80,10 @@ export default function WeightingPanel({
       const equalShare = Math.floor(remainingPercentage / otherWeights.length);
       const remainder = remainingPercentage % otherWeights.length;
       
-      otherWeights.forEach((weight, index) => {
+      otherWeights.forEach((weight, weightIndex) => {
         const originalIndex = updatedWeights.findIndex(w => w.id === weight.id);
         if (originalIndex !== -1) {
-          const value = equalShare + (index < remainder ? 1 : 0);
+          const value = equalShare + (weightIndex < remainder ? 1 : 0);
           updatedWeights[originalIndex] = { 
             ...updatedWeights[originalIndex], 
             value: Math.max(0, value) 
@@ -96,8 +96,8 @@ export default function WeightingPanel({
     const total = updatedWeights.reduce((sum, weight) => sum + weight.value, 0);
     if (total !== 100) {
       const difference = 100 - total;
-      const lastOtherIndex = updatedWeights.findIndex((weight, index) => 
-        index !== changedIndex && weight.value > 0
+      const lastOtherIndex = updatedWeights.findIndex((weight, weightIndex) => 
+        weightIndex !== changedIndex && weight.value > 0
       );
       
       if (lastOtherIndex !== -1) {

@@ -543,7 +543,7 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
                   ))}
                 </HStack>
                 <Text fontSize="xs" color="gray.400" textAlign="center">
-                  These factors have data but aren't included because no meaningful filters were applied
+                  These factors have data but aren&apos;t included because no meaningful filters were applied
                 </Text>
               </VStack>
             </Box>
