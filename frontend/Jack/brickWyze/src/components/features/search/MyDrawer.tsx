@@ -182,6 +182,16 @@ export default function MyDrawer({
     updateWeight(id, value);
   }, [updateWeight]);
 
+  // ✅ NEW: Handle auto-balanced weight updates
+  const handleWeightsUpdated = useCallback((updatedWeights: Weighting[]) => {
+    console.log('🎯 [MyDrawer] Auto-balancing weights:', updatedWeights);
+    
+    // Update each weight individually through the store
+    updatedWeights.forEach(weight => {
+      updateWeight(weight.id, weight.value);
+    });
+  }, [updateWeight]);
+
   const handleAddWeight = useCallback((layer: Layer) => {
     addWeight(layer);
   }, [addWeight]);
@@ -664,6 +674,7 @@ export default function MyDrawer({
                         onSliderChangeEnd={handleWeightChangeEnd} 
                         onRemove={handleRemoveWeight} 
                         onAdd={handleAddWeight}
+                        onWeightsUpdated={handleWeightsUpdated}
                       />
                       <Flex justify="center" w="100%" mt={4}>
                         <Button 
