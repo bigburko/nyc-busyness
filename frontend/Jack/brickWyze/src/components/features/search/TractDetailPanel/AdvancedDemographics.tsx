@@ -1,4 +1,4 @@
-// Fixed AdvancedDemographics.tsx - Handles data correctly without double scoring
+// Fixed AdvancedDemographics.tsx - Collapsible Section
 
 'use client';
 
@@ -6,7 +6,7 @@ import {
   Box, VStack, HStack, Text, Progress, SimpleGrid, Badge, Flex
 } from '@chakra-ui/react';
 import { useFilterStore } from '../../../../stores/filterStore';
-import MyToolTip from '../../../ui/MyToolTip';
+import CollapsibleSection from '../../../ui/CollapsibleSection';
 import { TractResult } from '../../../../types/TractTypes';
 import { DemographicScoring, DemographicWeights, ThresholdBonus, Penalty, FilterStore } from '../../../../types/WeightTypes';
 
@@ -89,7 +89,7 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
   
   // Use advanced weights if available, otherwise use defaults
   const weights = demographicScoring?.weights || defaultWeights;
-  const hasAdvancedScoring = demographicScoring && demographicScoring.weights;
+  const hasAdvancedScoring = !!(demographicScoring && demographicScoring.weights); // ✅ FIXED: Convert to boolean
   const thresholdBonuses = demographicScoring?.thresholdBonuses || [];
   const penalties = demographicScoring?.penalties || [];
   const reasoning = demographicScoring?.reasoning;
@@ -194,35 +194,9 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
   
   console.log('🔍 [AdvancedDemographics] Final components:', components.length, components.map(c => `${c.name}: ${c.percentage}% → ${c.score} pts`));
   
+  // If no components, don't render the section at all
   if (components.length === 0) {
-    return (
-      <Box p={6}>
-        <HStack mb={6} align="center" spacing={3}>
-          <Text fontSize="xl" fontWeight="bold" color="gray.800">
-            👥 Advanced Demographic Analysis
-          </Text>
-          <MyToolTip label="Advanced Demographic Analysis">
-            Shows sophisticated demographic scoring using AI-optimized weights, threshold bonuses, and penalties
-          </MyToolTip>
-        </HStack>
-        
-        <Box 
-          p={4} 
-          bg="gray.50" 
-          borderRadius="lg" 
-          border="1px solid" 
-          borderColor="gray.200"
-          textAlign="center"
-        >
-          <Text fontSize="md" color="gray.600">
-            No demographic filters applied in your search
-          </Text>
-          <Text fontSize="sm" color="gray.500" mt={2}>
-            Add ethnicity, gender, age, or income filters to see advanced demographic analysis
-          </Text>
-        </Box>
-      </Box>
-    );
+    return null;
   }
   
   // Calculate weighted demographic score
@@ -244,18 +218,29 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
     components_count: components.length
   });
   
+  // Generate summary for collapsed state
+  const generateSummary = (): string => {
+    const scoreText = `${finalScore}/100 ${overallThreshold.label.toLowerCase()}`;
+    const componentText = components.length === 1 
+      ? `${components[0].name}: ${components[0].percentage}%`
+      : `${components.length} factors analyzed`;
+    const methodText = hasAdvancedScoring ? "AI-weighted" : "balanced";
+    
+    return `${scoreText} • ${componentText} • ${methodText}`;
+  };
+  
   return (
-    <Box p={6}>
-      <HStack mb={6} align="center" spacing={3}>
-        <Text fontSize="xl" fontWeight="bold" color="gray.800">
-          👥 Advanced Demographic Analysis
-        </Text>
-        <MyToolTip label="Advanced Demographic Analysis">
-          Shows sophisticated demographic scoring using AI-optimized weights, threshold bonuses, and penalties
-        </MyToolTip>
-      </HStack>
-      
-      <VStack spacing={6}>
+    <CollapsibleSection
+      title="👥 Advanced Demographic Analysis"
+      tooltip="Shows sophisticated demographic scoring using AI-optimized weights, threshold bonuses, and penalties"
+      defaultIsOpen={false}
+      priority={hasAdvancedScoring ? "high" : "medium"}
+      itemCount={components.length}
+      summary={generateSummary()}
+      userType="business"
+      glowing={hasAdvancedScoring}
+    >
+      <VStack spacing={6} p={4}>
         {/* AI Strategy Display */}
         {hasAdvancedScoring && (
           <Box 
@@ -548,6 +533,6 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
           </VStack>
         </Box>
       </VStack>
-    </Box>
+    </CollapsibleSection>
   );
 }

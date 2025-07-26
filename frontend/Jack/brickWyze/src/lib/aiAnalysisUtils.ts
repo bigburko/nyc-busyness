@@ -237,11 +237,11 @@ export const buildBusinessIntelligencePrompt = (
   trendInsights: LocationInsights, 
   filterStore: FilterStoreSlice
 ): string => {
-  // ✅ FIXED: Calculate combined demographic score from all applied filters
+  // ✅ FIXED: Calculate combined demographic score from all applied filters with CORRECTED detection
   const calculateCombinedDemographicScore = (): { percentage: number; details: string } => {
     const components: Array<{ name: string; percentage: number; hasFilter: boolean }> = [];
     
-    // Check each demographic component
+    // Check each demographic component with CORRECTED filter detection
     if (tract.demographic_match_pct !== null && tract.demographic_match_pct !== undefined) {
       const hasEthnicityFilter = !!(filterStore.selectedEthnicities && filterStore.selectedEthnicities.length > 0);
       components.push({
@@ -252,7 +252,9 @@ export const buildBusinessIntelligencePrompt = (
     }
     
     if (tract.gender_match_pct !== null && tract.gender_match_pct !== undefined) {
-      const hasGenderFilter = !!(filterStore.selectedGenders && filterStore.selectedGenders.length > 0);
+      // ✅ FIXED: Gender filter is only active if it's a meaningful subset (not both or neither)
+      const selectedGenders = filterStore.selectedGenders || [];
+      const hasGenderFilter = selectedGenders.length > 0 && selectedGenders.length < 2; // Only if exactly 1 gender selected
       components.push({
         name: 'Gender',
         percentage: tract.gender_match_pct,
@@ -261,7 +263,9 @@ export const buildBusinessIntelligencePrompt = (
     }
     
     if (tract.age_match_pct !== null && tract.age_match_pct !== undefined) {
-      const hasAgeFilter = !!(filterStore.ageRange && (filterStore.ageRange[0] > 25 || filterStore.ageRange[1] < 65));
+      // ✅ FIXED: Age filter detection - check against actual application defaults (18-100)
+      const ageRange = filterStore.ageRange || [18, 100];
+      const hasAgeFilter = !!(ageRange && (ageRange[0] > 18 || ageRange[1] < 100));
       components.push({
         name: 'Age',
         percentage: tract.age_match_pct,
@@ -270,7 +274,9 @@ export const buildBusinessIntelligencePrompt = (
     }
     
     if (tract.income_match_pct !== null && tract.income_match_pct !== undefined) {
-      const hasIncomeFilter = !!(filterStore.incomeRange && (filterStore.incomeRange[0] > 50000 || filterStore.incomeRange[1] < 150000));
+      // ✅ FIXED: Income filter detection - check against actual application defaults (0-250000)
+      const incomeRange = filterStore.incomeRange || [0, 250000];
+      const hasIncomeFilter = !!(incomeRange && (incomeRange[0] > 0 || incomeRange[1] < 250000));
       components.push({
         name: 'Income',
         percentage: tract.income_match_pct,
