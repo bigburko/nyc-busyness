@@ -15,7 +15,6 @@ export const BrickyAvatar = ({
   showDebugInfo = false 
 }: BrickyAvatarProps) => {
   const [imageLoadStatus, setImageLoadStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const [imageError, setImageError] = useState<string>('');
   const [currentPathIndex, setCurrentPathIndex] = useState(0);
   
   // Array of possible image paths for debugging
@@ -60,21 +59,18 @@ export const BrickyAvatar = ({
   const tryNextPath = () => {
     setCurrentPathIndex((prev) => (prev + 1) % imagePaths.length);
     setImageLoadStatus('loading');
-    setImageError('');
   };
 
   // Image debugging handlers
   const handleImageLoad = () => {
     console.log('✅ [Bricky Image] Successfully loaded');
     setImageLoadStatus('loaded');
-    setImageError('');
   };
 
-  const handleImageError = (e: any) => {
+  const handleImageError = () => {
     const errorMsg = `Image failed to load`;
     console.error('❌ [Bricky Image] Failed to load:', errorMsg);
     setImageLoadStatus('error');
-    setImageError(errorMsg);
   };
 
   const currentImagePath = imagePaths[currentPathIndex];

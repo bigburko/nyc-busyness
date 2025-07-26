@@ -2,7 +2,7 @@
 'use client';
 
 import { 
-  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text, Badge, Flex
+  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text
 } from '@chakra-ui/react';
 import { CloseIcon, ArrowBackIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
@@ -88,13 +88,6 @@ export default function TractDetailPanel({
     if (score >= 60) return "blue.500";
     if (score >= 40) return "orange.500";
     return "red.500";
-  };
-
-  const getScoreLabel = (score: number) => {
-    if (score >= 80) return "Excellent";
-    if (score >= 60) return "Good";
-    if (score >= 40) return "Fair";
-    return "Poor";
   };
 
   // Tab configuration

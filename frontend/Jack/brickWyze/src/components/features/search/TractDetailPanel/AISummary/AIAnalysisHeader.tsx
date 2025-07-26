@@ -24,7 +24,7 @@ export const AIAnalysisHeader = ({ tract, analysis, filterStore }: AIAnalysisHea
         {/* Title Section - Full Width */}
         <VStack spacing={2} w="full">
           <Text fontSize="2xl" fontWeight="bold" lineHeight="1.2" textAlign="center" w="full">
-            Bricky's Business Intelligence
+            Bricky&apos;s Business Intelligence
           </Text>
           <Text fontSize="md" opacity={0.9} lineHeight="1.3" textAlign="center" w="full">
             AI-powered market analysis for {tract.nta_name}

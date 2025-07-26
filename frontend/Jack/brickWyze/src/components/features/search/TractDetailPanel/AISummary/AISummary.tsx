@@ -28,9 +28,7 @@ import {
   extractTrendInsights,
   buildBusinessIntelligencePrompt,
   parseAIResponse,
-  getWeightLabel,
-  generatePersonalizedSpeechText,
-  getConfidenceColor
+  generatePersonalizedSpeechText
 } from '../../../../../lib/aiAnalysisUtils';
 
 interface AISummaryProps {
@@ -61,7 +59,6 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
   const [state, setState] = useState<ComponentState>('idle');
   const [analysis, setAnalysis] = useState<AIBusinessAnalysis | null>(null);
   const [typedText, setTypedText] = useState('');
-  const [error, setError] = useState<string | null>(null);
   
   // Refs for managing async operations
   const filterSnapshot = useRef<FilterStoreSlice | null>(null);
@@ -71,7 +68,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
   const isMountedRef = useRef(true);
 
   // 🔒 UPDATED: Use existing Gemini route with readOnly flag
-  const callGeminiReadOnly = useCallback(async (prompt: string, context: any): Promise<string> => {
+  const callGeminiReadOnly = useCallback(async (prompt: string, context: Record<string, unknown>): Promise<string> => {
     console.log('🔒 [AI Summary] Using existing Gemini route in READ-ONLY mode - NO filter updates');
     
     try {
@@ -174,7 +171,6 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
       if (isMountedRef.current) {
         setAnalysis(cachedResult);
         setTypedText(speechText);
-        setError(null);
         safeSetState('complete');
       }
       return;
@@ -183,7 +179,6 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     // Start loading for new analysis
     if (isMountedRef.current) {
       safeSetState('loading');
-      setError(null);
     }
     
     try {
@@ -234,17 +229,16 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     } catch (err) {
       console.error('❌ [AI Summary] Error generating analysis:', err);
       if (isMountedRef.current) {
-        setError('Failed to generate AI business analysis');
         safeSetState('error');
       }
     }
-  }, [tract.geoid, isVisible, state, callGeminiReadOnly, typeText, filterStore, weights, safeSetState]);
+  }, [tract, isVisible, state, callGeminiReadOnly, typeText, filterStore, weights, safeSetState]);
   
   // Update snapshots when props change
   useEffect(() => {
     filterSnapshot.current = filterStore as FilterStoreSlice;
     weightsSnapshot.current = weights;
-  }, [filterStore, weights]);
+  }, [filterStore, weights, tract]);
   
   // Handle tract changes with proper cleanup
   useEffect(() => {
@@ -265,16 +259,14 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
       
       setAnalysis(cachedResult);
       setTypedText(speechText);
-      setError(null);
       setState('complete');
     } else {
       // Reset to idle state for new tract
       setAnalysis(null);
       setTypedText('');
-      setError(null);
       setState('idle');
     }
-  }, [tract.geoid, cleanup]);
+  }, [tract.geoid, cleanup, filterStore, tract]);
   
   // Trigger analysis when becomes visible (original timing)
   useEffect(() => {
@@ -299,7 +291,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
             <HStack spacing={3} align="center">
               <Text fontSize="lg">🦉</Text>
               <Text fontSize="sm" color="gray.500" textAlign="center">
-                Scroll down to see Bricky's AI business analysis
+                Scroll down to see Bricky&apos;s AI business analysis
               </Text>
             </HStack>
           </VStack>
@@ -325,7 +317,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
         <VStack spacing={6} align="center">
           <VStack spacing={2} w="full">
             <Text fontSize="2xl" fontWeight="bold" lineHeight="1.2" textAlign="center" w="full">
-              Bricky's Business Intelligence
+              Bricky&apos;s Business Intelligence
             </Text>
             <Text fontSize="md" opacity={0.9} lineHeight="1.3" textAlign="center" w="full">
               AI-powered market analysis for {tract.nta_name}
@@ -391,7 +383,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
         <VStack spacing={6} align="center">
           <VStack spacing={2} w="full">
             <Text fontSize="2xl" fontWeight="bold" lineHeight="1.2" textAlign="center" w="full">
-              Bricky's Business Intelligence
+              Bricky&apos;s Business Intelligence
             </Text>
             <Text fontSize="md" opacity={0.9} lineHeight="1.3" textAlign="center" w="full">
               AI-powered market analysis for {tract.nta_name}
@@ -473,7 +465,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
             <VStack spacing={6} align="center">
               <VStack spacing={2} w="full">
                 <Text fontSize="2xl" fontWeight="bold" lineHeight="1.2" textAlign="center" w="full">
-                  Bricky's Business Intelligence
+                  Bricky&apos;s Business Intelligence
                 </Text>
                 <Text fontSize="md" opacity={0.9} lineHeight="1.3" textAlign="center" w="full">
                   AI-powered market analysis for {tract.nta_name}

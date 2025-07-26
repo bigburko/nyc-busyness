@@ -1,6 +1,6 @@
 // src/components/features/search/TractDetailPanel/AISummary/SpeechBubble.tsx
 
-import { Box, Text } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { useState, useEffect, useRef } from 'react';
 
 interface SpeechBubbleProps {
