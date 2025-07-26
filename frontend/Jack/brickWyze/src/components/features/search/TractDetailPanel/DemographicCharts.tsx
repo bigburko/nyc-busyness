@@ -6,6 +6,7 @@ import {
 } from '@chakra-ui/react';
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell, Legend } from 'recharts';
 import { TractResult } from '../../../../types/TractTypes';
+import { useFilterStore } from '../../../../stores/filterStore';
 
 // Define proper demographic data types
 interface DemographicDataItem {
@@ -100,6 +101,80 @@ const hasMeaningfulData = (data: DemographicDataItem[] | null): boolean => {
   );
 };
 
+// ✅ NEW: Calculate combined demographic score using SAME logic as Bricky
+const calculateCombinedDemographicScore = (tract: TractResult, filterStore: any): { percentage: number; details: string; components: Array<{ name: string; percentage: number; active: boolean }> } => {
+  const components: Array<{ name: string; percentage: number; hasFilter: boolean }> = [];
+  
+  // Check each demographic component (SAME logic as aiAnalysisUtils.ts)
+  if (tract.demographic_match_pct !== null && tract.demographic_match_pct !== undefined) {
+    const hasEthnicityFilter = !!(filterStore.selectedEthnicities && filterStore.selectedEthnicities.length > 0);
+    components.push({
+      name: 'Ethnicity',
+      percentage: tract.demographic_match_pct,
+      hasFilter: hasEthnicityFilter
+    });
+  }
+  
+  if (tract.gender_match_pct !== null && tract.gender_match_pct !== undefined) {
+    const hasGenderFilter = !!(filterStore.selectedGenders && filterStore.selectedGenders.length > 0);
+    components.push({
+      name: 'Gender',
+      percentage: tract.gender_match_pct,
+      hasFilter: hasGenderFilter
+    });
+  }
+  
+  if (tract.age_match_pct !== null && tract.age_match_pct !== undefined) {
+    const hasAgeFilter = !!(filterStore.ageRange && (filterStore.ageRange[0] > 25 || filterStore.ageRange[1] < 65));
+    components.push({
+      name: 'Age',
+      percentage: tract.age_match_pct,
+      hasFilter: hasAgeFilter
+    });
+  }
+  
+  if (tract.income_match_pct !== null && tract.income_match_pct !== undefined) {
+    const hasIncomeFilter = !!(filterStore.incomeRange && (filterStore.incomeRange[0] > 50000 || filterStore.incomeRange[1] < 150000));
+    components.push({
+      name: 'Income',
+      percentage: tract.income_match_pct,
+      hasFilter: hasIncomeFilter
+    });
+  }
+  
+  // Only include components where user has actually applied filters
+  const activeComponents = components.filter(comp => comp.hasFilter);
+  
+  if (activeComponents.length === 0) {
+    return { 
+      percentage: 0, 
+      details: "No demographic filters applied",
+      components: components.map(c => ({ name: c.name, percentage: c.percentage, active: false }))
+    };
+  }
+  
+  // Calculate average of active components (SAME as Bricky)
+  const combinedPercentage = activeComponents.reduce((sum, comp) => sum + comp.percentage, 0) / activeComponents.length;
+  
+  const details = activeComponents.map(comp => `${comp.name}: ${comp.percentage.toFixed(1)}%`).join(', ');
+  
+  console.log('🎯 [DemographicCharts] Combined demographic calculation (same as Bricky):', {
+    activeComponents: activeComponents.map(c => `${c.name}: ${c.percentage}%`),
+    combinedPercentage,
+    details
+  });
+  
+  return { 
+    percentage: combinedPercentage,
+    details: `Combined from ${details}`,
+    components: components.map(c => ({ 
+      name: c.name, 
+      percentage: c.percentage, 
+      active: c.hasFilter 
+    }))
+  };
+};
+
 // Helper function to get quality color based on percentage
 const getQualityColor = (percentage: number): string => {
   if (percentage >= 30) return 'green';
@@ -120,6 +195,8 @@ const getQualityLabel = (percentage: number): string => {
 };
 
 export function DemographicCharts({ tract, rawDemographicData }: DemographicChartsProps) {
+  const filterStore = useFilterStore();
+  
   console.log(`📊 DemographicCharts rendering for tract ${tract.geoid}`);
   
   // Check if we have real demographic data
@@ -130,10 +207,15 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
     hasMeaningfulData(rawDemographicData.incomeData)
   );
 
+  // ✅ Calculate combined score using SAME logic as Bricky
+  const combinedDemographicData = calculateCombinedDemographicScore(tract, filterStore);
+
   console.log('📊 [DemographicCharts] Data analysis:', {
     tractId: tract.geoid,
     hasRealData,
     hasProvidedData,
+    combinedScore: combinedDemographicData.percentage,
+    combinedDetails: combinedDemographicData.details,
     ethnicityMatch: tract.demographic_match_pct,
     genderMatch: tract.gender_match_pct,
     ageMatch: tract.age_match_pct,
@@ -553,53 +635,79 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
           )}
         </VStack>
 
-        {/* Overall assessment */}
+        {/* ✅ UPDATED: Overall assessment using Bricky's EXACT calculation */}
         {hasRealData && (
           <Box bg="blue.50" p={4} borderRadius="lg" border="1px solid" borderColor="blue.200" w="full">
-            <Text fontSize="md" fontWeight="bold" color="blue.700" mb={2}>
-              📋 Overall Demographic Assessment
-            </Text>
-            <Flex justify="space-between" align="center">
-              <Text fontSize="sm" color="blue.800" fontWeight="medium">
-                📊 Combined Demographic Fit: {
-                  (() => {
-                    const values = [
-                      tract.demographic_match_pct,
-                      tract.age_match_pct,
-                      tract.gender_match_pct,
-                      tract.income_match_pct
-                    ];
-                    
-                    const matches = values.filter((val): val is number => 
-                      val !== null && val !== undefined && !isNaN(val) && val > 0
-                    );
-                    
-                    if (matches.length === 0) return "No data";
-                    
-                    const avgMatch = matches.reduce((sum: number, val: number) => sum + val, 0) / matches.length;
-                    if (avgMatch >= 70) return "Excellent Match";
-                    if (avgMatch >= 50) return "Good Match";
-                    if (avgMatch >= 30) return "Moderate Match";
-                    return "Limited Match";
-                  })()
-                }
+            <VStack spacing={3} align="stretch">
+              <Text fontSize="md" fontWeight="bold" color="blue.700">
+                📋 Overall Demographic Assessment (Bricky's Analysis)
               </Text>
-              <Badge 
-                colorScheme={
-                  (() => {
-                    const values = [tract.demographic_match_pct, tract.age_match_pct, tract.gender_match_pct, tract.income_match_pct];
-                    const matches = values.filter((val): val is number => val !== null && val !== undefined && !isNaN(val) && val > 0);
-                    if (matches.length === 0) return "gray";
-                    const avgMatch = matches.reduce((sum: number, val: number) => sum + val, 0) / matches.length;
-                    return getQualityColor(avgMatch);
-                  })()
-                }
-                variant="subtle"
-                size="sm"
-              >
-                {availableTabs.length} Factor{availableTabs.length !== 1 ? 's' : ''} Analyzed
-              </Badge>
-            </Flex>
+              
+              {/* Combined Score - Same as Bricky */}
+              <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="blue.300">
+                <HStack justify="space-between" align="center">
+                  <VStack align="start" spacing={1}>
+                    <Text fontSize="lg" fontWeight="bold" color="blue.800">
+                      🎯 Combined Demographic Fit
+                    </Text>
+                    <Text fontSize="sm" color="blue.600">
+                      {combinedDemographicData.details}
+                    </Text>
+                  </VStack>
+                  <VStack align="end" spacing={0}>
+                    <Text 
+                      fontSize="2xl" 
+                      fontWeight="bold" 
+                      color={`${getQualityColor(combinedDemographicData.percentage)}.500`}
+                    >
+                      {safeToFixed(combinedDemographicData.percentage)}%
+                    </Text>
+                    <Text 
+                      fontSize="sm" 
+                      fontWeight="semibold" 
+                      color={`${getQualityColor(combinedDemographicData.percentage)}.600`}
+                    >
+                      {getQualityLabel(combinedDemographicData.percentage)}
+                    </Text>
+                  </VStack>
+                </HStack>
+              </Box>
+              
+              {/* Component Breakdown */}
+              <VStack spacing={2} align="stretch">
+                <Text fontSize="sm" fontWeight="semibold" color="blue.700">
+                  📊 Component Analysis
+                </Text>
+                {combinedDemographicData.components.map((component, index) => (
+                  <HStack key={index} justify="space-between" p={2} bg={component.active ? "blue.100" : "gray.100"} borderRadius="md">
+                    <HStack spacing={2}>
+                      <Badge 
+                        colorScheme={component.active ? "blue" : "gray"} 
+                        variant={component.active ? "solid" : "outline"}
+                        size="sm"
+                      >
+                        {component.active ? "ACTIVE" : "INACTIVE"}
+                      </Badge>
+                      <Text fontSize="sm" color={component.active ? "blue.800" : "gray.600"} fontWeight="medium">
+                        {component.name}
+                      </Text>
+                    </HStack>
+                    <Text 
+                      fontSize="sm" 
+                      fontWeight="bold" 
+                      color={component.active ? `${getQualityColor(component.percentage)}.600` : "gray.500"}
+                    >
+                      {safeToFixed(component.percentage)}%
+                    </Text>
+                  </HStack>
+                ))}
+              </VStack>
+              
+              {/* Note */}
+              <Text fontSize="xs" color="blue.500" textAlign="center" fontStyle="italic">
+                ✨ This is the exact same demographic score that Bricky uses in his analysis
+              </Text>
+            </VStack>
           </Box>
         )}
       </VStack>
