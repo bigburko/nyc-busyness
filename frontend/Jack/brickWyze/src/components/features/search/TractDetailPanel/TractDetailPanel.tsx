@@ -2,7 +2,7 @@
 'use client';
 
 import { 
-  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text, Badge, Flex
+  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text
 } from '@chakra-ui/react';
 import { CloseIcon, ArrowBackIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
@@ -88,13 +88,6 @@ export default function TractDetailPanel({
     if (score >= 60) return "blue.500";
     if (score >= 40) return "orange.500";
     return "red.500";
-  };
-
-  const getScoreLabel = (score: number) => {
-    if (score >= 80) return "Excellent";
-    if (score >= 60) return "Good";
-    if (score >= 40) return "Fair";
-    return "Poor";
   };
 
   // Tab configuration
@@ -210,10 +203,7 @@ export default function TractDetailPanel({
       case 'trends':
         return (
           <Box p={headerPadding} bg="gray.50" minH="100vh">
-            <Text fontSize="xl" fontWeight="bold" mb={6}>Trends Analysis</Text>
-            <VStack spacing={6}>
-              <TrendAnalysis tract={tract} />
-            </VStack>
+            <TrendAnalysis tract={tract} />
           </Box>
         );
 
@@ -398,7 +388,7 @@ export default function TractDetailPanel({
         h="100vh"
         overflowY="auto"
         overflowX="hidden"
-        pb="120px" // Reduced padding for simpler button layout
+        pb={activeTab === 'overview' ? "20px" : "350px"} // ✅ REDUCED: Less padding for overview (100px), keeps 350px for other tabs
         css={{
           scrollBehavior: 'smooth',
           '&::-webkit-scrollbar': {
