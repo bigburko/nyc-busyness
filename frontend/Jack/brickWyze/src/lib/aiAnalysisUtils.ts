@@ -58,13 +58,13 @@ export const setCachedAnalysis = (tractId: string, analysis: AIBusinessAnalysis)
   console.log('💾 [AI Summary] Cached analysis for tract:', tractId);
 };
 
-// Generate personalized speech text for Bricky
+// Generate personalized speech text for Bricky with rounded down scores
 export const generatePersonalizedSpeechText = (
   analysis: AIBusinessAnalysis, 
   tract: TractResult, 
   filterStore: FilterStoreSlice
 ): string => {
-  const score = tract.custom_score || 0;
+  const score = Math.floor(tract.custom_score || 0); // Round down to whole number
   const topWeight = filterStore.demographicScoring?.weights ? 
     Object.entries(filterStore.demographicScoring.weights).reduce((a, b) => a[1] > b[1] ? a : b)[0] : 'foot_traffic';
   
@@ -218,7 +218,7 @@ LOCATION ANALYSIS REQUEST:
 🏢 **Business Context**: User is evaluating this for their business venture
 
 KEY LOCATION METRICS:
-• **Overall Score**: ${tract.custom_score || 0}/100
+• **Overall Score**: ${Math.floor(tract.custom_score || 0)}/100
 • **Monthly Rent**: $${tract.avg_rent || 'N/A'} per sqft
 • **Demographic Match**: ${demographics.toFixed(1)}% (${demographics >= 30 ? 'Excellent' : demographics >= 20 ? 'Good' : demographics >= 15 ? 'Average' : 'Limited'} alignment)
 • **Foot Traffic**: ${trendInsights.footTraffic.current}/100 (${trendInsights.footTraffic.trend} ${trendInsights.footTraffic.change})
@@ -261,7 +261,7 @@ Be specific, use actual data points, and focus on actionable business intelligen
 export const parseAIResponse = (response: string, tract: TractResult): AIBusinessAnalysis => {
   console.log('🔍 [AI Summary] Raw AI response:', response);
   
-  // Default fallback analysis
+  // Default fallback analysis with rounded scores
   const analysis: AIBusinessAnalysis = {
     headline: `📍 Business Analysis for ${tract.nta_name}`,
     reasoning: `Analyzed based on location metrics and market trends for this NYC area.`,
@@ -270,7 +270,7 @@ export const parseAIResponse = (response: string, tract: TractResult): AIBusines
         type: 'strength',
         icon: '📊',
         title: 'Comprehensive Data Available',
-        description: `Location has complete metric coverage with ${tract.custom_score || 0}/100 overall score.`
+        description: `Location has complete metric coverage with ${Math.floor(tract.custom_score || 0)}/100 overall score.`
       }
     ],
     businessTypes: ['General retail', 'Food service', 'Professional services'],

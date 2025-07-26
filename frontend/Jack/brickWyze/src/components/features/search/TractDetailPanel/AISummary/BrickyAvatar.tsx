@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel/components/BrickyAvatar.tsx
+// src/components/features/search/TractDetailPanel/AISummary/BrickyAvatar.tsx
 
 import { Box, Image, Text } from '@chakra-ui/react';
 import { useState } from 'react';
@@ -11,7 +11,7 @@ interface BrickyAvatarProps {
 
 export const BrickyAvatar = ({ 
   size = 'md', 
-  withGlassBackground = false,
+  withGlassBackground = true,
   showDebugInfo = false 
 }: BrickyAvatarProps) => {
   const [imageLoadStatus, setImageLoadStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
@@ -80,7 +80,7 @@ export const BrickyAvatar = ({
   const currentImagePath = imagePaths[currentPathIndex];
 
   return (
-    <Box position="relative" flexShrink={0}>
+    <Box position="relative" flexShrink={0} display="flex" alignItems="center" justifyContent="center">
       {/* Liquid Glass Circle Background */}
       {withGlassBackground && (
         <Box
@@ -110,7 +110,7 @@ export const BrickyAvatar = ({
       )}
       
       {/* Bricky Image */}
-      <Box position="relative" zIndex={2}>
+      <Box position="relative" zIndex={2} display="flex" alignItems="center" justifyContent="center">
         <Image 
           src={currentImagePath}
           alt="Bricky the owl mascot"

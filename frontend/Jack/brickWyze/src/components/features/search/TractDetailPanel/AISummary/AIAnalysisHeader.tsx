@@ -1,6 +1,6 @@
 // src/components/features/search/TractDetailPanel/AISummary/AIAnalysisHeader.tsx
 
-import { Box, VStack, Text, HStack } from '@chakra-ui/react';
+import { Box, VStack, Text } from '@chakra-ui/react';
 import { TractResult } from '../../../../../types/TractTypes';
 import { AIBusinessAnalysis, FilterStoreSlice } from '../../../../../types/AIAnalysisTypes';
 import { BrickyAvatar } from './BrickyAvatar';
@@ -31,28 +31,28 @@ export const AIAnalysisHeader = ({ tract, analysis, filterStore }: AIAnalysisHea
           </Text>
         </VStack>
         
-        {/* Bricky with Speech Bubble - Horizontal Layout */}
-        <HStack spacing={4} align="center" justify="center" w="full">
-          {/* Bricky with Liquid Glass Background */}
-          <BrickyAvatar 
-            size="lg" 
-            withGlassBackground={true}
-            showDebugInfo={false}
-          />
-          
-          {/* Custom Speech Bubble */}
-          <Box flex="1" maxW="300px">
+        {/* Speech Bubble and Bricky - Vertical Layout */}
+        <VStack spacing={4} align="center" justify="center" w="full">
+          {/* Custom Speech Bubble - Higher up */}
+          <Box maxW="400px" w="full" display="flex" justifyContent="center">
             <SpeechBubble
               bg={getConfidenceColor(analysis.confidence).bg}
               borderColor={getConfidenceColor(analysis.confidence).border}
               color="white"
               size="md"
-              direction="left"
+              direction="right"
             >
               {generatePersonalizedSpeechText(analysis, tract, filterStore)}
             </SpeechBubble>
           </Box>
-        </HStack>
+          
+          {/* Bricky with Liquid Glass Background - Lower down */}
+          <BrickyAvatar 
+            size="lg" 
+            withGlassBackground={true}
+            showDebugInfo={false}
+          />
+        </VStack>
       </VStack>
     </Box>
   );
