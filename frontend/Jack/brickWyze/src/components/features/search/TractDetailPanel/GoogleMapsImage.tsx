@@ -82,116 +82,60 @@ const snapToRoadWithDirection = async (lat: number, lng: number, apiKey: string)
   heading?: number;
 } | null> => {
   try {
-    // Step 1: Get nearby road points in a small radius to determine road direction
-    const radius = 0.001; // ~100m radius
-    const points = [
-      `${lat},${lng}`, // Center point
-      `${lat + radius},${lng}`, // North
-      `${lat - radius},${lng}`, // South  
-      `${lat},${lng + radius}`, // East
-      `${lat},${lng - radius}`, // West
-    ].join('|');
+    // Use Google Roads API to snap to nearest road
+    const roadCoords = { lat, lng };
+    let heading: number | undefined;
     
-    const roadsUrl = `https://roads.googleapis.com/v1/nearestRoads?points=${points}&key=${apiKey}`;
-    
-    console.log(`🛣️ [Roads API] Snapping coordinates and calculating road direction for ${lat},${lng}`);
-    
-    const response = await fetch(roadsUrl);
-    const data = await response.json();
+    const roadsUrl = `https://roads.googleapis.com/v1/nearestRoads?points=${lat},${lng}&key=${apiKey}`;
+    const roadsResponse = await fetch(roadsUrl);
+    const data = await roadsResponse.json();
     
     if (data.snappedPoints && data.snappedPoints.length > 0) {
       const snappedPoint = data.snappedPoints[0];
-      const roadCoords = {
-        lat: snappedPoint.location.latitude,
-        lng: snappedPoint.location.longitude
-      };
-      
-      console.log(`✅ [Roads API] Successfully snapped to road: ${roadCoords.lat},${roadCoords.lng}`);
-      console.log(`📍 [Offset] Moved ${Math.round(getDistance(lat, lng, roadCoords.lat, roadCoords.lng))}m to road centerline`);
-      
-      // Step 2: Calculate road direction if we have multiple points
-      let heading: number | undefined;
-      
-      if (data.snappedPoints.length >= 2) {
-        // Use the first two snapped points to determine road direction
-        const point1 = data.snappedPoints[0];
-        const point2 = data.snappedPoints[1];
-        
-        heading = calculateBearing(
-          point1.location.latitude,
-          point1.location.longitude,
-          point2.location.latitude,
-          point2.location.longitude
-        );
-        
-        console.log(`🧭 [Road Direction] Calculated road heading: ${Math.round(heading)}° from North`);
-        console.log(`🎯 [Street View] Will align camera to look down the road`);
-      } else {
-        // Fallback: Try to get road segments for this location
-        try {
-          const segmentUrl = `https://roads.googleapis.com/v1/snapToRoads?path=${roadCoords.lat},${roadCoords.lng}&interpolate=true&key=${apiKey}`;
-          const segmentResponse = await fetch(segmentUrl);
-          const segmentData = await segmentResponse.json();
-          
-          if (segmentData.snappedPoints && segmentData.snappedPoints.length >= 2) {
-            const p1 = segmentData.snappedPoints[0];
-            const p2 = segmentData.snappedPoints[1];
-            
-            heading = calculateBearing(
-              p1.location.latitude,
-              p1.location.longitude,
-              p2.location.latitude,
-              p2.location.longitude
-            );
-            
-            console.log(`🧭 [Segment API] Calculated road heading: ${Math.round(heading)}° from North`);
-          }
-        } catch (segmentError) {
-          console.warn(`⚠️ [Segment API] Could not determine road direction:`, segmentError);
-        }
-      }
-      
-      return {
-        lat: roadCoords.lat,
-        lng: roadCoords.lng,
-        heading
-      };
-    } else {
-      console.warn(`⚠️ [Roads API] No road found near ${lat},${lng}`);
-      return null;
+      roadCoords.lat = snappedPoint.location.latitude;
+      roadCoords.lng = snappedPoint.location.longitude;
+      console.log(`🛣️ [Road Snap] Snapped to road: ${roadCoords.lat}, ${roadCoords.lng}`);
     }
+    
+    // Try to get road direction if we have multiple points
+    if (data.snappedPoints && data.snappedPoints.length >= 2) {
+      const point1 = data.snappedPoints[0];
+      const point2 = data.snappedPoints[1];
+      
+      heading = calculateBearing(
+        point1.location.latitude,
+        point1.location.longitude,
+        point2.location.latitude,
+        point2.location.longitude
+      );
+      
+      console.log(`🧭 [Road Direction] Calculated road heading: ${Math.round(heading)}° from North`);
+    }
+    
+    return { ...roadCoords, heading };
+    
   } catch (error) {
-    console.error(`🚫 [Roads API] Error snapping to road:`, error);
-    return null;
+    console.warn('⚠️ [Road Snap] Could not snap to road:', error);
+    return { lat, lng };
   }
 };
 
-// Helper function to calculate distance between two points
-const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371000; // Earth's radius in meters
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-};
-
-// Original coordinate lookup using your computed centroids
+// Get tract coordinates from centroids
 const getTractCoordinates = (geoid: string): { lat: number; lng: number } => {
   const centroids = tractCentroids as TractCentroids;
   const coords = centroids[geoid];
   
   if (coords) {
+    console.log(`📍 [Tract Coords] Found for ${geoid}: ${coords.lat}, ${coords.lng}`);
     return coords;
   }
   
-  console.warn(`⚠️ [Coordinates] No coordinates found for tract ${geoid}, using NYC center`);
-  return { lat: 40.7589, lng: -73.9851 }; // NYC center fallback
+  // Fallback to center of Manhattan
+  console.warn(`📍 [Tract Coords] Not found for ${geoid}, using Manhattan center`);
+  return { lat: 40.7589, lng: -73.9851 };
 };
 
-// Generate Google Maps URLs WITH road snapping for consistency
+// Generate images for a tract with road snapping
 const generateTractImages = async (tract: TractResult): Promise<CachedImages> => {
   const cacheKey = tract.geoid;
   
@@ -225,7 +169,7 @@ const generateTractImages = async (tract: TractResult): Promise<CachedImages> =>
   
   const apiKey = process.env.NEXT_PUBLIC_GOOGLEMAPS_API_KEY!;
   
-  // 🎯 CRITICAL FIX: Road-snap coordinates BEFORE generating ANY URLs
+  // Road-snap coordinates BEFORE generating ANY URLs
   console.log(`🎯 [CONSISTENCY] Road-snapping coordinates and calculating direction for ALL images and clicks`);
   const roadSnappedResult = await snapToRoadWithDirection(originalCoords.lat, originalCoords.lng, apiKey);
   
@@ -270,7 +214,7 @@ const generateTractImages = async (tract: TractResult): Promise<CachedImages> =>
 
 // Generate the Street View URL for clicking - USES EXACT SAME COORDINATES AS THUMBNAIL!
 const openStreetView = (tract: TractResult, cachedImages: CachedImages) => {
-  // 🎯 PERFECT CONSISTENCY: Use the EXACT same coordinates as the thumbnail
+  // Use the EXACT same coordinates as the thumbnail
   const { lat, lng } = cachedImages.roadSnappedCoords;
   const heading = cachedImages.roadSnappedCoords.heading;
   
@@ -342,6 +286,7 @@ export default function GoogleMapsImage({ tract }: GoogleMapsImageProps) {
   if (!images) {
     return (
       <Box 
+        data-testid="google-maps-image"
         w="100%" 
         h="300px" 
         bg="gray.200" 
@@ -385,6 +330,7 @@ export default function GoogleMapsImage({ tract }: GoogleMapsImageProps) {
   if (imageError) {
     return (
       <Box 
+        data-testid="google-maps-image"
         w="100%" 
         h="300px" 
         bg="linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)" 
@@ -458,6 +404,7 @@ export default function GoogleMapsImage({ tract }: GoogleMapsImageProps) {
   
   return (
     <Box 
+      data-testid="google-maps-image"
       position="relative" 
       w="100%" 
       h="300px" 

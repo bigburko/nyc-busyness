@@ -2,7 +2,7 @@
 'use client';
 
 import { 
-  Box, VStack, HStack, Text, Badge
+  Box, VStack, HStack, Text, Badge, Flex
 } from '@chakra-ui/react';
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell, Legend } from 'recharts';
 import { TractResult } from '../../../../types/TractTypes';
@@ -24,13 +24,6 @@ interface RawDemographicData {
 interface DemographicChartsProps {
   tract: TractResult;
   rawDemographicData?: RawDemographicData;
-}
-
-interface FilterStoreType {
-  selectedEthnicities?: string[];
-  selectedGenders?: string[];
-  ageRange?: [number, number];
-  incomeRange?: [number, number];
 }
 
 // Custom color palettes for charts
@@ -109,7 +102,7 @@ const hasMeaningfulData = (data: DemographicDataItem[] | null): boolean => {
 };
 
 // ✅ FIXED: Calculate combined demographic score using CORRECTED filter detection logic
-const calculateCombinedDemographicScore = (tract: TractResult, filterStore: FilterStoreType): { percentage: number; details: string; components: Array<{ name: string; percentage: number; active: boolean }> } => {
+const calculateCombinedDemographicScore = (tract: TractResult, filterStore: any): { percentage: number; details: string; components: Array<{ name: string; percentage: number; active: boolean }> } => {
   const components: Array<{ name: string; percentage: number; hasFilter: boolean }> = [];
   
   // Check each demographic component with CORRECTED filter detection
@@ -238,7 +231,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
   // If no meaningful data, show appropriate message
   if (!hasRealData && !hasProvidedData) {
     return (
-      <Box p={6} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+      <Box data-testid="demographic-chart" p={6} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
         <VStack spacing={4}>
           <Text fontSize="xl" fontWeight="bold" color="gray.800">
             📊 Neighborhood Demographics
@@ -312,34 +305,22 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
                 <Pie
                   data={ethnicityData.map(item => ({
                     ...item,
-                    name: item.name.includes('Target') ? `Target ${item.name.replace('Target', '').trim()}` : item.name
+                    name: item.name.includes('Target') ? 
+                      item.name.replace('Target', '🎯 Target') : item.name
                   }))}
                   cx="50%"
-                  cy="42%"
+                  cy="50%"
                   labelLine={false}
-                  outerRadius={75}
+                  outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
-                  label={({ value }) => `${safeToFixed(value, 1)}%`}
+                  label={({ name, value }) => `${name}: ${safeToFixed(value, 1)}%`}
                 >
                   {ethnicityData.map((entry: DemographicDataItem, index: number) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={getChartColor(index, 'ethnicity', entry.name)} 
-                    />
+                    <Cell key={`cell-${index}`} fill={getChartColor(index, 'ethnicity', entry.name)} />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={50}
-                  wrapperStyle={{
-                    paddingTop: '15px',
-                    fontSize: '12px',
-                    color: '#1F2937'
-                  }}
-                  iconType="rect"
-                />
               </PieChart>
             </ResponsiveContainer>
           </Box>
@@ -349,10 +330,10 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
       {/* Insights */}
       <Box bg="blue.50" p={4} borderRadius="lg" border="1px solid" borderColor="blue.200" w="full">
         <Text fontSize="sm" fontWeight="bold" color="blue.700" mb={2}>
-          🎯 Ethnicity Insights
+          🌍 Ethnicity Insights
         </Text>
-        <Text fontSize="sm" color="blue.600">
-          <strong>{safeToFixed(tract.demographic_match_pct)}%</strong> of residents match your target ethnicity demographics.
+        <Text fontSize="sm" color="blue.600" lineHeight="1.5">
+          Your target demographic represents <strong>{safeToFixed(tract.demographic_match_pct)}%</strong> of this area's population.
           This represents a <strong>{getQualityLabel(tract.demographic_match_pct || 0).toLowerCase()}</strong> match
           for your business requirements.
         </Text>
@@ -443,31 +424,22 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
                 <Pie
                   data={incomeData.map(item => ({
                     ...item,
-                    name: item.name.includes('Target') ? `Target ${item.name.replace('Target', '').trim()}` : item.name
+                    name: item.name.includes('Target') ? 
+                      item.name.replace('Target', '🎯 Target') : item.name
                   }))}
                   cx="50%"
-                  cy="42%"
+                  cy="50%"
                   labelLine={false}
-                  outerRadius={75}
+                  outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
-                  label={({ value }) => `${safeToFixed(value, 1)}%`}
+                  label={({ name, value }) => `${name}: ${safeToFixed(value, 1)}%`}
                 >
                   {incomeData.map((entry: DemographicDataItem, index: number) => (
                     <Cell key={`cell-${index}`} fill={getChartColor(index, 'income', entry.name)} />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={50}
-                  wrapperStyle={{
-                    paddingTop: '15px',
-                    fontSize: '12px',
-                    color: '#1F2937'
-                  }}
-                  iconType="rect"
-                />
               </PieChart>
             </ResponsiveContainer>
           </Box>
@@ -477,10 +449,10 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
       {/* Insights */}
       <Box bg="green.50" p={4} borderRadius="lg" border="1px solid" borderColor="green.200" w="full">
         <Text fontSize="sm" fontWeight="bold" color="green.700" mb={2}>
-          🎯 Income Insights
+          💰 Income Insights
         </Text>
-        <Text fontSize="sm" color="green.600">
-          <strong>{safeToFixed(tract.income_match_pct)}%</strong> of households are in your target income range.
+        <Text fontSize="sm" color="green.600" lineHeight="1.5">
+          <strong>{safeToFixed(tract.income_match_pct)}%</strong> of households fall within your target income range.
           This indicates a <strong>{getQualityLabel(tract.income_match_pct || 0).toLowerCase()}</strong> economic
           alignment with your target market.
         </Text>
@@ -489,8 +461,75 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
   );
 
   return (
-    <Box maxW="100%" overflow="hidden">
+    <Box data-testid="demographic-chart" maxW="100%" overflow="hidden">
       <VStack spacing={4}>
+        {/* Combined Score Summary */}
+        <Box bg="blue.50" p={4} borderRadius="lg" border="1px solid" borderColor="blue.200" w="full">
+          <Text fontSize="sm" fontWeight="bold" color="blue.700">
+            📋 Overall Demographic Assessment (Bricky's Analysis)
+          </Text>
+          
+          {/* Combined Score - Same as Bricky */}
+          <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="blue.300">
+            <HStack justify="space-between" align="center">
+              <VStack align="start" spacing={1}>
+                <Text fontSize="lg" fontWeight="bold" color="blue.800">
+                  🎯 Combined Demographic Fit
+                </Text>
+                <Text fontSize="sm" color="blue.600">
+                  {combinedDemographicData.details}
+                </Text>
+              </VStack>
+              <VStack align="end" spacing={0}>
+                <Text 
+                  fontSize="2xl" 
+                  fontWeight="bold" 
+                  color={`${getQualityColor(combinedDemographicData.percentage)}.500`}
+                >
+                  {safeToFixed(combinedDemographicData.percentage)}%
+                </Text>
+                <Text 
+                  fontSize="sm" 
+                  fontWeight="semibold" 
+                  color={`${getQualityColor(combinedDemographicData.percentage)}.600`}
+                >
+                  {getQualityLabel(combinedDemographicData.percentage)}
+                </Text>
+              </VStack>
+            </HStack>
+          </Box>
+          
+          {/* Component Breakdown */}
+          <VStack spacing={2} align="stretch">
+            <Text fontSize="sm" fontWeight="semibold" color="blue.700">
+              📊 Component Analysis
+            </Text>
+            {combinedDemographicData.components.map((component, index) => (
+              <HStack key={index} justify="space-between" p={2} bg={component.active ? "blue.100" : "gray.100"} borderRadius="md">
+                <HStack spacing={2}>
+                  <Badge 
+                    colorScheme={component.active ? "blue" : "gray"} 
+                    variant={component.active ? "solid" : "outline"}
+                    size="sm"
+                  >
+                    {component.active ? "ACTIVE" : "INACTIVE"}
+                  </Badge>
+                  <Text fontSize="sm" color={component.active ? "blue.800" : "gray.600"} fontWeight="medium">
+                    {component.name}
+                  </Text>
+                </HStack>
+                <Text 
+                  fontSize="sm" 
+                  fontWeight="bold" 
+                  color={component.active ? `${getQualityColor(component.percentage)}.600` : "gray.500"}
+                >
+                  {safeToFixed(component.percentage)}%
+                </Text>
+              </HStack>
+            ))}
+          </VStack>
+        </Box>
+
         {/* Stacked Charts */}
         <VStack spacing={4} w="full" maxW="100%">
           {/* Ethnicity Section */}
@@ -647,82 +686,6 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
             </Box>
           )}
         </VStack>
-
-        {/* ✅ UPDATED: Overall assessment using Bricky's EXACT calculation */}
-        {hasRealData && (
-          <Box bg="blue.50" p={4} borderRadius="lg" border="1px solid" borderColor="blue.200" w="full">
-            <VStack spacing={3} align="stretch">
-              <Text fontSize="md" fontWeight="bold" color="blue.700">
-                📋 Overall Demographic Assessment (Bricky&apos;s Analysis)
-              </Text>
-              
-              {/* Combined Score - Same as Bricky */}
-              <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="blue.300">
-                <HStack justify="space-between" align="center">
-                  <VStack align="start" spacing={1}>
-                    <Text fontSize="lg" fontWeight="bold" color="blue.800">
-                      🎯 Combined Demographic Fit
-                    </Text>
-                    <Text fontSize="sm" color="blue.600">
-                      {combinedDemographicData.details}
-                    </Text>
-                  </VStack>
-                  <VStack align="end" spacing={0}>
-                    <Text 
-                      fontSize="2xl" 
-                      fontWeight="bold" 
-                      color={`${getQualityColor(combinedDemographicData.percentage)}.500`}
-                    >
-                      {safeToFixed(combinedDemographicData.percentage)}%
-                    </Text>
-                    <Text 
-                      fontSize="sm" 
-                      fontWeight="semibold" 
-                      color={`${getQualityColor(combinedDemographicData.percentage)}.600`}
-                    >
-                      {getQualityLabel(combinedDemographicData.percentage)}
-                    </Text>
-                  </VStack>
-                </HStack>
-              </Box>
-              
-              {/* Component Breakdown */}
-              <VStack spacing={2} align="stretch">
-                <Text fontSize="sm" fontWeight="semibold" color="blue.700">
-                  📊 Component Analysis
-                </Text>
-                {combinedDemographicData.components.map((component, index) => (
-                  <HStack key={index} justify="space-between" p={2} bg={component.active ? "blue.100" : "gray.100"} borderRadius="md">
-                    <HStack spacing={2}>
-                      <Badge 
-                        colorScheme={component.active ? "blue" : "gray"} 
-                        variant={component.active ? "solid" : "outline"}
-                        size="sm"
-                      >
-                        {component.active ? "ACTIVE" : "INACTIVE"}
-                      </Badge>
-                      <Text fontSize="sm" color={component.active ? "blue.800" : "gray.600"} fontWeight="medium">
-                        {component.name}
-                      </Text>
-                    </HStack>
-                    <Text 
-                      fontSize="sm" 
-                      fontWeight="bold" 
-                      color={component.active ? `${getQualityColor(component.percentage)}.600` : "gray.500"}
-                    >
-                      {safeToFixed(component.percentage)}%
-                    </Text>
-                  </HStack>
-                ))}
-              </VStack>
-              
-              {/* Note */}
-              <Text fontSize="xs" color="blue.500" textAlign="center" fontStyle="italic">
-                ✨ This is the exact same demographic score that Bricky uses in his analysis
-              </Text>
-            </VStack>
-          </Box>
-        )}
       </VStack>
     </Box>
   );

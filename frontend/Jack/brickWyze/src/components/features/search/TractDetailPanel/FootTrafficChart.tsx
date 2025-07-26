@@ -1,4 +1,4 @@
-// src/components/features/search/components/FootTrafficChart.tsx
+// src/components/features/search/TractDetailPanel/FootTrafficChart.tsx
 'use client';
 
 import { Box, VStack, HStack, Text, Flex } from '@chakra-ui/react';
@@ -32,7 +32,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
     
     if (activePeriods.length === 0) {
       return (
-        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+        <Box data-testid="foot-traffic-chart" w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
           <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
             Foot Traffic by Time Period
           </Text>
@@ -60,7 +60,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
     
     if (chartData.length === 0) {
       return (
-        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+        <Box data-testid="foot-traffic-chart" w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
           <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
             Foot Traffic Score
           </Text>
@@ -92,7 +92,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
     };
 
     return (
-      <Box w="full">
+      <Box data-testid="foot-traffic-chart" w="full">
         <HStack mb={4} align="center" spacing={3}>
           <Text fontSize="lg" fontWeight="bold" color="gray.800">
             Foot Traffic by Time Period
@@ -226,7 +226,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
     };
 
     return (
-      <Box w="full">
+      <Box data-testid="foot-traffic-chart" w="full">
         <HStack mb={4} align="center" spacing={3}>
           <Text fontSize="lg" fontWeight="bold" color="gray.800">
             Foot Traffic Trend
@@ -290,7 +290,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
 
   // Final fallback: Show current score only
   return (
-    <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+    <Box data-testid="foot-traffic-chart" w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
       <HStack mb={2} align="center" spacing={3}>
         <Text fontSize="lg" fontWeight="bold" color="gray.800">
           Foot Traffic Score
