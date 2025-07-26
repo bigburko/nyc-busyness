@@ -50,7 +50,7 @@ export class OpenRouterService {
         body: JSON.stringify({
           model: params.model || this.DEFAULT_MODEL,
           messages,
-          response_format: { type: 'json_object' },
+          response_format: { type: 'json_object' }, // Always use JSON format
           temperature: params.temperature || this.DEFAULT_TEMPERATURE,
           max_tokens: params.maxTokens || this.DEFAULT_MAX_TOKENS,
         }),
@@ -119,6 +119,7 @@ export class OpenRouterService {
     return true;
   }
 
+  // Extract and validate JSON content (used for both regular and read-only modes)
   static extractContent(data: OpenRouterResponseData): string | null {
     if (!this.validateResponse(data)) {
       return null;

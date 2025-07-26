@@ -27,35 +27,19 @@ export const BusinessInsightCard = ({ insight, index }: BusinessInsightCardProps
       transition="all 0.2s"
     >
       <VStack spacing={4} align="stretch">
-        {/* Header Section - Title and Badge */}
-        <HStack spacing={4} align="center" justify="space-between">
-          <HStack spacing={3} flex="1">
-            <Box
-              bg={`${getInsightColor(insight.type)}.100`}
-              p={3}
-              borderRadius="xl"
-              fontSize="xl"
-            >
-              {insight.icon}
-            </Box>
-            <Text fontSize="lg" fontWeight="bold" color="gray.800" flex="1">
-              {insight.title}
-            </Text>
-          </HStack>
-          
-          {/* Insight Type Badge */}
+        {/* Header Section - Title and Icon only (no badge) */}
+        <HStack spacing={3} align="center">
           <Box
             bg={`${getInsightColor(insight.type)}.100`}
-            px={3}
-            py={1}
-            borderRadius="full"
-            fontSize="xs"
-            fontWeight="semibold"
-            color={`${getInsightColor(insight.type)}.700`}
-            textTransform="capitalize"
+            p={3}
+            borderRadius="xl"
+            fontSize="xl"
           >
-            {insight.type}
+            {insight.icon}
           </Box>
+          <Text fontSize="lg" fontWeight="bold" color="gray.800" flex="1">
+            {insight.title}
+          </Text>
         </HStack>
 
         {/* Description Section */}

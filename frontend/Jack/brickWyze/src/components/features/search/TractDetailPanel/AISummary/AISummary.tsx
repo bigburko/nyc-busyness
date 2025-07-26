@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel/AISummary.tsx
+// src/components/features/search/TractDetailPanel/AISummary/AISummary.tsx
 'use client';
 
 import { Box, VStack, Text, HStack } from '@chakra-ui/react';
@@ -6,7 +6,6 @@ import { keyframes } from '@emotion/react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TractResult } from '../../../../../types/TractTypes';
 import { useFilterStore } from '../../../../../stores/filterStore';
-import { useGeminiStore } from '../../../../../stores/geminiStore';
 import { Weight } from '../../../../../types/WeightTypes';
 
 // Import modular components
@@ -57,7 +56,6 @@ const dots = keyframes`
 
 export function AISummary({ tract, weights, isVisible = false }: AISummaryProps) {
   const filterStore = useFilterStore();
-  const geminiStore = useGeminiStore();
   
   // Consolidated state management to prevent flashing
   const [state, setState] = useState<ComponentState>('idle');
@@ -72,29 +70,37 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
   const currentTractRef = useRef<string>('');
   const isMountedRef = useRef(true);
 
-  // Custom sendToGemini that prevents global state updates
-  const sendToGeminiIsolated = useCallback(async (prompt: string, context: any) => {
-    console.log('🔒 [AI Summary] Using isolated Gemini call - will prevent state updates');
-    
-    // Store current filter state before calling
-    const originalFilters = { ...filterStore };
+  // 🔒 UPDATED: Use existing Gemini route with readOnly flag
+  const callGeminiReadOnly = useCallback(async (prompt: string, context: any): Promise<string> => {
+    console.log('🔒 [AI Summary] Using existing Gemini route in READ-ONLY mode - NO filter updates');
     
     try {
-      // Call the real sendToGemini function
-      const response = await geminiStore.sendToGemini(prompt, context);
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: prompt,
+          currentState: context,
+          readOnly: true // 🔒 CRITICAL: This prevents filter updates
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('🔒 [AI Summary] Read-only response received:', data.readOnlyMode);
       
-      console.log('🔒 [AI Summary] Got response, now restoring original state');
+      return data.reply || 'Unable to generate analysis';
       
-      // Restore original filter state to prevent side effects
-      filterStore.setFilters(originalFilters);
-      
-      return response;
     } catch (error) {
-      // Restore state even on error
-      filterStore.setFilters(originalFilters);
+      console.error('❌ [AI Summary] Read-only API call failed:', error);
       throw error;
     }
-  }, [geminiStore, filterStore]);
+  }, []);
 
   // Cleanup function to prevent memory leaks and race conditions
   const cleanup = useCallback(() => {
@@ -181,28 +187,19 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     }
     
     try {
-      console.log('🧠 [AI Summary] Starting analysis for tract:', tractId);
+      console.log('🧠 [AI Summary] Starting READ-ONLY analysis for tract:', tractId);
       
-      // Create isolated snapshots to prevent store interference with map
+      // Create snapshots - but these won't affect global state anymore
       const currentFilter = filterSnapshot.current ? { ...filterSnapshot.current } : { ...filterStore as FilterStoreSlice };
       const currentWeights = weightsSnapshot.current ? [...weightsSnapshot.current] : [...weights];
       
       const trendInsights = extractTrendInsights(tract);
       const businessPrompt = buildBusinessIntelligencePrompt(tract, currentWeights, trendInsights, currentFilter);
       
-      console.log('📤 [AI Summary] Making isolated Gemini call');
+      console.log('📤 [AI Summary] Using existing Gemini route in READ-ONLY mode');
       
-      const geminiWeights = currentWeights.map(w => ({ 
-        id: w.id, 
-        value: w.value, 
-        label: getWeightLabel(w),
-        icon: '', 
-        color: '' 
-      }));
-      
-      // Use isolated call that prevents state updates
-      const aiResponse = await sendToGeminiIsolated(businessPrompt, {
-        weights: geminiWeights,
+      // 🔒 UPDATED: Use existing Gemini route with readOnly flag
+      const aiResponse = await callGeminiReadOnly(businessPrompt, {
         selectedTimePeriods: currentFilter.selectedTimePeriods,
         selectedEthnicities: currentFilter.selectedEthnicities,
         selectedGenders: currentFilter.selectedGenders,
@@ -217,12 +214,13 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
         return;
       }
       
-      console.log('📥 [AI Summary] Received isolated response length:', aiResponse.length);
+      console.log('📥 [AI Summary] Received read-only response length:', aiResponse.length);
+      console.log('🔒 [AI Summary] NO FILTER UPDATES APPLIED - completely isolated');
       
       const businessAnalysis = parseAIResponse(aiResponse, tract);
       setCachedAnalysis(tractId, businessAnalysis);
       
-      console.log('✅ [AI Summary] Analysis complete - NO GLOBAL STATE UPDATED:', businessAnalysis.headline);
+      console.log('✅ [AI Summary] Analysis complete - ZERO global state changes:', businessAnalysis.headline);
       
       // Set analysis and start typing effect
       if (isMountedRef.current) {
@@ -240,7 +238,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
         safeSetState('error');
       }
     }
-  }, [tract.geoid, isVisible, state, sendToGeminiIsolated, typeText, filterStore, weights, safeSetState]);
+  }, [tract.geoid, isVisible, state, callGeminiReadOnly, typeText, filterStore, weights, safeSetState]);
   
   // Update snapshots when props change
   useEffect(() => {
@@ -278,13 +276,12 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     }
   }, [tract.geoid, cleanup]);
   
-  // Trigger analysis when becomes visible
+  // Trigger analysis when becomes visible (original timing)
   useEffect(() => {
     if (isVisible && state === 'idle' && !analysis) {
-      // Keep original timing but add safeguards to prevent map interference
       const timer = setTimeout(() => {
         if (isMountedRef.current && currentTractRef.current === tract.geoid && state === 'idle') {
-          console.log('🧠 [AI Summary] Starting analysis (original timing restored)');
+          console.log('🧠 [AI Summary] Starting READ-ONLY analysis - no map interference possible');
           generateAIAnalysis();
         }
       }, 100);
