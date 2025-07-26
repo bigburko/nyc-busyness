@@ -15,6 +15,7 @@ import { BusinessRecommendations } from './BusinessRecommendations';
 import { BottomLineSection } from './BottomLineSection';
 import { BrickyAvatar } from './BrickyAvatar';
 import { SpeechBubble } from './SpeechBubble';
+import { CompetitorExamples } from './CompetitorExamples';
 
 // Import utility functions and types
 import { 
@@ -536,6 +537,8 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
                 </VStack>
                 
                 <BusinessRecommendations analysis={analysis} />
+                
+                <CompetitorExamples analysis={analysis} />
                 
                 <BottomLineSection analysis={analysis} />
               </VStack>

@@ -16,29 +16,27 @@ export const CompetitorExamples = ({ analysis }: CompetitorExamplesProps) => {
   return (
     <Box 
       p={6} 
-      bg="linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)"
-      borderRadius="xl" 
+      bg="gray.50"
+      borderRadius="2xl" 
       border="2px solid" 
-      borderColor="emerald.200"
+      borderColor="blue.200"
       boxShadow="sm"
     >
       <VStack align="start" spacing={4}>
         <HStack spacing={3}>
-          <Box bg="emerald.100" p={2} borderRadius="lg">
-            <Text fontSize="lg">🏢</Text>
+          <Box bg="blue.100" p={3} borderRadius="xl">
+            <Text fontSize="xl">🏢</Text>
           </Box>
-          <Text fontSize="md" fontWeight="bold" color="emerald.800">
+          <Text fontSize="lg" fontWeight="bold" color="gray.800">
             Similar Successful Businesses
           </Text>
         </HStack>
-        <VStack align="start" spacing={2}>
+        
+        <VStack align="start" spacing={3} w="full">
           {analysis.competitorExamples.map((example, index) => (
-            <HStack key={index} spacing={2}>
-              <Box w="2" h="2" bg="emerald.400" borderRadius="full" />
-              <Text fontSize="sm" color="emerald.700" fontWeight="medium">
-                {example}
-              </Text>
-            </HStack>
+            <Text key={index} fontSize="sm" color="gray.700" lineHeight="1.6">
+              {example}
+            </Text>
           ))}
         </VStack>
       </VStack>
