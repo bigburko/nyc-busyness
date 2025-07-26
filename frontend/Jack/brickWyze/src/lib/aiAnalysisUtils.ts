@@ -77,7 +77,39 @@ export const generatePersonalizedSpeechText = (
   }
 };
 
-// Extract trend analysis logic from TrendIndicators
+// Helper function - SAME calculation method as TrendIndicators component
+const calculateTrendFromData = (data: number[]): { trend: 'increasing' | 'decreasing' | 'stable' | 'unknown'; change: string } => {
+  if (data.length < 2) return { trend: 'unknown', change: '0%' };
+  
+  const start = data[0];
+  const end = data[data.length - 1];
+  
+  if (start === 0) return { trend: 'unknown', change: '0%' };
+  
+  const changePercent = ((end - start) / start) * 100;
+  
+  let trend: 'increasing' | 'decreasing' | 'stable' | 'unknown';
+  if (Math.abs(changePercent) < 2) {
+    trend = 'stable';
+  } else if (changePercent > 0) {
+    trend = 'increasing';
+  } else {
+    trend = 'decreasing';
+  }
+  
+  // ✅ FIXED: Use Math.ceil for absolute value to match AI rounding logic
+  const roundedPercent = changePercent >= 0 ? 
+    Math.ceil(changePercent) : 
+    -Math.ceil(Math.abs(changePercent));
+  
+  const sign = roundedPercent >= 0 ? '+' : '';
+  return { 
+    trend, 
+    change: `${sign}${roundedPercent}%` 
+  };
+};
+
+// ✅ FIXED: Extract trend analysis logic - now calculates trends the SAME WAY as TrendIndicators
 export const extractTrendInsights = (tract: TractResult): LocationInsights => {
   const insights: LocationInsights = {
     footTraffic: {
@@ -95,101 +127,104 @@ export const extractTrendInsights = (tract: TractResult): LocationInsights => {
     overallOutlook: 'Mixed trends'
   };
 
-  // Foot Traffic Analysis
+  // Foot Traffic Analysis - ✅ CALCULATE THE SAME WAY AS TRENDINDICATORS
   if (tract.foot_traffic_score) {
     let footTrafficSparkline: number[] = [];
-    let footTrafficTrend: TrendInsight['trend'] = 'unknown';
     
-    if (tract.foot_traffic_timeline) {
+    if (tract.foot_traffic_timeline && Object.keys(tract.foot_traffic_timeline).length > 0) {
       const timeline = tract.foot_traffic_timeline as FootTrafficTimeline;
       footTrafficSparkline = [
         timeline['2022'] || 0,
         timeline['2023'] || 0,
+        timeline['2024'] || 0,  // ✅ Include 2024
         timeline['pred_2025'] || 0,
         timeline['pred_2026'] || 0,
         timeline['pred_2027'] || 0
-      ].filter(val => val > 0);
-      
-      // Determine trend direction
-      if (footTrafficSparkline.length >= 2) {
-        const recent = footTrafficSparkline[footTrafficSparkline.length - 2];
-        const current = footTrafficSparkline[footTrafficSparkline.length - 1];
-        if (current > recent * 1.05) {
-          footTrafficTrend = 'increasing';
-          insights.footTraffic.change = '+5%';
-        } else if (current < recent * 0.95) {
-          footTrafficTrend = 'decreasing';
-          insights.footTraffic.change = '-3%';
-        } else {
-          footTrafficTrend = 'stable';
-          insights.footTraffic.change = '0%';
-        }
-      }
+      ];
     } else {
-      // Generate realistic trend based on current score
+      // Generate realistic trend based on current score - SAME as TrendIndicators
       const current = tract.foot_traffic_score;
       footTrafficSparkline = [
         current * 0.85,
         current * 0.92,
-        current,
+        current * 1.0,  // 2024
+        current,         // 2025 = current
         current * 1.03,
         current * 1.06
       ];
-      footTrafficTrend = 'increasing';
-      insights.footTraffic.change = '+5%';
     }
     
+    // ✅ USE SAME CALCULATION METHOD as TrendIndicators
+    const { trend, change } = calculateTrendFromData(footTrafficSparkline);
+    
+    console.log('✅ [extractTrendInsights] Foot traffic calculated (using AI rounding logic):', {
+      data: footTrafficSparkline,
+      trend,
+      change,
+      source: 'calculated_from_timeline'
+    });
+    
     insights.footTraffic = {
-      current: Math.round(tract.foot_traffic_score),
-      trend: footTrafficTrend,
-      change: insights.footTraffic.change,
+      current: Math.round(tract.foot_traffic_score), // ✅ Use Math.round for display consistency
+      trend,
+      change,
       sparklineData: footTrafficSparkline
     };
   }
 
-  // Crime/Safety Analysis
+  // Crime/Safety Analysis - ✅ CALCULATE THE SAME WAY AS TRENDINDICATORS
   if (tract.crime_score) {
     let crimeSparkline: number[] = [];
-    let crimeTrend: TrendInsight['trend'] = tract.crime_trend_direction as TrendInsight['trend'] || 'unknown';
     
-    if (tract.crime_timeline) {
+    if (tract.crime_timeline && Object.keys(tract.crime_timeline).length > 0) {
       const timeline = tract.crime_timeline as CrimeTimeline;
       crimeSparkline = [
         timeline.year_2022 || 0,
         timeline.year_2023 || 0,
+        timeline.year_2024 || 0,  // ✅ Include 2024
         timeline.pred_2025 || 0,
         timeline.pred_2026 || 0,
         timeline.pred_2027 || 0
-      ].filter(val => val > 0);
+      ];
     } else {
-      // Generate realistic trend
+      // Generate realistic trend - SAME as TrendIndicators
       const current = tract.crime_score;
       crimeSparkline = [
-        current * 0.88,
-        current * 0.94,
-        current,
-        current * 1.02,
-        current * 1.04
+        current * 0.80,
+        current * 0.85,
+        current * 0.92,
+        current,          // 2025 = current
+        Math.min(100, current * 1.02),
+        Math.min(100, current * 1.05)
       ];
-      crimeTrend = 'increasing';
     }
     
+    // ✅ USE SAME CALCULATION METHOD as TrendIndicators
+    const { trend, change } = calculateTrendFromData(crimeSparkline);
+    
+    console.log('✅ [extractTrendInsights] Crime calculated (using AI rounding logic):', {
+      data: crimeSparkline,
+      trend,
+      change,
+      source: 'calculated_from_timeline'
+    });
+    
     insights.safety = {
-      current: Math.round(tract.crime_score),
-      trend: crimeTrend,
-      change: tract.crime_trend_change || '+2%',
+      current: Math.round(tract.crime_score), // ✅ Use Math.round for display consistency
+      trend,
+      change,
       sparklineData: crimeSparkline
     };
   }
 
-  // Overall outlook assessment
-  const increasingTrends = [insights.footTraffic, insights.safety].filter(t => t.trend === 'increasing').length;
-  const decreasingTrends = [insights.footTraffic, insights.safety].filter(t => t.trend === 'decreasing').length;
+  // Overall outlook assessment - SAME logic as TrendIndicators
+  const negativeChanges = [insights.footTraffic, insights.safety].filter(t => t.change.startsWith('-')).length;
+  const positiveChanges = [insights.footTraffic, insights.safety].filter(t => t.change.startsWith('+')).length;
   
-  if (increasingTrends > decreasingTrends) {
+  if (negativeChanges > positiveChanges) {
+    insights.overallOutlook = "📉 This area shows declining trends that need attention";
+  } else if (positiveChanges > negativeChanges) {
     insights.overallOutlook = "📈 This area shows positive growth trends across key metrics";
-  } else if (decreasingTrends > increasingTrends) {
-    insights.overallOutlook = "📉 This area shows some declining trends to monitor";
   } else {
     insights.overallOutlook = "📊 This area shows stable performance with mixed trends";
   }
@@ -257,7 +292,7 @@ Please provide a comprehensive business analysis in this EXACT format:
 Be specific, use actual data points, and focus on actionable business intelligence. Reference the neighborhood characteristics and explain WHY this location works (or doesn't) for business.`;
 };
 
-// Parse AI response into structured business analysis
+// ✅ FIXED: Parse AI response into structured business analysis
 export const parseAIResponse = (response: string, tract: TractResult): AIBusinessAnalysis => {
   console.log('🔍 [AI Summary] Raw AI response:', response);
   
@@ -300,49 +335,58 @@ export const parseAIResponse = (response: string, tract: TractResult): AIBusines
     }
     
     // Try to parse as JSON
-    const parsed = JSON.parse(cleanResponse) as ParsedAIResponse;
+    const parsed = JSON.parse(cleanResponse) as any;
     console.log('✅ [AI Summary] Successfully parsed JSON:', parsed);
     
-    // Extract data from JSON structure
-    if (parsed.HEADLINE) {
-      analysis.headline = parsed.HEADLINE;
+    // ✅ FIXED: Check for both UPPERCASE and lowercase property names
+    if (parsed.HEADLINE || parsed.headline) {
+      analysis.headline = parsed.HEADLINE || parsed.headline;
     }
     
-    if (parsed.REASONING) {
-      analysis.reasoning = parsed.REASONING;
+    if (parsed.REASONING || parsed.reasoning) {
+      analysis.reasoning = parsed.REASONING || parsed.reasoning;
     }
     
-    if (parsed.KEY_INSIGHTS && Array.isArray(parsed.KEY_INSIGHTS)) {
-      analysis.insights = parsed.KEY_INSIGHTS.map((insight) => ({
-        type: (insight.Type?.toLowerCase() as 'strength' | 'opportunity' | 'consideration') || 'strength',
-        icon: insight.Type?.toLowerCase() === 'strength' ? '💪' : 
-              insight.Type?.toLowerCase() === 'opportunity' ? '🚀' : '⚠️',
-        title: insight.Title || 'Business Insight',
-        description: insight.Description || ''
+    // ✅ FIXED: Check for both formats of insights
+    const insights = parsed.KEY_INSIGHTS || parsed.key_insights;
+    if (insights && Array.isArray(insights)) {
+      analysis.insights = insights.map((insight: any) => ({
+        type: (insight.Type?.toLowerCase() || insight.type?.toLowerCase() || 'strength') as 'strength' | 'opportunity' | 'consideration',
+        icon: (insight.Type?.toLowerCase() || insight.type?.toLowerCase()) === 'strength' ? '💪' : 
+              (insight.Type?.toLowerCase() || insight.type?.toLowerCase()) === 'opportunity' ? '🚀' : '⚠️',
+        title: insight.Title || insight.title || 'Business Insight',
+        description: insight.Description || insight.description || ''
       })).slice(0, 4);
     }
     
-    if (parsed.BUSINESS_TYPES && Array.isArray(parsed.BUSINESS_TYPES)) {
-      analysis.businessTypes = parsed.BUSINESS_TYPES.slice(0, 5);
+    // ✅ FIXED: Check for both formats of business types
+    const businessTypes = parsed.BUSINESS_TYPES || parsed.business_types;
+    if (businessTypes && Array.isArray(businessTypes)) {
+      analysis.businessTypes = businessTypes.slice(0, 5);
     }
     
-    if (parsed.MARKET_STRATEGY) {
-      analysis.marketStrategy = parsed.MARKET_STRATEGY;
+    // ✅ FIXED: Check for both formats of market strategy
+    if (parsed.MARKET_STRATEGY || parsed.market_strategy) {
+      analysis.marketStrategy = parsed.MARKET_STRATEGY || parsed.market_strategy;
     }
     
-    if (parsed.COMPETITOR_EXAMPLES && Array.isArray(parsed.COMPETITOR_EXAMPLES)) {
-      analysis.competitorExamples = parsed.COMPETITOR_EXAMPLES;
+    // ✅ FIXED: Check for both formats of competitor examples
+    const competitorExamples = parsed.COMPETITOR_EXAMPLES || parsed.competitor_examples;
+    if (competitorExamples && Array.isArray(competitorExamples)) {
+      analysis.competitorExamples = competitorExamples;
     }
     
-    if (parsed.BOTTOM_LINE) {
-      analysis.bottomLine = parsed.BOTTOM_LINE;
+    // ✅ FIXED: Check for both formats of bottom line
+    if (parsed.BOTTOM_LINE || parsed.bottom_line) {
+      analysis.bottomLine = parsed.BOTTOM_LINE || parsed.bottom_line;
       
       // Extract confidence from bottom line
-      if (parsed.BOTTOM_LINE.toLowerCase().includes('high confidence')) {
+      const bottomLineText = (parsed.BOTTOM_LINE || parsed.bottom_line).toLowerCase();
+      if (bottomLineText.includes('high') || bottomLineText.includes('strong')) {
         analysis.confidence = 'high';
-      } else if (parsed.BOTTOM_LINE.toLowerCase().includes('medium confidence')) {
+      } else if (bottomLineText.includes('medium') || bottomLineText.includes('moderate')) {
         analysis.confidence = 'medium';
-      } else if (parsed.BOTTOM_LINE.toLowerCase().includes('low confidence')) {
+      } else if (bottomLineText.includes('low') || bottomLineText.includes('weak')) {
         analysis.confidence = 'low';
       }
     }

@@ -51,7 +51,7 @@ const SimpleSparkline = ({ data, color }: { data: number[]; color: string }) => 
   );
 };
 
-// Helper function to calculate real trend from data
+// Helper function to calculate real trend from data - ✅ UPDATED TO MATCH AI LOGIC
 const calculateTrend = (data: number[]): { trend: TrendData['trend']; change: string } => {
   if (data.length < 2) return { trend: 'unknown', change: '0%' };
   
@@ -71,43 +71,56 @@ const calculateTrend = (data: number[]): { trend: TrendData['trend']; change: st
     trend = 'decreasing';
   }
   
-  const sign = changePercent >= 0 ? '+' : '';
+  // ✅ FIXED: Use Math.ceil for absolute value to match AI rounding logic
+  const roundedPercent = changePercent >= 0 ? 
+    Math.ceil(changePercent) : 
+    -Math.ceil(Math.abs(changePercent));
+  
+  const sign = roundedPercent >= 0 ? '+' : '';
   return { 
     trend, 
-    change: `${sign}${Math.round(changePercent)}%` 
+    change: `${sign}${roundedPercent}%` 
   };
 };
 
 export function TrendIndicators({ tract }: TrendIndicatorsProps) {
   const trends: TrendData[] = [];
   
-  // Foot Traffic Trend
+  // Foot Traffic Trend - ✅ CALCULATE FROM REAL TIMELINE DATA
   if (tract.foot_traffic_score) {
-    const currentScore = Math.round(tract.foot_traffic_score);
+    const currentScore = Math.round(tract.foot_traffic_score); // ✅ Keep Math.round for display
     let chartData: number[] = [];
     
     if (tract.foot_traffic_timeline && Object.keys(tract.foot_traffic_timeline).length > 0) {
       const timeline = tract.foot_traffic_timeline;
       chartData = [
-        Math.round(timeline['2022'] || 0),
-        Math.round(timeline['2023'] || 0),
-        Math.round(timeline['2024'] || 0),
-        Math.round(timeline['pred_2025'] || 0),
-        Math.round(timeline['pred_2026'] || 0),
-        Math.round(timeline['pred_2027'] || 0),
+        timeline['2022'] || 0, // ✅ Use raw values for calculation
+        timeline['2023'] || 0, // ✅ Use raw values for calculation
+        timeline['2024'] || 0, // ✅ Use raw values for calculation
+        timeline['pred_2025'] || 0, // ✅ Use raw values for calculation
+        timeline['pred_2026'] || 0, // ✅ Use raw values for calculation
+        timeline['pred_2027'] || 0, // ✅ Use raw values for calculation
       ];
     } else {
       chartData = [
-        Math.round(currentScore * 0.85),
-        Math.round(currentScore * 0.92),
-        Math.round(currentScore * 1.0),
+        currentScore * 0.85,
+        currentScore * 0.92,
+        currentScore * 1.0,
         currentScore,
-        Math.round(currentScore * 1.03),
-        Math.round(currentScore * 1.06)
+        currentScore * 1.03,
+        currentScore * 1.06
       ];
     }
     
+    // ✅ CALCULATE TREND FROM ACTUAL DATA (your original approach was correct)
     const { trend, change } = calculateTrend(chartData);
+    
+    console.log('✅ [TrendIndicators] Foot traffic calculated (using AI rounding logic):', {
+      chartData,
+      trend,
+      change,
+      source: 'calculated_from_timeline'
+    });
     
     trends.push({
       label: 'Foot Traffic',
@@ -119,33 +132,41 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
     });
   }
   
-  // Safety Trend
+  // Safety Trend - ✅ CALCULATE FROM REAL TIMELINE DATA
   if (tract.crime_score) {
-    const currentScore = Math.round(tract.crime_score);
+    const currentScore = Math.round(tract.crime_score); // ✅ Keep Math.round for display
     let chartData: number[] = [];
     
     if (tract.crime_timeline && Object.keys(tract.crime_timeline).length > 0) {
       const timeline = tract.crime_timeline;
       chartData = [
-        Math.round(timeline.year_2022 || 0),
-        Math.round(timeline.year_2023 || 0),
-        Math.round(timeline.year_2024 || 0),
-        Math.round(timeline.pred_2025 || 0),
-        Math.round(timeline.pred_2026 || 0),
-        Math.round(timeline.pred_2027 || 0),
+        timeline.year_2022 || 0, // ✅ Use raw values for calculation
+        timeline.year_2023 || 0, // ✅ Use raw values for calculation
+        timeline.year_2024 || 0, // ✅ Use raw values for calculation
+        timeline.pred_2025 || 0, // ✅ Use raw values for calculation
+        timeline.pred_2026 || 0, // ✅ Use raw values for calculation
+        timeline.pred_2027 || 0, // ✅ Use raw values for calculation
       ];
     } else {
       chartData = [
-        Math.round(currentScore * 0.80),
-        Math.round(currentScore * 0.85),
-        Math.round(currentScore * 0.92),
+        currentScore * 0.80,
+        currentScore * 0.85,
+        currentScore * 0.92,
         currentScore,
-        Math.min(100, Math.round(currentScore * 1.02)),
-        Math.min(100, Math.round(currentScore * 1.05)),
+        Math.min(100, currentScore * 1.02),
+        Math.min(100, currentScore * 1.05),
       ];
     }
     
+    // ✅ CALCULATE TREND FROM ACTUAL DATA (your original approach was correct)
     const { trend, change } = calculateTrend(chartData);
+    
+    console.log('✅ [TrendIndicators] Crime calculated (using AI rounding logic):', {
+      chartData,
+      trend,
+      change,
+      source: 'calculated_from_timeline'
+    });
     
     trends.push({
       label: 'Safety Score',
@@ -168,6 +189,17 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
         </Text>
       </Box>
     );
+  }
+
+  // ✅ DYNAMIC FUTURE OUTLOOK based on actual calculated trends
+  const negativeChanges = trends.filter(t => t.change.startsWith('-')).length;
+  const positiveChanges = trends.filter(t => t.change.startsWith('+')).length;
+  
+  let futureOutlook = "This area shows stable performance with mixed trends";
+  if (negativeChanges > positiveChanges) {
+    futureOutlook = "This area shows declining trends that need attention";
+  } else if (positiveChanges > negativeChanges) {
+    futureOutlook = "This area shows positive growth trends across key metrics";
   }
 
   return (
@@ -228,7 +260,7 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
         borderColor="blue.200"
       >
         <Text fontSize="sm" color="blue.700" fontWeight="medium">
-          Future Outlook: This area shows stable performance with mixed trends
+          Future Outlook: {futureOutlook}
         </Text>
       </Box>
     </Box>

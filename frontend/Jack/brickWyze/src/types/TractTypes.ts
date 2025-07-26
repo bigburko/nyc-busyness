@@ -14,8 +14,15 @@ export interface TractResult {
   rent_score?: number;
   poi_score?: number;
   main_crime_score?: number;
+  
+  // Crime trend properties
   crime_trend_direction?: string;
   crime_trend_change?: string;
+  
+  // ✅ ADDED: Foot traffic trend properties (missing from original)
+  foot_traffic_trend_direction?: string;
+  foot_traffic_trend_change?: string;
+  
   demographic_match_pct?: number;
   gender_match_pct?: number;
   age_match_pct?: number;

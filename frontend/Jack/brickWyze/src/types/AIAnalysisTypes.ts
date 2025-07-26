@@ -35,6 +35,7 @@ export interface AIBusinessAnalysis {
 export interface FootTrafficTimeline {
   '2022'?: number;
   '2023'?: number;
+  '2024'?: number;  // ✅ ADDED: Missing 2024 property
   'pred_2025'?: number;
   'pred_2026'?: number;
   'pred_2027'?: number;
@@ -43,6 +44,7 @@ export interface FootTrafficTimeline {
 export interface CrimeTimeline {
   year_2022?: number;
   year_2023?: number;
+  year_2024?: number;  // ✅ ADDED: Missing 2024 property
   pred_2025?: number;
   pred_2026?: number;
   pred_2027?: number;
