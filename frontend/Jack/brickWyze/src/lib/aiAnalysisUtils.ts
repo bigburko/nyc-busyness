@@ -5,10 +5,8 @@ import { Weight } from '../types/WeightTypes';
 import { 
   AIBusinessAnalysis, 
   LocationInsights, 
-  TrendInsight, 
   FootTrafficTimeline, 
   CrimeTimeline,
-  ParsedAIResponse,
   FilterStoreSlice,
   CachedAnalysis 
 } from '../types/AIAnalysisTypes';
@@ -292,6 +290,33 @@ Please provide a comprehensive business analysis in this EXACT format:
 Be specific, use actual data points, and focus on actionable business intelligence. Reference the neighborhood characteristics and explain WHY this location works (or doesn't) for business.`;
 };
 
+// Define proper types for AI response parsing
+interface ParsedInsight {
+  Type?: string;
+  type?: string;
+  Title?: string;
+  title?: string;
+  Description?: string;
+  description?: string;
+}
+
+interface ParsedAIResponseData {
+  HEADLINE?: string;
+  headline?: string;
+  REASONING?: string;
+  reasoning?: string;
+  KEY_INSIGHTS?: ParsedInsight[];
+  key_insights?: ParsedInsight[];
+  BUSINESS_TYPES?: string[];
+  business_types?: string[];
+  MARKET_STRATEGY?: string;
+  market_strategy?: string;
+  COMPETITOR_EXAMPLES?: string[];
+  competitor_examples?: string[];
+  BOTTOM_LINE?: string;
+  bottom_line?: string;
+}
+
 // ✅ FIXED: Parse AI response into structured business analysis
 export const parseAIResponse = (response: string, tract: TractResult): AIBusinessAnalysis => {
   console.log('🔍 [AI Summary] Raw AI response:', response);
@@ -335,22 +360,22 @@ export const parseAIResponse = (response: string, tract: TractResult): AIBusines
     }
     
     // Try to parse as JSON
-    const parsed = JSON.parse(cleanResponse) as any;
+    const parsed = JSON.parse(cleanResponse) as ParsedAIResponseData;
     console.log('✅ [AI Summary] Successfully parsed JSON:', parsed);
     
     // ✅ FIXED: Check for both UPPERCASE and lowercase property names
     if (parsed.HEADLINE || parsed.headline) {
-      analysis.headline = parsed.HEADLINE || parsed.headline;
+      analysis.headline = parsed.HEADLINE || parsed.headline || analysis.headline;
     }
     
     if (parsed.REASONING || parsed.reasoning) {
-      analysis.reasoning = parsed.REASONING || parsed.reasoning;
+      analysis.reasoning = parsed.REASONING || parsed.reasoning || analysis.reasoning;
     }
     
     // ✅ FIXED: Check for both formats of insights
     const insights = parsed.KEY_INSIGHTS || parsed.key_insights;
     if (insights && Array.isArray(insights)) {
-      analysis.insights = insights.map((insight: any) => ({
+      analysis.insights = insights.map((insight: ParsedInsight) => ({
         type: (insight.Type?.toLowerCase() || insight.type?.toLowerCase() || 'strength') as 'strength' | 'opportunity' | 'consideration',
         icon: (insight.Type?.toLowerCase() || insight.type?.toLowerCase()) === 'strength' ? '💪' : 
               (insight.Type?.toLowerCase() || insight.type?.toLowerCase()) === 'opportunity' ? '🚀' : '⚠️',
@@ -367,7 +392,7 @@ export const parseAIResponse = (response: string, tract: TractResult): AIBusines
     
     // ✅ FIXED: Check for both formats of market strategy
     if (parsed.MARKET_STRATEGY || parsed.market_strategy) {
-      analysis.marketStrategy = parsed.MARKET_STRATEGY || parsed.market_strategy;
+      analysis.marketStrategy = parsed.MARKET_STRATEGY || parsed.market_strategy || analysis.marketStrategy;
     }
     
     // ✅ FIXED: Check for both formats of competitor examples
@@ -378,16 +403,19 @@ export const parseAIResponse = (response: string, tract: TractResult): AIBusines
     
     // ✅ FIXED: Check for both formats of bottom line
     if (parsed.BOTTOM_LINE || parsed.bottom_line) {
-      analysis.bottomLine = parsed.BOTTOM_LINE || parsed.bottom_line;
-      
-      // Extract confidence from bottom line
-      const bottomLineText = (parsed.BOTTOM_LINE || parsed.bottom_line).toLowerCase();
-      if (bottomLineText.includes('high') || bottomLineText.includes('strong')) {
-        analysis.confidence = 'high';
-      } else if (bottomLineText.includes('medium') || bottomLineText.includes('moderate')) {
-        analysis.confidence = 'medium';
-      } else if (bottomLineText.includes('low') || bottomLineText.includes('weak')) {
-        analysis.confidence = 'low';
+      const bottomLineValue = parsed.BOTTOM_LINE || parsed.bottom_line;
+      if (bottomLineValue) {
+        analysis.bottomLine = bottomLineValue;
+        
+        // Extract confidence from bottom line
+        const bottomLineText = bottomLineValue.toLowerCase();
+        if (bottomLineText.includes('high') || bottomLineText.includes('strong')) {
+          analysis.confidence = 'high';
+        } else if (bottomLineText.includes('medium') || bottomLineText.includes('moderate')) {
+          analysis.confidence = 'medium';
+        } else if (bottomLineText.includes('low') || bottomLineText.includes('weak')) {
+          analysis.confidence = 'low';
+        }
       }
     }
     

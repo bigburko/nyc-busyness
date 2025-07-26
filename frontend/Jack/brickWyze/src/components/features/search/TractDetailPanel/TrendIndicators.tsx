@@ -1,7 +1,7 @@
 // src/components/features/search/TractDetailPanel/TrendIndicators.tsx
 'use client';
 
-import { Box, VStack, HStack, Text, SimpleGrid } from '@chakra-ui/react';
+import { Box, VStack, HStack, Text } from '@chakra-ui/react';
 import { TractResult } from '../../../../types/TractTypes';
 
 interface TrendIndicatorsProps {

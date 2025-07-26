@@ -57,12 +57,10 @@ const getQuickInsights = (tract: TractResult): string => {
 // Key Metric Pills Component
 const KeyMetricPills = ({ 
   tract, 
-  rentText, 
-  weights 
+  rentText
 }: { 
   tract: TractResult; 
-  rentText: string; 
-  weights: Weight[]; 
+  rentText: string;
 }) => {
   return (
     <VStack spacing={3} align="stretch">
@@ -241,7 +239,6 @@ export default function TabbedInterface({
             <KeyMetricPills 
               tract={tract} 
               rentText={rentText}
-              weights={weights}
             />
 
             {/* Quick Insights */}
