@@ -31,27 +31,29 @@ export const AIAnalysisHeader = ({ tract, analysis, filterStore }: AIAnalysisHea
           </Text>
         </VStack>
         
-        {/* Speech Bubble and Bricky - Vertical Layout */}
-        <VStack spacing={4} align="center" justify="center" w="full">
-          {/* Custom Speech Bubble - Higher up */}
-          <Box maxW="400px" w="full" display="flex" justifyContent="center">
+        {/* Speech Bubble with integrated curved tail pointing to Bricky */}
+        <VStack spacing={1} align="center" w="full">
+          {/* Speech Bubble - With curved tail pointing down */}
+          <Box maxW="450px" w="full" display="flex" justifyContent="center">
             <SpeechBubble
               bg={getConfidenceColor(analysis.confidence).bg}
               borderColor={getConfidenceColor(analysis.confidence).border}
               color="white"
               size="md"
-              direction="right"
+              direction="down"
             >
               {generatePersonalizedSpeechText(analysis, tract, filterStore)}
             </SpeechBubble>
           </Box>
           
-          {/* Bricky with Liquid Glass Background - Lower down */}
-          <BrickyAvatar 
-            size="lg" 
-            withGlassBackground={true}
-            showDebugInfo={false}
-          />
+          {/* Bricky positioned closer to speech bubble tail */}
+          <Box>
+            <BrickyAvatar 
+              size="lg" 
+              withGlassBackground={true}
+              showDebugInfo={false}
+            />
+          </Box>
         </VStack>
       </VStack>
     </Box>
