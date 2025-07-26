@@ -40,15 +40,13 @@ interface AISummaryProps {
   isVisible?: boolean;
 }
 
+// Component states - using a single state object to prevent race conditions
+type ComponentState = 'idle' | 'loading' | 'typing' | 'complete' | 'error';
+
 // Animation keyframes
 const thinkingPulse = keyframes`
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.05); }
-`;
-
-const fadeInUp = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
 `;
 
 const dots = keyframes`
@@ -59,85 +57,140 @@ const dots = keyframes`
 
 export function AISummary({ tract, weights, isVisible = false }: AISummaryProps) {
   const filterStore = useFilterStore();
-  const sendToGemini = useGeminiStore((s) => s.sendToGemini);
+  const geminiStore = useGeminiStore();
   
+  // Consolidated state management to prevent flashing
+  const [state, setState] = useState<ComponentState>('idle');
   const [analysis, setAnalysis] = useState<AIBusinessAnalysis | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [typing, setTyping] = useState(false);
   const [typedText, setTypedText] = useState('');
-  const [showResults, setShowResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasTriggered, setHasTriggered] = useState(false);
   
+  // Refs for managing async operations
   const filterSnapshot = useRef<FilterStoreSlice | null>(null);
   const weightsSnapshot = useRef<Weight[] | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentTractRef = useRef<string>('');
+  const isMountedRef = useRef(true);
 
-  // Typing effect function
+  // Custom sendToGemini that prevents global state updates
+  const sendToGeminiIsolated = useCallback(async (prompt: string, context: any) => {
+    console.log('🔒 [AI Summary] Using isolated Gemini call - will prevent state updates');
+    
+    // Store current filter state before calling
+    const originalFilters = { ...filterStore };
+    
+    try {
+      // Call the real sendToGemini function
+      const response = await geminiStore.sendToGemini(prompt, context);
+      
+      console.log('🔒 [AI Summary] Got response, now restoring original state');
+      
+      // Restore original filter state to prevent side effects
+      filterStore.setFilters(originalFilters);
+      
+      return response;
+    } catch (error) {
+      // Restore state even on error
+      filterStore.setFilters(originalFilters);
+      throw error;
+    }
+  }, [geminiStore, filterStore]);
+
+  // Cleanup function to prevent memory leaks and race conditions
+  const cleanup = useCallback(() => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Set mounted ref on mount/unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      cleanup();
+    };
+  }, [cleanup]);
+
+  // Safe state setter that only updates if component is still mounted
+  const safeSetState = useCallback((newState: ComponentState) => {
+    if (isMountedRef.current) {
+      setState(newState);
+    }
+  }, []);
+
+  // Typing effect function with better control
   const typeText = useCallback((text: string, speed: number = 50) => {
+    if (!isMountedRef.current) return;
+    
+    cleanup(); // Clear any existing timeout
     setTypedText('');
     let i = 0;
     
     const typeChar = () => {
+      if (!isMountedRef.current) return;
+      
       if (i < text.length) {
         setTypedText(text.slice(0, i + 1));
         i++;
         typingTimeoutRef.current = setTimeout(typeChar, speed);
       } else {
-        // Typing complete, hide cursor and show results after a brief pause
-        setTyping(false);
-        setTimeout(() => setShowResults(true), 500);
+        // Typing complete, transition to final state
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            safeSetState('complete');
+          }
+        }, 300);
       }
     };
     
     typeChar();
-  }, []);
-
-  // Cleanup typing timeout
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    };
-  }, []);
+  }, [cleanup, safeSetState]);
   
   const generateAIAnalysis = useCallback(async () => {
     const tractId = tract.geoid;
     
-    // First check cache
-    const cachedResult = getCachedAnalysis(tractId);
-    if (cachedResult) {
-      setAnalysis(cachedResult);
-      setHasTriggered(true);
-      
-      // For cached results, skip animations and show final state immediately
-      const currentFilter = filterSnapshot.current || (filterStore as FilterStoreSlice);
-      const speechText = generatePersonalizedSpeechText(cachedResult, tract, currentFilter);
-      setTypedText(speechText); // Set full text immediately
-      setTyping(false); // No typing animation
-      setShowResults(true); // Show results immediately
+    // Prevent multiple calls and race conditions
+    if (!isMountedRef.current || !isVisible || state !== 'idle') {
       return;
     }
     
-    if (loading || hasTriggered || !isVisible) {
+    // Check cache first
+    const cachedResult = getCachedAnalysis(tractId);
+    if (cachedResult) {
+      console.log('💾 [AI Summary] Loading cached analysis for tract:', tractId);
+      
+      // For cached results, set everything immediately to prevent flashing
+      const currentFilter = filterSnapshot.current || (filterStore as FilterStoreSlice);
+      const speechText = generatePersonalizedSpeechText(cachedResult, tract, currentFilter);
+      
+      if (isMountedRef.current) {
+        setAnalysis(cachedResult);
+        setTypedText(speechText);
+        setError(null);
+        safeSetState('complete');
+      }
       return;
+    }
+    
+    // Start loading for new analysis
+    if (isMountedRef.current) {
+      safeSetState('loading');
+      setError(null);
     }
     
     try {
-      setLoading(true);
-      setError(null);
-      setHasTriggered(true);
-      
       console.log('🧠 [AI Summary] Starting analysis for tract:', tractId);
       
-      const currentFilter = filterSnapshot.current || (filterStore as FilterStoreSlice);
-      const currentWeights = weightsSnapshot.current || weights;
+      // Create isolated snapshots to prevent store interference with map
+      const currentFilter = filterSnapshot.current ? { ...filterSnapshot.current } : { ...filterStore as FilterStoreSlice };
+      const currentWeights = weightsSnapshot.current ? [...weightsSnapshot.current] : [...weights];
       
       const trendInsights = extractTrendInsights(tract);
       const businessPrompt = buildBusinessIntelligencePrompt(tract, currentWeights, trendInsights, currentFilter);
       
-      console.log('📤 [AI Summary] Sending business intelligence prompt to Gemini');
+      console.log('📤 [AI Summary] Making isolated Gemini call');
       
       const geminiWeights = currentWeights.map(w => ({ 
         id: w.id, 
@@ -147,7 +200,8 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
         color: '' 
       }));
       
-      const aiResponse = await sendToGemini(businessPrompt, {
+      // Use isolated call that prevents state updates
+      const aiResponse = await sendToGeminiIsolated(businessPrompt, {
         weights: geminiWeights,
         selectedTimePeriods: currentFilter.selectedTimePeriods,
         selectedEthnicities: currentFilter.selectedEthnicities,
@@ -158,27 +212,35 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
         demographicScoring: currentFilter.demographicScoring
       });
       
-      console.log('📥 [AI Summary] Received AI response length:', aiResponse.length);
+      // Check if component is still mounted and we're still on the same tract
+      if (!isMountedRef.current || currentTractRef.current !== tractId) {
+        return;
+      }
+      
+      console.log('📥 [AI Summary] Received isolated response length:', aiResponse.length);
       
       const businessAnalysis = parseAIResponse(aiResponse, tract);
       setCachedAnalysis(tractId, businessAnalysis);
-      setAnalysis(businessAnalysis);
       
-      console.log('✅ [AI Summary] Analysis complete:', businessAnalysis.headline);
+      console.log('✅ [AI Summary] Analysis complete - NO GLOBAL STATE UPDATED:', businessAnalysis.headline);
       
-      // Start typing effect
-      setLoading(false);
-      setTyping(true);
-      const speechText = generatePersonalizedSpeechText(businessAnalysis, tract, currentFilter);
-      typeText(speechText);
+      // Set analysis and start typing effect
+      if (isMountedRef.current) {
+        setAnalysis(businessAnalysis);
+        safeSetState('typing');
+        
+        const speechText = generatePersonalizedSpeechText(businessAnalysis, tract, currentFilter);
+        typeText(speechText);
+      }
       
     } catch (err) {
       console.error('❌ [AI Summary] Error generating analysis:', err);
-      setError('Failed to generate AI business analysis');
-      setHasTriggered(false);
-      setLoading(false);
+      if (isMountedRef.current) {
+        setError('Failed to generate AI business analysis');
+        safeSetState('error');
+      }
     }
-  }, [tract.geoid, isVisible, loading, hasTriggered, sendToGemini, typeText, filterStore, weights]);
+  }, [tract.geoid, isVisible, state, sendToGeminiIsolated, typeText, filterStore, weights, safeSetState]);
   
   // Update snapshots when props change
   useEffect(() => {
@@ -186,47 +248,50 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     weightsSnapshot.current = weights;
   }, [filterStore, weights]);
   
-  // Reset state when tract changes
+  // Handle tract changes with proper cleanup
   useEffect(() => {
     const tractId = tract.geoid;
+    currentTractRef.current = tractId;
     
-    // Clear typing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
+    // Always cleanup first to prevent conflicts
+    cleanup();
     
+    // Check for cached results
     const cachedResult = getCachedAnalysis(tractId);
     if (cachedResult) {
       console.log('💾 [AI Summary] Loading cached analysis for tract:', tractId);
-      setAnalysis(cachedResult);
-      setHasTriggered(true);
-      setError(null);
-      setLoading(false);
-      setTyping(false);
       
-      // For cached results, show final state immediately with no animations
+      // Set everything immediately for cached results
       const currentFilter = filterSnapshot.current || (filterStore as FilterStoreSlice);
       const speechText = generatePersonalizedSpeechText(cachedResult, tract, currentFilter);
-      setTypedText(speechText); // Set full text immediately
-      setShowResults(true); // Show results immediately
-    } else {
-      // Reset for new tract
-      setHasTriggered(false);
-      setAnalysis(null);
+      
+      setAnalysis(cachedResult);
+      setTypedText(speechText);
       setError(null);
-      setLoading(false);
-      setTyping(false);
+      setState('complete');
+    } else {
+      // Reset to idle state for new tract
+      setAnalysis(null);
       setTypedText('');
-      setShowResults(false);
+      setError(null);
+      setState('idle');
     }
-  }, [tract.geoid]);
+  }, [tract.geoid, cleanup]);
   
-  // Only trigger when becomes visible and hasn't been triggered yet
+  // Trigger analysis when becomes visible
   useEffect(() => {
-    if (isVisible && !hasTriggered && !loading && !analysis) {
-      generateAIAnalysis();
+    if (isVisible && state === 'idle' && !analysis) {
+      // Keep original timing but add safeguards to prevent map interference
+      const timer = setTimeout(() => {
+        if (isMountedRef.current && currentTractRef.current === tract.geoid && state === 'idle') {
+          console.log('🧠 [AI Summary] Starting analysis (original timing restored)');
+          generateAIAnalysis();
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
-  }, [isVisible, hasTriggered, loading, analysis, generateAIAnalysis]);
+  }, [isVisible, state, analysis, generateAIAnalysis, tract.geoid]);
 
   // Show placeholder when not visible yet
   if (!isVisible) {
@@ -246,8 +311,8 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     );
   }
 
-  // Enhanced loading state with thinking Bricky
-  if (loading) {
+  // Loading state
+  if (state === 'loading') {
     return (
       <Box 
         bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)" 
@@ -261,7 +326,6 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
         color="white"
       >
         <VStack spacing={6} align="center">
-          {/* Title Section */}
           <VStack spacing={2} w="full">
             <Text fontSize="2xl" fontWeight="bold" lineHeight="1.2" textAlign="center" w="full">
               Bricky's Business Intelligence
@@ -271,9 +335,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
             </Text>
           </VStack>
           
-          {/* Consistent Speech Bubble Layout */}
           <VStack spacing={1} align="center" w="full">
-            {/* Same Speech Bubble with Loading Message */}
             <Box maxW="450px" w="full" display="flex" justifyContent="center">
               <SpeechBubble
                 bg="rgba(255, 255, 255, 0.15)"
@@ -298,7 +360,6 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
               </SpeechBubble>
             </Box>
             
-            {/* Thinking Bricky with pulse animation */}
             <Box
               sx={{
                 animation: `${thinkingPulse} 2s ease-in-out infinite`
@@ -317,7 +378,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
   }
 
   // Error state
-  if (error) {
+  if (state === 'error') {
     return (
       <Box bg="white" borderRadius="xl" p={6} boxShadow="sm" border="1px solid" borderColor="gray.100">
         <VStack spacing={2} align="center" py={4}>
@@ -335,8 +396,8 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     );
   }
 
-  // Success state with typing effect
-  if (analysis && (typing || showResults)) {
+  // Success states (typing or complete)
+  if (analysis && (state === 'typing' || state === 'complete')) {
     return (
       <Box bg="white" borderRadius="2xl" p={0} boxShadow="lg" border="1px solid" borderColor="gray.100" overflow="hidden">
         <VStack spacing={0} align="stretch">
@@ -347,7 +408,6 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
             color="white"
           >
             <VStack spacing={6} align="center">
-              {/* Title Section */}
               <VStack spacing={2} w="full">
                 <Text fontSize="2xl" fontWeight="bold" lineHeight="1.2" textAlign="center" w="full">
                   Bricky's Business Intelligence
@@ -369,7 +429,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
                   >
                     <Text color="inherit" fontSize="inherit">
                       {typedText}
-                      {typing && (
+                      {state === 'typing' && (
                         <Box 
                           as="span" 
                           opacity={0.7} 
@@ -395,78 +455,34 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
             </VStack>
           </Box>
 
-          {/* Results Section with Staggered Animation */}
-          {showResults && (
+          {/* Results Section - Only show when complete */}
+          {state === 'complete' && (
             <Box p={6}>
               <VStack spacing={6} align="stretch">
-                {/* Headline Section */}
-                <Box
-                  sx={{
-                    animation: `${fadeInUp} 0.6s ease-out`,
-                    animationDelay: "0.2s",
-                    animationFillMode: "both"
-                  }}
-                >
-                  <HeadlineSection analysis={analysis} />
-                </Box>
+                <HeadlineSection analysis={analysis} />
                 
-                {/* Key Business Insights */}
-                <Box
-                  sx={{
-                    animation: `${fadeInUp} 0.6s ease-out`,
-                    animationDelay: "0.4s",
-                    animationFillMode: "both"
-                  }}
-                >
-                  <VStack spacing={4} align="stretch">
-                    <HStack spacing={2} align="center">
-                      <Box w="4px" h="6" bg="purple.500" borderRadius="full" />
-                      <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                        Key Business Insights
-                      </Text>
-                    </HStack>
-                    
-                    <VStack spacing={3} align="stretch">
-                      {analysis.insights.map((insight, index) => (
-                        <Box
-                          key={index}
-                          sx={{
-                            animation: `${fadeInUp} 0.6s ease-out`,
-                            animationDelay: `${0.6 + (index * 0.1)}s`,
-                            animationFillMode: "both"
-                          }}
-                        >
-                          <BusinessInsightCard 
-                            index={index}
-                            insight={insight}
-                          />
-                        </Box>
-                      ))}
-                    </VStack>
+                <VStack spacing={4} align="stretch">
+                  <HStack spacing={2} align="center">
+                    <Box w="4px" h="6" bg="purple.500" borderRadius="full" />
+                    <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                      Key Business Insights
+                    </Text>
+                  </HStack>
+                  
+                  <VStack spacing={3} align="stretch">
+                    {analysis.insights.map((insight, index) => (
+                      <BusinessInsightCard 
+                        key={index}
+                        index={index}
+                        insight={insight}
+                      />
+                    ))}
                   </VStack>
-                </Box>
+                </VStack>
                 
-                {/* Business Recommendations */}
-                <Box
-                  sx={{
-                    animation: `${fadeInUp} 0.6s ease-out`,
-                    animationDelay: "1s",
-                    animationFillMode: "both"
-                  }}
-                >
-                  <BusinessRecommendations analysis={analysis} />
-                </Box>
+                <BusinessRecommendations analysis={analysis} />
                 
-                {/* Bottom Line */}
-                <Box
-                  sx={{
-                    animation: `${fadeInUp} 0.6s ease-out`,
-                    animationDelay: "1.2s",
-                    animationFillMode: "both"
-                  }}
-                >
-                  <BottomLineSection analysis={analysis} />
-                </Box>
+                <BottomLineSection analysis={analysis} />
               </VStack>
             </Box>
           )}
@@ -475,6 +491,6 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     );
   }
 
-  // Fallback
+  // Fallback - should rarely be reached with the new state management
   return null;
 }
