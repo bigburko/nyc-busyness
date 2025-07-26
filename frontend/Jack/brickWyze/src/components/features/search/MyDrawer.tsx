@@ -621,9 +621,6 @@ export default function MyDrawer({
                     <Text fontSize="lg" fontWeight="bold" color="gray.800">
                       ⚖️ Score Weighting
                     </Text>
-                    <MyToolTip label="Score Weighting">
-                      Adjust the importance of different factors when ranking neighborhoods. Higher percentages mean that factor has more influence on the results.
-                    </MyToolTip>
                   </HStack>
                   
                   {/* ✅ UPDATED: Use same chevron style as other components */}
@@ -644,6 +641,13 @@ export default function MyDrawer({
                 {/* Content - Only show when expanded */}
                 {isWeightingOpen && (
                   <VStack spacing={3} p={3} pt={0}>
+                    {/* Explanation text */}
+                    <Box w="full" bg="blue.50" p={3} borderRadius="lg" border="1px solid" borderColor="blue.200">
+                      <Text fontSize="sm" color="blue.800" textAlign="center">
+                        💡 Adjust the importance of different factors when ranking neighborhoods. Higher percentages mean that factor has more influence on the results.
+                      </Text>
+                    </Box>
+                    
                     {/* Total weight indicator for debugging */}
                     <Box w="full" bg="gray.50" p={3} borderRadius="lg">
                       <Text fontSize="sm" color="gray.600" textAlign="center" fontWeight="medium">
