@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel/CrimeTrendChart.tsx
+// src/components/features/search/TractDetailPanel/CrimeTrendChart.tsx - EXACTLY as you uploaded
 'use client';
 
 import { Box, VStack, HStack, Text, Flex } from '@chakra-ui/react';
@@ -51,7 +51,7 @@ export function CrimeTrendChart({ tract }: CrimeTrendChartProps) {
   };
 
   return (
-    <Box data-testid="crime-trend-chart" w="full">
+    <Box w="full">
       <HStack mb={4} align="center" spacing={3}>
         <Text fontSize="lg" fontWeight="bold" color="gray.800">
           Safety Score Trend

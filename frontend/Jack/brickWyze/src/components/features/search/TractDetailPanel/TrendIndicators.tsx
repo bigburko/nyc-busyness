@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel/TrendIndicators.tsx
+// src/components/features/search/TractDetailPanel/TrendIndicators.tsx - EXACTLY as you uploaded with REAL DATA FIRST
 'use client';
 
 import { Box, VStack, HStack, Text } from '@chakra-ui/react';
@@ -51,7 +51,7 @@ const SimpleSparkline = ({ data, color }: { data: number[]; color: string }) => 
   );
 };
 
-// Helper function to calculate real trend from data - ✅ UPDATED TO MATCH AI LOGIC
+// Helper function to calculate real trend from data
 const calculateTrend = (data: number[]): { trend: TrendData['trend']; change: string } => {
   if (data.length < 2) return { trend: 'unknown', change: '0%' };
   
@@ -71,7 +71,6 @@ const calculateTrend = (data: number[]): { trend: TrendData['trend']; change: st
     trend = 'decreasing';
   }
   
-  // ✅ FIXED: Use Math.ceil for absolute value to match AI rounding logic
   const roundedPercent = changePercent >= 0 ? 
     Math.ceil(changePercent) : 
     -Math.ceil(Math.abs(changePercent));
@@ -86,22 +85,25 @@ const calculateTrend = (data: number[]): { trend: TrendData['trend']; change: st
 export function TrendIndicators({ tract }: TrendIndicatorsProps) {
   const trends: TrendData[] = [];
   
-  // Foot Traffic Trend - ✅ CALCULATE FROM REAL TIMELINE DATA
+  // Foot Traffic Trend - USE REAL TIMELINE DATA FIRST
   if (tract.foot_traffic_score) {
-    const currentScore = Math.round(tract.foot_traffic_score); // ✅ Keep Math.round for display
+    const currentScore = Math.round(tract.foot_traffic_score);
     let chartData: number[] = [];
     
+    // PRIORITY 1: Use REAL timeline data if available
     if (tract.foot_traffic_timeline && Object.keys(tract.foot_traffic_timeline).length > 0) {
       const timeline = tract.foot_traffic_timeline;
       chartData = [
-        timeline['2022'] || 0, // ✅ Use raw values for calculation
-        timeline['2023'] || 0, // ✅ Use raw values for calculation
-        timeline['2024'] || 0, // ✅ Use raw values for calculation
-        timeline['pred_2025'] || 0, // ✅ Use raw values for calculation
-        timeline['pred_2026'] || 0, // ✅ Use raw values for calculation
-        timeline['pred_2027'] || 0, // ✅ Use raw values for calculation
+        timeline['2022'] || 0,
+        timeline['2023'] || 0,
+        timeline['2024'] || 0,
+        timeline['pred_2025'] || 0,
+        timeline['pred_2026'] || 0,
+        timeline['pred_2027'] || 0,
       ];
+      console.log('✅ [TrendIndicators] Using REAL foot traffic timeline data:', timeline);
     } else {
+      // FALLBACK: Only use synthetic when NO real data
       chartData = [
         currentScore * 0.85,
         currentScore * 0.92,
@@ -110,17 +112,10 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
         currentScore * 1.03,
         currentScore * 1.06
       ];
+      console.log('⚠️ [TrendIndicators] No real foot traffic data, using synthetic');
     }
     
-    // ✅ CALCULATE TREND FROM ACTUAL DATA (your original approach was correct)
     const { trend, change } = calculateTrend(chartData);
-    
-    console.log('✅ [TrendIndicators] Foot traffic calculated (using AI rounding logic):', {
-      chartData,
-      trend,
-      change,
-      source: 'calculated_from_timeline'
-    });
     
     trends.push({
       label: 'Foot Traffic',
@@ -132,22 +127,25 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
     });
   }
   
-  // Safety Trend - ✅ CALCULATE FROM REAL TIMELINE DATA
+  // Safety Trend - USE REAL TIMELINE DATA FIRST
   if (tract.crime_score) {
-    const currentScore = Math.round(tract.crime_score); // ✅ Keep Math.round for display
+    const currentScore = Math.round(tract.crime_score);
     let chartData: number[] = [];
     
+    // PRIORITY 1: Use REAL timeline data if available
     if (tract.crime_timeline && Object.keys(tract.crime_timeline).length > 0) {
       const timeline = tract.crime_timeline;
       chartData = [
-        timeline.year_2022 || 0, // ✅ Use raw values for calculation
-        timeline.year_2023 || 0, // ✅ Use raw values for calculation
-        timeline.year_2024 || 0, // ✅ Use raw values for calculation
-        timeline.pred_2025 || 0, // ✅ Use raw values for calculation
-        timeline.pred_2026 || 0, // ✅ Use raw values for calculation
-        timeline.pred_2027 || 0, // ✅ Use raw values for calculation
+        timeline.year_2022 || 0,
+        timeline.year_2023 || 0,
+        timeline.year_2024 || 0,
+        timeline.pred_2025 || 0,
+        timeline.pred_2026 || 0,
+        timeline.pred_2027 || 0,
       ];
+      console.log('✅ [TrendIndicators] Using REAL crime timeline data:', timeline);
     } else {
+      // FALLBACK: Only use synthetic when NO real data
       chartData = [
         currentScore * 0.80,
         currentScore * 0.85,
@@ -156,17 +154,10 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
         Math.min(100, currentScore * 1.02),
         Math.min(100, currentScore * 1.05),
       ];
+      console.log('⚠️ [TrendIndicators] No real crime data, using synthetic');
     }
     
-    // ✅ CALCULATE TREND FROM ACTUAL DATA (your original approach was correct)
     const { trend, change } = calculateTrend(chartData);
-    
-    console.log('✅ [TrendIndicators] Crime calculated (using AI rounding logic):', {
-      chartData,
-      trend,
-      change,
-      source: 'calculated_from_timeline'
-    });
     
     trends.push({
       label: 'Safety Score',
@@ -191,7 +182,7 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
     );
   }
 
-  // ✅ DYNAMIC FUTURE OUTLOOK based on actual calculated trends
+  // Dynamic future outlook based on actual calculated trends
   const negativeChanges = trends.filter(t => t.change.startsWith('-')).length;
   const positiveChanges = trends.filter(t => t.change.startsWith('+')).length;
   

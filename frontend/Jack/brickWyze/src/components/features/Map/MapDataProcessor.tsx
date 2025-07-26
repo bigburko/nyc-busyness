@@ -24,6 +24,68 @@ interface ResilienceScoreWithRanking extends ResilienceScore {
   ranking: number;
 }
 
+// 🔧 ADD: Data transformation function to convert edge function format to chart format
+const transformTractData = (tract: any): any => {
+  const transformed = { ...tract };
+  
+  // 🔧 TRANSFORM FOOT TRAFFIC DATA
+  if (tract.foot_traffic_data && !tract.foot_traffic_timeline) {
+    console.log('🔧 [MapDataProcessor] Transforming foot_traffic_data to timeline format for tract:', tract.geoid);
+    
+    // Transform foot_traffic_by_period (preserve the period-based data)
+    if (tract.foot_traffic_data.morning || tract.foot_traffic_data.afternoon || tract.foot_traffic_data.evening) {
+      transformed.foot_traffic_by_period = {
+        morning: tract.foot_traffic_data.morning || {},
+        afternoon: tract.foot_traffic_data.afternoon || {},
+        evening: tract.foot_traffic_data.evening || {}
+      };
+    }
+    
+    // Transform foot_traffic_timeline (use average data for charts)
+    if (tract.foot_traffic_data.average) {
+      const avgData = tract.foot_traffic_data.average;
+      transformed.foot_traffic_timeline = {
+        '2020': avgData['2020'],
+        '2021': avgData['2021'], 
+        '2022': avgData['2022'],
+        '2023': avgData['2023'],
+        '2024': avgData['2024'],
+        'pred_2025': avgData['pred_2025'],
+        'pred_2026': avgData['pred_2026'],
+        'pred_2027': avgData['pred_2027']
+      };
+      
+      console.log('✅ [MapDataProcessor] Created foot_traffic_timeline:', transformed.foot_traffic_timeline);
+    }
+    
+    // Clean up original format
+    delete transformed.foot_traffic_data;
+  }
+  
+  // 🔧 TRANSFORM CRIME DATA  
+  if (tract.crime_data && !tract.crime_timeline) {
+    console.log('🔧 [MapDataProcessor] Transforming crime_data to timeline format for tract:', tract.geoid);
+    
+    transformed.crime_timeline = {
+      year_2020: tract.crime_data.year_2020,
+      year_2021: tract.crime_data.year_2021,
+      year_2022: tract.crime_data.year_2022,
+      year_2023: tract.crime_data.year_2023,
+      year_2024: tract.crime_data.year_2024,
+      pred_2025: tract.crime_data.pred_2025,
+      pred_2026: tract.crime_data.pred_2026,
+      pred_2027: tract.crime_data.pred_2027
+    };
+    
+    console.log('✅ [MapDataProcessor] Created crime_timeline:', transformed.crime_timeline);
+    
+    // Clean up original format
+    delete transformed.crime_data;
+  }
+  
+  return transformed;
+};
+
 interface UseMapDataProcessorProps {
   map: mapboxgl.Map | null;
   weights?: Weighting[];
@@ -227,10 +289,14 @@ export const useMapDataProcessor = ({
         console.error('❌ [MapDataProcessor] No zones returned from edge function!');
       }
 
+      // 🔧 TRANSFORM DATA: Convert edge function format to chart format
+      console.log('🔧 [MapDataProcessor] Transforming data for chart compatibility...');
+      const transformedZones = searchResults.map(transformTractData);
+
       // SAFETY FIX: Cap all scores at 100 to prevent frontend multiplication issues
-      // ✅ CRITICAL: Explicitly preserve foot traffic timeline data
-      const cappedZones = searchResults.map(zone => ({
-        ...zone, // ✅ This preserves ALL original fields including timeline data
+      // ✅ CRITICAL: Explicitly preserve timeline data
+      const cappedZones = transformedZones.map(zone => ({
+        ...zone, // ✅ This preserves ALL original fields including transformed timeline data
         custom_score: Math.min(Math.max(zone.custom_score || 0, 0), 100),
         // Also cap other scores if needed
         foot_traffic_score: Math.min(Math.max(zone.foot_traffic_score || 0, 0), 100),
@@ -238,27 +304,27 @@ export const useMapDataProcessor = ({
         flood_risk_score: Math.min(Math.max(zone.flood_risk_score || 0, 0), 100),
         rent_score: Math.min(Math.max(zone.rent_score || 0, 0), 100),
         poi_score: Math.min(Math.max(zone.poi_score || 0, 0), 100),
-        
-        // ✅ EXPLICITLY PRESERVE TIMELINE DATA (defensive programming)
-        foot_traffic_timeline: zone.foot_traffic_timeline,
-        foot_traffic_by_period: zone.foot_traffic_by_period,
-        crime_timeline: zone.crime_timeline,
-        foot_traffic_timeline_metadata: zone.foot_traffic_timeline_metadata,
-        crime_timeline_metadata: zone.crime_timeline_metadata,
-        foot_traffic_periods_used: zone.foot_traffic_periods_used,
       }));
 
-      // ✅ ADD DEBUG: Log timeline data preservation
+      // ✅ ADD DEBUG: Log timeline data preservation AFTER transformation
       if (DEBUG_MODE && cappedZones.length > 0) {
         const firstZone = cappedZones[0];
-        console.log('🔍 [MapDataProcessor] Timeline data preservation check:', {
+        console.log('🔍 [MapDataProcessor] Timeline data preservation check AFTER transformation:', {
           zone_geoid: firstZone.geoid,
           has_foot_traffic_timeline: !!firstZone.foot_traffic_timeline,
           has_foot_traffic_by_period: !!firstZone.foot_traffic_by_period,
           has_crime_timeline: !!firstZone.crime_timeline,
           foot_traffic_timeline_keys: firstZone.foot_traffic_timeline ? Object.keys(firstZone.foot_traffic_timeline) : 'none',
-          foot_traffic_by_period_keys: firstZone.foot_traffic_by_period ? Object.keys(firstZone.foot_traffic_by_period) : 'none'
+          foot_traffic_by_period_keys: firstZone.foot_traffic_by_period ? Object.keys(firstZone.foot_traffic_by_period) : 'none',
+          crime_timeline_keys: firstZone.crime_timeline ? Object.keys(firstZone.crime_timeline) : 'none'
         });
+        
+        if (firstZone.foot_traffic_timeline) {
+          console.log('✅ [MapDataProcessor] Sample foot_traffic_timeline data:', firstZone.foot_traffic_timeline);
+        }
+        if (firstZone.crime_timeline) {
+          console.log('✅ [MapDataProcessor] Sample crime_timeline data:', firstZone.crime_timeline);
+        }
       }
 
       // Log any scores that were over 100

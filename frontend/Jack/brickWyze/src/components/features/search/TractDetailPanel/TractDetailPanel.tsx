@@ -2,11 +2,9 @@
 'use client';
 
 import { 
-  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text,
-  useToast, AlertDialog, AlertDialogOverlay, AlertDialogContent,
-  AlertDialogHeader, AlertDialogBody, AlertDialogFooter, useDisclosure
+  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text
 } from '@chakra-ui/react';
-import { CloseIcon, ArrowBackIcon, DownloadIcon } from '@chakra-ui/icons';
+import { CloseIcon, ArrowBackIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
 import { useFilterStore } from '../../../../stores/filterStore';
 import { TractResult } from '../../../../types/TractTypes';
@@ -19,10 +17,6 @@ import { QuickStats } from './QuickStats';
 import { AISummary } from './AISummary/AISummary'; // 🧠 NEW: Import AI Summary
 import GoogleMapsImage from './GoogleMapsImage';
 import { LoopNetButton } from './LoopNetIntegration';
-
-// Import PDF export functionality
-import { usePDFExport } from '../../../../hooks/usePDFExport';
-import { LoadingOverlay } from '../../../ui/LoadingOverlay';
 
 // Define proper demographic data types
 interface DemographicDataItem {
@@ -55,24 +49,6 @@ export default function TractDetailPanel({
   const [scrollY, setScrollY] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  
-  // PDF Export functionality
-  const { 
-    isExporting, 
-    error: exportError, 
-    progress: exportProgress,
-    currentStep,
-    downloadWithAI,
-    downloadQuick,
-    resetExportState 
-  } = usePDFExport();
-
-  // Toast for notifications
-  const toast = useToast();
-  
-  // Alert dialog for export options
-  const { isOpen: isAlertOpen, onOpen: onAlertOpen, onClose: onAlertClose } = useDisclosure();
-  const cancelRef = useRef<HTMLButtonElement>(null);
   
   // Responsive design
   const isMobile = useBreakpointValue({ base: true, md: false });
@@ -127,59 +103,6 @@ export default function TractDetailPanel({
     console.log(`📋 [TractDetailPanel] Opened for tract ${tract.geoid} (${tract.nta_name})`);
     console.log('🧠 [TractDetailPanel] AI Summary will generate for this tract');
   }, [tract.geoid, tract.nta_name]);
-
-  // Handle PDF export with full AI analysis
-  const handleFullExport = async () => {
-    try {
-      onAlertClose();
-      await downloadWithAI(tract, weights);
-      toast({
-        title: "Report Generated!",
-        description: "Your comprehensive location report has been downloaded.",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      toast({
-        title: "Export Failed",
-        description: exportError || "Failed to generate report. Please try again.",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-
-  // Handle quick PDF export without AI
-  const handleQuickExport = async () => {
-    try {
-      onAlertClose();
-      await downloadQuick(tract, weights);
-      toast({
-        title: "Quick Report Generated!",
-        description: "Your location summary has been downloaded.",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      toast({
-        title: "Export Failed",
-        description: exportError || "Failed to generate report. Please try again.",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-
-  // Reset export state when component unmounts
-  useEffect(() => {
-    return () => {
-      resetExportState();
-    };
-  }, [resetExportState]);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -524,89 +447,16 @@ export default function TractDetailPanel({
             borderColor="rgba(255, 255, 255, 0.3)"
             boxShadow="0 8px 32px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(255,255,255,0.3)"
             transition="all 0.3s ease"
-            onClick={onAlertOpen}
-            isLoading={isExporting}
-            loadingText="Generating..."
-            leftIcon={<DownloadIcon />}
           >
-            <Text fontSize="lg" fontWeight="600">
-              {isExporting ? currentStep || "Generating..." : "Report"}
-            </Text>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7,10 12,15 17,10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <Text fontSize="lg" fontWeight="600">Report</Text>
           </Button>
         </HStack>
       </Box>
-
-      {/* PDF Export Options Alert Dialog */}
-      <AlertDialog
-        isOpen={isAlertOpen}
-        leastDestructiveRef={cancelRef}
-        onClose={onAlertClose}
-      >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Download Report Options
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
-              <VStack spacing={4} align="stretch">
-                <Text fontSize="sm" color="gray.600">
-                  Choose your preferred report type for {tract.nta_name}:
-                </Text>
-                
-                <VStack spacing={3} align="stretch">
-                  {/* Full Export Option */}
-                  <Box p={4} borderRadius="md" border="1px solid" borderColor="blue.200" bg="blue.50">
-                    <Text fontWeight="semibold" color="blue.800" mb={1}>
-                      📊 Full Report with AI Analysis
-                    </Text>
-                    <Text fontSize="sm" color="blue.700" mb={2}>
-                      Complete analysis including AI insights, trends, demographics, and scoring methodology
-                    </Text>
-                    <Text fontSize="xs" color="blue.600">
-                      Takes 10-30 seconds • Includes everything
-                    </Text>
-                  </Box>
-
-                  {/* Quick Export Option */}
-                  <Box p={4} borderRadius="md" border="1px solid" borderColor="green.200" bg="green.50">
-                    <Text fontWeight="semibold" color="green.800" mb={1}>
-                      ⚡ Quick Report
-                    </Text>
-                    <Text fontSize="sm" color="green.700" mb={2}>
-                      Essential metrics, charts, and property links without AI generation
-                    </Text>
-                    <Text fontSize="xs" color="green.600">
-                      Takes 5-10 seconds • No AI generation
-                    </Text>
-                  </Box>
-                </VStack>
-              </VStack>
-            </AlertDialogBody>
-
-            <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onAlertClose}>
-                Cancel
-              </Button>
-              <Button colorScheme="green" onClick={handleQuickExport} ml={3}>
-                Quick Export
-              </Button>
-              <Button colorScheme="blue" onClick={handleFullExport} ml={3}>
-                Full Export
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
-
-      {/* Loading Overlay */}
-      <LoadingOverlay 
-        isOpen={isExporting}
-        title="Generating Report"
-        message="Creating your comprehensive location analysis with AI insights, charts, and property links..."
-        progress={exportProgress}
-        currentStep={currentStep}
-      />
     </Box>
   );
 }
