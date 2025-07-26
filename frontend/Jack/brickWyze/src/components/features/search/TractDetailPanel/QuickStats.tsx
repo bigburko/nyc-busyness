@@ -1,7 +1,7 @@
 // src/components/features/search/TractDetailPanel/QuickStats.tsx - Modern Version
 'use client';
 
-import { Box, VStack, Text, SimpleGrid, HStack, Badge } from '@chakra-ui/react';
+import { Box, VStack, Text, SimpleGrid } from '@chakra-ui/react';
 import { TractResult, WeightConfig } from '../../../../types/TractTypes';
 import { Weight } from '../../../../types/WeightTypes';
 

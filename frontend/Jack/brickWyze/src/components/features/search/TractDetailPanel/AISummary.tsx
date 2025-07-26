@@ -2,11 +2,27 @@
 'use client';
 
 import { Box, VStack, Text, HStack, Badge, Flex, Divider, Spinner } from '@chakra-ui/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { TractResult } from '../../../../types/TractTypes';
 import { useFilterStore } from '../../../../stores/filterStore';
 import { useGeminiStore } from '../../../../stores/geminiStore';
 import { Weight } from '../../../../types/WeightTypes';
+
+// Define the interface for filterStore properties we need
+interface FilterStoreSlice {
+  selectedTimePeriods?: string[];
+  selectedEthnicities?: string[];
+  selectedGenders?: string[];
+  ageRange?: [number, number];
+  incomeRange?: [number, number];
+  rentRange?: [number, number];
+  demographicScoring?: {
+    weights: { ethnicity: number; gender: number; age: number; income: number; };
+    thresholdBonuses: { condition: string; bonus: number; description: string; }[];
+    penalties: { condition: string; penalty: number; description: string; }[];
+    reasoning?: string;
+  };
+}
 
 interface AISummaryProps {
   tract: TractResult;
@@ -43,6 +59,38 @@ interface AIBusinessAnalysis {
   competitorExamples: string[];
   bottomLine: string;
   confidence: 'high' | 'medium' | 'low';
+}
+
+interface FootTrafficTimeline {
+  '2022'?: number;
+  '2023'?: number;
+  'pred_2025'?: number;
+  'pred_2026'?: number;
+  'pred_2027'?: number;
+}
+
+interface CrimeTimeline {
+  year_2022?: number;
+  year_2023?: number;
+  pred_2025?: number;
+  pred_2026?: number;
+  pred_2027?: number;
+}
+
+
+
+interface ParsedAIResponse {
+  HEADLINE?: string;
+  REASONING?: string;
+  KEY_INSIGHTS?: Array<{
+    Type?: string;
+    Title?: string;
+    Description?: string;
+  }>;
+  BUSINESS_TYPES?: string[];
+  MARKET_STRATEGY?: string;
+  COMPETITOR_EXAMPLES?: string[];
+  BOTTOM_LINE?: string;
 }
 
 // Weight ID to label mapping for display purposes
@@ -84,7 +132,7 @@ const extractTrendInsights = (tract: TractResult): LocationInsights => {
     let footTrafficTrend: TrendInsight['trend'] = 'unknown';
     
     if (tract.foot_traffic_timeline) {
-      const timeline = tract.foot_traffic_timeline as any;
+      const timeline = tract.foot_traffic_timeline as FootTrafficTimeline;
       footTrafficSparkline = [
         timeline['2022'] || 0,
         timeline['2023'] || 0,
@@ -136,7 +184,7 @@ const extractTrendInsights = (tract: TractResult): LocationInsights => {
     let crimeTrend: TrendInsight['trend'] = tract.crime_trend_direction as TrendInsight['trend'] || 'unknown';
     
     if (tract.crime_timeline) {
-      const timeline = tract.crime_timeline as any;
+      const timeline = tract.crime_timeline as CrimeTimeline;
       crimeSparkline = [
         timeline.year_2022 || 0,
         timeline.year_2023 || 0,
@@ -185,7 +233,7 @@ const buildBusinessIntelligencePrompt = (
   tract: TractResult, 
   weights: Weight[], 
   trendInsights: LocationInsights, 
-  filterStore: any
+  filterStore: FilterStoreSlice
 ): string => {
   const demographics = tract.demographic_match_pct ? 
     (tract.demographic_match_pct > 1 ? tract.demographic_match_pct : tract.demographic_match_pct * 100) : 0;
@@ -210,7 +258,7 @@ KEY LOCATION METRICS:
 USER'S BUSINESS PRIORITIES:
 • **Top Priority**: ${topWeightLabel} (${topWeight?.value || 0}% weight)
 • **Strategy Focus**: ${weights.map(w => `${getWeightLabel(w)}: ${w.value}%`).join(', ')}
-• **Target Demographics**: ${filterStore.ageRange?.[0]}-${filterStore.ageRange?.[1]} years old, $${filterStore.incomeRange?.[0]/1000}K-${filterStore.incomeRange?.[1]/1000}K income
+• **Target Demographics**: ${filterStore.ageRange?.[0] ?? 25}-${filterStore.ageRange?.[1] ?? 65} years old, ${(filterStore.incomeRange?.[0] ?? 50000)/1000}K-${(filterStore.incomeRange?.[1] ?? 150000)/1000}K income
 • **Time Focus**: ${filterStore.selectedTimePeriods?.join(', ') || 'All day periods'}
 • **Cultural Focus**: ${filterStore.selectedEthnicities?.join(', ') || 'No specific ethnicity targeting'}
 
@@ -237,11 +285,11 @@ Please provide a comprehensive business analysis in this EXACT format:
 
 **BOTTOM LINE**: [Clear recommendation with confidence level: high/medium/low]
 
-Be specific, use actual data points, and focus on actionable business intelligence. Reference the neighborhood characteristics and explain WHY this location works (or doesn't) for business.`;
+Be specific, use actual data points, and focus on actionable business intelligence. Reference the neighborhood characteristics and explain WHY this location works (or doesn&apos;t) for business.`;
 };
 
 // Parse AI response into structured business analysis
-const parseAIResponse = (response: string, tract: TractResult, trendInsights: LocationInsights): AIBusinessAnalysis => {
+const parseAIResponse = (response: string, tract: TractResult): AIBusinessAnalysis => {
   console.log('🔍 [AI Summary] Raw AI response:', response);
   
   // Default fallback analysis
@@ -283,7 +331,7 @@ const parseAIResponse = (response: string, tract: TractResult, trendInsights: Lo
     }
     
     // Try to parse as JSON
-    const parsed = JSON.parse(cleanResponse);
+    const parsed = JSON.parse(cleanResponse) as ParsedAIResponse;
     console.log('✅ [AI Summary] Successfully parsed JSON:', parsed);
     
     // Extract data from JSON structure
@@ -296,8 +344,8 @@ const parseAIResponse = (response: string, tract: TractResult, trendInsights: Lo
     }
     
     if (parsed.KEY_INSIGHTS && Array.isArray(parsed.KEY_INSIGHTS)) {
-      analysis.insights = parsed.KEY_INSIGHTS.map((insight: any) => ({
-        type: insight.Type?.toLowerCase() || 'strength',
+      analysis.insights = parsed.KEY_INSIGHTS.map((insight) => ({
+        type: (insight.Type?.toLowerCase() as 'strength' | 'opportunity' | 'consideration') || 'strength',
         icon: insight.Type?.toLowerCase() === 'strength' ? '💪' : 
               insight.Type?.toLowerCase() === 'opportunity' ? '🚀' : '⚠️',
         title: insight.Title || 'Business Insight',
@@ -478,13 +526,6 @@ const parseAIResponse = (response: string, tract: TractResult, trendInsights: Lo
   return analysis;
 };
 
-// Helper function to extract sections from AI response
-const extractSection = (text: string, sectionName: string): string => {
-  const regex = new RegExp(`\\*\\*${sectionName}\\*\\*:?\\s*([\\s\\S]*?)(?=\\n\\*\\*|$)`, 'i');
-  const match = text.match(regex);
-  return match ? match[1].trim() : '';
-};
-
 export function AISummary({ tract, weights }: AISummaryProps) {
   const filterStore = useFilterStore();
   const sendToGemini = useGeminiStore((s) => s.sendToGemini);
@@ -493,64 +534,63 @@ export function AISummary({ tract, weights }: AISummaryProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const generateAIAnalysis = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🧠 [AI Summary] Starting analysis for tract:', tract.geoid);
+      
+      // Extract trend insights using TrendIndicators logic
+      const trendInsights = extractTrendInsights(tract);
+      
+      // Build comprehensive business intelligence prompt
+      const businessPrompt = buildBusinessIntelligencePrompt(tract, weights, trendInsights, filterStore as FilterStoreSlice);
+      
+      console.log('📤 [AI Summary] Sending business intelligence prompt to Gemini');
+      
+      // Convert Weight[] to expected format for sendToGemini
+      const geminiWeights = weights.map(w => ({ 
+        id: w.id, 
+        value: w.value, 
+        label: getWeightLabel(w),
+        icon: '', 
+        color: '' 
+      }));
+      
+      // Call Gemini API for real AI analysis
+      const filterStoreTyped = filterStore as FilterStoreSlice;
+      const aiResponse = await sendToGemini(businessPrompt, {
+        weights: geminiWeights,
+        selectedTimePeriods: filterStoreTyped.selectedTimePeriods,
+        selectedEthnicities: filterStoreTyped.selectedEthnicities,
+        selectedGenders: filterStoreTyped.selectedGenders,
+        ageRange: filterStoreTyped.ageRange,
+        incomeRange: filterStoreTyped.incomeRange,
+        rentRange: filterStoreTyped.rentRange || [26, 160],
+        demographicScoring: filterStoreTyped.demographicScoring
+      });
+      
+      console.log('📥 [AI Summary] Received AI response length:', aiResponse.length);
+      
+      // Parse the AI response into structured business analysis
+      const businessAnalysis = parseAIResponse(aiResponse, tract);
+      setAnalysis(businessAnalysis);
+      
+      console.log('✅ [AI Summary] Analysis complete:', businessAnalysis.headline);
+      
+    } catch (err) {
+      console.error('❌ [AI Summary] Error generating analysis:', err);
+      setError('Failed to generate AI business analysis');
+    } finally {
+      setLoading(false);
+    }
+  }, [tract, weights, filterStore, sendToGemini]);
+  
   useEffect(() => {
-    const generateAIAnalysis = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        console.log('🧠 [AI Summary] Starting analysis for tract:', tract.geoid);
-        
-        // Extract trend insights using TrendIndicators logic
-        const trendInsights = extractTrendInsights(tract);
-        
-        // Build comprehensive business intelligence prompt
-        const businessPrompt = buildBusinessIntelligencePrompt(tract, weights, trendInsights, filterStore);
-        
-        console.log('📤 [AI Summary] Sending business intelligence prompt to Gemini');
-        
-        // Convert Weight[] to expected format for sendToGemini
-        const geminiWeights = weights.map(w => ({ 
-          id: w.id, 
-          value: w.value, 
-          label: getWeightLabel(w),
-          icon: '', 
-          color: '' 
-        }));
-        
-        // Call Gemini API for real AI analysis with type assertion
-        const aiResponse = await sendToGemini(businessPrompt, {
-          weights: geminiWeights as any, // Type assertion to match FilterContext interface
-          selectedTimePeriods: filterStore.selectedTimePeriods,
-          selectedEthnicities: filterStore.selectedEthnicities,
-          selectedGenders: filterStore.selectedGenders,
-          ageRange: filterStore.ageRange,
-          incomeRange: filterStore.incomeRange,
-          rentRange: filterStore.rentRange || [26, 160],
-          demographicScoring: filterStore.demographicScoring
-        });
-        
-        console.log('📥 [AI Summary] Received AI response length:', aiResponse.length);
-        
-        // Parse the AI response into structured business analysis
-        const businessAnalysis = parseAIResponse(aiResponse, tract, trendInsights);
-        setAnalysis(businessAnalysis);
-        
-        console.log('✅ [AI Summary] Analysis complete:', businessAnalysis.headline);
-        
-      } catch (err) {
-        console.error('❌ [AI Summary] Error generating analysis:', err);
-        setError('Failed to generate AI business analysis');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    // Only generate when panel opens for this tract - simplified dependencies
+    // Only generate when panel opens for this tract
     generateAIAnalysis();
-    
-    // Simplified dependencies to prevent unnecessary re-runs
-  }, [tract.geoid]); // Only re-run when tract changes
+  }, [generateAIAnalysis]);
   
   if (loading) {
     return (
@@ -611,7 +651,7 @@ export function AISummary({ tract, weights }: AISummaryProps) {
           <VStack align="start" spacing={1}>
             <HStack spacing={2}>
               <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                🧠 Bricky's Business Intelligence
+                🧠 Bricky&apos;s Business Intelligence
               </Text>
               <Badge bg="#FF492C" color="white" fontSize="xs" borderRadius="full">
                 AI Analysis
@@ -653,7 +693,7 @@ export function AISummary({ tract, weights }: AISummaryProps) {
             border="1px solid rgba(255, 73, 44, 0.1)"
           >
             <Text fontSize="sm" color="gray.700" lineHeight="1.6" fontStyle="italic">
-              "{analysis.reasoning}"
+              &ldquo;{analysis.reasoning}&rdquo;
             </Text>
           </Box>
         </Box>

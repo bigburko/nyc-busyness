@@ -1,7 +1,7 @@
 // src/components/features/search/TractDetailPanel/GoogleMapsImage.tsx
 'use client';
 
-import { Box, Text, HStack, Button, Image } from '@chakra-ui/react';
+import { Box, Text, HStack, Image } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import { TractResult } from '../../../../types/TractTypes';
 
@@ -71,7 +71,7 @@ const calculateBearing = (lat1: number, lng1: number, lat2: number, lng2: number
   const y = Math.sin(dLng) * Math.cos(lat2Rad);
   const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
   
-  let bearing = Math.atan2(y, x) * 180 / Math.PI;
+  const bearing = Math.atan2(y, x) * 180 / Math.PI;
   return (bearing + 360) % 360; // Normalize to 0-360
 };
 
@@ -336,7 +336,7 @@ export default function GoogleMapsImage({ tract }: GoogleMapsImageProps) {
     };
     
     loadImages();
-  }, [tract.geoid]); // Only depend on tract.geoid so it re-runs when tract changes
+  }, [tract]); // Include full tract object as dependency
   
   // Don't render until images are ready
   if (!images) {
