@@ -3,7 +3,7 @@
 
 import { Box, VStack, HStack, Text, Flex } from '@chakra-ui/react';
 import MyToolTip from '../../../ui/MyToolTip';
-import { TractResult } from '../types/TractTypes';
+import { TractResult } from '../../../../types/TractTypes';
 
 interface CrimeTrendChartProps {
   tract: TractResult;

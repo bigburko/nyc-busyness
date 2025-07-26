@@ -13,277 +13,224 @@ interface TrendData {
   current: number;
   trend: 'increasing' | 'decreasing' | 'stable' | 'unknown';
   change: string;
-  icon: string;
   color: string;
   sparklineData: number[];
 }
 
-interface TimelineData {
-  [key: string]: number | undefined;
-  '2022'?: number;
-  '2023'?: number;
-  'pred_2025'?: number;
-  'pred_2026'?: number;
-  'pred_2027'?: number;
-}
-
-interface CrimeTimelineData {
-  year_2020?: number;
-  year_2021?: number;
-  year_2022?: number;
-  year_2023?: number;
-  year_2024?: number;
-  pred_2025?: number;
-  pred_2026?: number;
-  pred_2027?: number;
-}
-
-const getTrendIcon = (trend: string): string => {
-  switch (trend) {
-    case 'increasing': return '↗️';
-    case 'decreasing': return '↘️';
-    case 'stable': return '➡️';
-    default: return '❓';
-  }
-};
-
-const getTrendColor = (trend: string): string => {
-  switch (trend) {
-    case 'increasing': return '#10B981'; // Green for increasing
-    case 'decreasing': return '#EF4444'; // Red for decreasing  
-    case 'stable': return '#3B82F6'; // Blue for stable
-    default: return '#6B7280'; // Gray for unknown
-  }
-};
-
-const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
+const SimpleSparkline = ({ data, color }: { data: number[]; color: string }) => {
   if (data.length === 0) return null;
   
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min;
   
+  // Add padding to prevent clipping
+  const padding = 4;
+  const width = 100 - (padding * 2);
+  const height = 40 - (padding * 2);
+  
   const points = data.map((value, index) => {
-    const x = (index / (data.length - 1)) * 60; // 60px wide
-    const y = range === 0 ? 10 : (1 - (value - min) / range) * 20; // 20px tall, inverted
+    const x = padding + (index / (data.length - 1)) * width;
+    const y = padding + (range === 0 ? height/2 : (1 - (value - min) / range) * height);
     return `${x},${y}`;
   }).join(' ');
   
   return (
-    <Box w="60px" h="20px">
-      <svg width="60" height="20" viewBox="0 0 60 20">
+    <Box w="100px" h="40px" p="1">
+      <svg width="100" height="40" viewBox="0 0 100 40">
         <polyline
           fill="none"
           stroke={color}
-          strokeWidth="2"
+          strokeWidth="2.5"
           points={points}
-        />
-        {/* Current value dot */}
-        <circle
-          cx={60}
-          cy={range === 0 ? 10 : (1 - (data[data.length - 1] - min) / range) * 20}
-          r="2"
-          fill={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
       </svg>
     </Box>
   );
 };
 
+// Helper function to calculate real trend from data
+const calculateTrend = (data: number[]): { trend: TrendData['trend']; change: string } => {
+  if (data.length < 2) return { trend: 'unknown', change: '0%' };
+  
+  const start = data[0];
+  const end = data[data.length - 1];
+  
+  if (start === 0) return { trend: 'unknown', change: '0%' };
+  
+  const changePercent = ((end - start) / start) * 100;
+  
+  let trend: TrendData['trend'];
+  if (Math.abs(changePercent) < 2) {
+    trend = 'stable';
+  } else if (changePercent > 0) {
+    trend = 'increasing';
+  } else {
+    trend = 'decreasing';
+  }
+  
+  const sign = changePercent >= 0 ? '+' : '';
+  return { 
+    trend, 
+    change: `${sign}${Math.round(changePercent)}%` 
+  };
+};
+
 export function TrendIndicators({ tract }: TrendIndicatorsProps) {
-  // Prepare trend data
   const trends: TrendData[] = [];
   
   // Foot Traffic Trend
   if (tract.foot_traffic_score) {
-    let footTrafficSparkline: number[] = [];
-    let footTrafficTrend: TrendData['trend'] = 'unknown';
+    const currentScore = Math.round(tract.foot_traffic_score);
+    let chartData: number[] = [];
     
-    // Try to get real timeline data
-    if (tract.foot_traffic_timeline) {
-      const timeline = tract.foot_traffic_timeline as TimelineData;
-      footTrafficSparkline = [
-        timeline['2022'] || 0,
-        timeline['2023'] || 0,
-        timeline['pred_2025'] || 0,
-        timeline['pred_2026'] || 0,
-        timeline['pred_2027'] || 0
-      ].filter(val => val > 0);
-      
-      // Determine trend
-      if (footTrafficSparkline.length >= 2) {
-        const recent = footTrafficSparkline[footTrafficSparkline.length - 2];
-        const current = footTrafficSparkline[footTrafficSparkline.length - 1];
-        if (current > recent * 1.05) footTrafficTrend = 'increasing';
-        else if (current < recent * 0.95) footTrafficTrend = 'decreasing';
-        else footTrafficTrend = 'stable';
-      }
-    } else {
-      // Generate realistic sparkline based on current score
-      const current = tract.foot_traffic_score;
-      footTrafficSparkline = [
-        current * 0.85,
-        current * 0.92,
-        current,
-        current * 1.03,
-        current * 1.06
+    if (tract.foot_traffic_timeline && Object.keys(tract.foot_traffic_timeline).length > 0) {
+      const timeline = tract.foot_traffic_timeline;
+      chartData = [
+        Math.round(timeline['2022'] || 0),
+        Math.round(timeline['2023'] || 0),
+        Math.round(timeline['2024'] || 0),
+        Math.round(timeline['pred_2025'] || 0),
+        Math.round(timeline['pred_2026'] || 0),
+        Math.round(timeline['pred_2027'] || 0),
       ];
-      footTrafficTrend = 'increasing';
+    } else {
+      chartData = [
+        Math.round(currentScore * 0.85),
+        Math.round(currentScore * 0.92),
+        Math.round(currentScore * 1.0),
+        currentScore,
+        Math.round(currentScore * 1.03),
+        Math.round(currentScore * 1.06)
+      ];
     }
+    
+    const { trend, change } = calculateTrend(chartData);
     
     trends.push({
       label: 'Foot Traffic',
-      current: Math.round(tract.foot_traffic_score),
-      trend: footTrafficTrend,
-      change: '+5%',
-      icon: '🚶',
+      current: currentScore,
+      trend,
+      change,
       color: '#4299E1',
-      sparklineData: footTrafficSparkline
+      sparklineData: chartData
     });
   }
   
-  // Crime/Safety Trend
+  // Safety Trend
   if (tract.crime_score) {
-    let crimeSparkline: number[] = [];
-    let crimeTrend: TrendData['trend'] = tract.crime_trend_direction as TrendData['trend'] || 'unknown';
+    const currentScore = Math.round(tract.crime_score);
+    let chartData: number[] = [];
     
-    // Try to get real timeline data
-    if (tract.crime_timeline) {
-      const timeline = tract.crime_timeline as CrimeTimelineData;
-      crimeSparkline = [
-        timeline.year_2022 || 0,
-        timeline.year_2023 || 0,
-        timeline.pred_2025 || 0,
-        timeline.pred_2026 || 0,
-        timeline.pred_2027 || 0
-      ].filter(val => val > 0);
-    } else {
-      // Generate realistic sparkline based on current score
-      const current = tract.crime_score;
-      crimeSparkline = [
-        current * 0.88,
-        current * 0.94,
-        current,
-        current * 1.02,
-        current * 1.04
+    if (tract.crime_timeline && Object.keys(tract.crime_timeline).length > 0) {
+      const timeline = tract.crime_timeline;
+      chartData = [
+        Math.round(timeline.year_2022 || 0),
+        Math.round(timeline.year_2023 || 0),
+        Math.round(timeline.year_2024 || 0),
+        Math.round(timeline.pred_2025 || 0),
+        Math.round(timeline.pred_2026 || 0),
+        Math.round(timeline.pred_2027 || 0),
       ];
-      crimeTrend = 'increasing';
+    } else {
+      chartData = [
+        Math.round(currentScore * 0.80),
+        Math.round(currentScore * 0.85),
+        Math.round(currentScore * 0.92),
+        currentScore,
+        Math.min(100, Math.round(currentScore * 1.02)),
+        Math.min(100, Math.round(currentScore * 1.05)),
+      ];
     }
+    
+    const { trend, change } = calculateTrend(chartData);
     
     trends.push({
       label: 'Safety Score',
-      current: Math.round(tract.crime_score),
-      trend: crimeTrend,
-      change: tract.crime_trend_change || '+2%',
-      icon: '🛡️',
+      current: currentScore,
+      trend,
+      change,
       color: '#10B981',
-      sparklineData: crimeSparkline
+      sparklineData: chartData
     });
   }
   
   if (trends.length === 0) {
     return (
-      <Box p={6} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
-        <Text fontSize="lg" fontWeight="bold" color="gray.700" mb={2}>
-          📈 Trends at a Glance
+      <Box p={4} bg="gray.50" borderRadius="md">
+        <Text fontSize="md" fontWeight="semibold" color="gray.700">
+          Trend Summary
         </Text>
-        <Text fontSize="sm" color="gray.600">
-          No trend data available for this location.
+        <Text fontSize="sm" color="gray.600" mt={1}>
+          No trend data available.
         </Text>
       </Box>
     );
   }
 
   return (
-    <Box p={6} bg="white">
-      <VStack spacing={4}>
-        <Text fontSize="xl" fontWeight="bold" color="gray.800">
-          📈 Trends at a Glance
-        </Text>
-        
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} w="full">
-          {trends.map((trend, index) => (
-            <Box 
-              key={`trend-${index}`}
-              p={4} 
-              bg="gray.50" 
-              borderRadius="lg" 
-              border="1px solid" 
-              borderColor="gray.200"
-              w="full"
-            >
-              <VStack spacing={3}>
-                <HStack justify="space-between" w="full">
-                  <HStack spacing={2}>
-                    <Text fontSize="lg">{trend.icon}</Text>
-                    <VStack align="start" spacing={0}>
-                      <Text fontSize="sm" fontWeight="semibold" color="gray.700">
-                        {trend.label}
-                      </Text>
-                      <HStack spacing={2}>
-                        <Text fontSize="xs" color={getTrendColor(trend.trend)}>
-                          {getTrendIcon(trend.trend)} {trend.change}
-                        </Text>
-                      </HStack>
-                    </VStack>
-                  </HStack>
-                  
-                  <VStack align="end" spacing={0}>
-                    <Text fontSize="xl" fontWeight="bold" color={trend.color}>
-                      {trend.current}
-                    </Text>
-                    <Text fontSize="xs" color="gray.500">
-                      current
-                    </Text>
-                  </VStack>
-                </HStack>
-                
-                {/* Sparkline */}
-                <HStack justify="space-between" w="full" align="center">
-                  <Text fontSize="xs" color="gray.500">
-                    5yr trend
-                  </Text>
-                  <Sparkline data={trend.sparklineData} color={trend.color} />
-                </HStack>
-                
-                {/* Future Outlook */}
-                <Box 
-                  p={2} 
-                  bg={trend.trend === 'increasing' ? 'green.50' : trend.trend === 'decreasing' ? 'red.50' : 'blue.50'}
-                  borderRadius="md" 
-                  w="full"
+    <Box>
+      <Text fontSize="lg" fontWeight="bold" color="gray.800" mb={4}>
+        Trend Summary
+      </Text>
+      
+      <VStack spacing={3} w="full">
+        {trends.map((trend, index) => (
+          <Box 
+            key={`trend-${index}`}
+            p={4} 
+            bg="white" 
+            borderRadius="md" 
+            border="1px solid" 
+            borderColor="gray.200"
+            w="full"
+          >
+            <HStack justify="space-between" align="center">
+              {/* Left: Label and Change */}
+              <VStack align="start" spacing={1}>
+                <Text fontSize="sm" fontWeight="medium" color="gray.600">
+                  {trend.label}
+                </Text>
+                <Text 
+                  fontSize="sm" 
+                  fontWeight="semibold" 
+                  color={trend.change.startsWith('-') ? '#EF4444' : '#10B981'}
                 >
-                  <Text fontSize="xs" color={getTrendColor(trend.trend)} textAlign="center" fontWeight="medium">
-                    {trend.trend === 'increasing' ? '📈 Growing' : 
-                     trend.trend === 'decreasing' ? '📉 Declining' : 
-                     trend.trend === 'stable' ? '📊 Stable' : '❓ Unknown'}
-                  </Text>
-                </Box>
+                  {trend.change}
+                </Text>
               </VStack>
-            </Box>
-          ))}
-        </SimpleGrid>
-        
-        {/* Summary Insight */}
-        <Box 
-          p={3} 
-          bg="blue.50" 
-          borderRadius="lg" 
-          border="1px solid" 
-          borderColor="blue.200"
-          w="full"
-        >
-          <Text fontSize="sm" color="blue.700" textAlign="center" lineHeight="1.5">
-            <strong>Future Outlook:</strong> {
-              trends.filter(t => t.trend === 'increasing').length > trends.filter(t => t.trend === 'decreasing').length
-                ? "📈 This area shows positive growth trends across key metrics"
-                : trends.filter(t => t.trend === 'decreasing').length > trends.filter(t => t.trend === 'increasing').length
-                ? "📉 This area shows some declining trends to monitor"
-                : "📊 This area shows stable performance with mixed trends"
-            }
-          </Text>
-        </Box>
+              
+              {/* Center: Sparkline */}
+              <SimpleSparkline data={trend.sparklineData} color={trend.color} />
+              
+              {/* Right: Current Score */}
+              <VStack align="end" spacing={1}>
+                <Text fontSize="2xl" fontWeight="bold" color={trend.color}>
+                  {trend.current}
+                </Text>
+                <Text fontSize="xs" color="gray.500" textTransform="uppercase">
+                  current
+                </Text>
+              </VStack>
+            </HStack>
+          </Box>
+        ))}
       </VStack>
+      
+      <Box 
+        mt={4}
+        p={3} 
+        bg="blue.50" 
+        borderRadius="md" 
+        border="1px solid" 
+        borderColor="blue.200"
+      >
+        <Text fontSize="sm" color="blue.700" fontWeight="medium">
+          Future Outlook: This area shows stable performance with mixed trends
+        </Text>
+      </Box>
     </Box>
   );
 }
