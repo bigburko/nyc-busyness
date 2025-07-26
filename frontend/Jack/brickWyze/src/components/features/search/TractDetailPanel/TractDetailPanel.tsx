@@ -14,7 +14,7 @@ import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
 import { DemographicCharts } from './DemographicCharts';
 import { QuickStats } from './QuickStats';
-import { AISummary } from './AISummary'; // 🧠 NEW: Import AI Summary
+import { AISummary } from './AISummary/AISummary'; // 🧠 NEW: Import AI Summary
 import GoogleMapsImage from './GoogleMapsImage';
 import { LoopNetButton } from './LoopNetIntegration';
 

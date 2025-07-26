@@ -1,14 +1,142 @@
 // src/components/features/search/TractDetailPanel/AISummary.tsx
 'use client';
 
-import { Box, VStack, Text, HStack, Badge, Flex, Divider, Spinner } from '@chakra-ui/react';
+import { Box, VStack, Text, HStack, Badge, Flex, Spinner, Image } from '@chakra-ui/react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { TractResult } from '../../../../types/TractTypes';
-import { useFilterStore } from '../../../../stores/filterStore';
-import { useGeminiStore } from '../../../../stores/geminiStore';
-import { Weight } from '../../../../types/WeightTypes';
+import { TractResult } from '../../../../../types/TractTypes';
+import { useFilterStore } from '../../../../../stores/filterStore';
+import { useGeminiStore } from '../../../../../stores/geminiStore';
+import { Weight } from '../../../../../types/WeightTypes';
 
-// Define the interface for filterStore properties we need
+// ============================================================================
+// Custom Speech Bubble Component
+// ============================================================================
+
+interface SpeechBubbleProps {
+  children: React.ReactNode;
+  bg?: string;
+  borderColor?: string;
+  color?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+const SpeechBubble = ({ children, bg = "rgba(255,255,255,0.9)", borderColor = "rgba(255,255,255,0.3)", color = "white", size = "md", direction = "right" }: SpeechBubbleProps & { direction?: "left" | "right" }) => {
+  const sizes = {
+    sm: { padding: "12px 16px", fontSize: "sm", minW: "120px" },
+    md: { padding: "16px 20px", fontSize: "md", minW: "180px" },
+    lg: { padding: "20px 24px", fontSize: "lg", minW: "220px" }
+  };
+
+  const currentSize = sizes[size];
+
+  // Different SVG paths for left vs right direction
+  const bubblePath = direction === "left" 
+    ? `M 20 10 
+       L 180 10 
+       Q 190 10 190 20 
+       L 190 60 
+       Q 190 70 180 70 
+       L 20 70 
+       Q 10 70 10 60 
+       L 10 20 
+       Q 10 10 20 10 Z
+       M 10 45
+       L -5 50
+       L 10 55 Z`  // Left-pointing tail
+    : `M 20 10 
+       L 180 10 
+       Q 190 10 190 20 
+       L 190 60 
+       Q 190 70 180 70 
+       L 110 70
+       L 95 85
+       L 100 70
+       L 20 70 
+       Q 10 70 10 60 
+       L 10 20 
+       Q 10 10 20 10 Z`; // Down-right pointing tail
+
+  return (
+    <Box position="relative" display="inline-block">
+      {/* Speech Bubble SVG Background */}
+      <Box position="absolute" top="0" left="0" w="100%" h="100%" zIndex={1}>
+        <svg
+          width="100%"
+          height="100%"
+          viewBox={direction === "left" ? "-5 0 205 80" : "0 0 200 120"}
+          preserveAspectRatio="none"
+          style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}
+        >
+          <path
+            d={bubblePath}
+            fill={bg}
+            stroke={borderColor}
+            strokeWidth="2"
+            style={{ backdropFilter: 'blur(10px)' }}
+          />
+        </svg>
+      </Box>
+      
+      {/* Content */}
+      <Box
+        position="relative"
+        zIndex={2}
+        padding={currentSize.padding}
+        color={color}
+        fontSize={currentSize.fontSize}
+        fontWeight="medium"
+        textAlign="left"
+        minW={currentSize.minW}
+        maxW="280px"
+        lineHeight="1.4"
+        pb={direction === "right" ? "20px" : "12px"}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+};
+
+interface CachedAnalysis {
+  analysis: AIBusinessAnalysis;
+  timestamp: number;
+  tractId: string;
+}
+
+// Module-level cache that persists between component lifecycle
+const aiAnalysisCache = new Map<string, CachedAnalysis>();
+
+// Cache expiration time (30 minutes)
+const CACHE_EXPIRY_MS = 30 * 60 * 1000;
+
+// Cache helper functions
+const getCachedAnalysis = (tractId: string): AIBusinessAnalysis | null => {
+  const cached = aiAnalysisCache.get(tractId);
+  if (!cached) return null;
+  
+  // Check if cache has expired
+  if (Date.now() - cached.timestamp > CACHE_EXPIRY_MS) {
+    aiAnalysisCache.delete(tractId);
+    return null;
+  }
+  
+  console.log('✅ [AI Summary] Using cached analysis for tract:', tractId);
+  return cached.analysis;
+};
+
+const setCachedAnalysis = (tractId: string, analysis: AIBusinessAnalysis): void => {
+  aiAnalysisCache.set(tractId, {
+    analysis,
+    timestamp: Date.now(),
+    tractId
+  });
+  console.log('💾 [AI Summary] Cached analysis for tract:', tractId);
+};
+
+// ============================================================================
+// Component Types and Interfaces
+// ============================================================================
+
 interface FilterStoreSlice {
   selectedTimePeriods?: string[];
   selectedEthnicities?: string[];
@@ -27,7 +155,7 @@ interface FilterStoreSlice {
 interface AISummaryProps {
   tract: TractResult;
   weights: Weight[];
-  isVisible?: boolean; // NEW: Only trigger when visible/scrolled
+  isVisible?: boolean; // Only trigger when visible/scrolled
 }
 
 interface TrendInsight {
@@ -78,8 +206,6 @@ interface CrimeTimeline {
   pred_2027?: number;
 }
 
-
-
 interface ParsedAIResponse {
   HEADLINE?: string;
   REASONING?: string;
@@ -109,7 +235,26 @@ const getWeightLabel = (weight: Weight): string => {
   return WEIGHT_LABELS[weight.id] || weight.id;
 };
 
-// Extract trend analysis logic from TrendIndicators (same exact logic)
+// Generate personalized speech text for Bricky
+const generatePersonalizedSpeechText = (
+  analysis: AIBusinessAnalysis, 
+  tract: TractResult, 
+  filterStore: FilterStoreSlice
+): string => {
+  const score = tract.custom_score || 0;
+  const topWeight = filterStore.demographicScoring?.weights ? 
+    Object.entries(filterStore.demographicScoring.weights).reduce((a, b) => a[1] > b[1] ? a : b)[0] : 'foot_traffic';
+  
+  if (analysis.confidence === 'high' && score >= 70) {
+    return `This location scores ${score}/100 and looks very promising for your ${topWeight.replace('_', ' ')} focused business!`;
+  } else if (score >= 50) {
+    return `I've analyzed this spot based on your priorities. Here's what stands out about ${tract.nta_name}...`;
+  } else {
+    return `Let me break down the challenges and opportunities I see in this area for you.`;
+  }
+};
+
+// Extract trend analysis logic from TrendIndicators
 const extractTrendInsights = (tract: TractResult): LocationInsights => {
   const insights: LocationInsights = {
     footTraffic: {
@@ -127,7 +272,7 @@ const extractTrendInsights = (tract: TractResult): LocationInsights => {
     overallOutlook: 'Mixed trends'
   };
 
-  // Foot Traffic Analysis (exact same logic as TrendIndicators)
+  // Foot Traffic Analysis
   if (tract.foot_traffic_score) {
     let footTrafficSparkline: number[] = [];
     let footTrafficTrend: TrendInsight['trend'] = 'unknown';
@@ -179,7 +324,7 @@ const extractTrendInsights = (tract: TractResult): LocationInsights => {
     };
   }
 
-  // Crime/Safety Analysis (exact same logic as TrendIndicators)
+  // Crime/Safety Analysis
   if (tract.crime_score) {
     let crimeSparkline: number[] = [];
     let crimeTrend: TrendInsight['trend'] = tract.crime_trend_direction as TrendInsight['trend'] || 'unknown';
@@ -214,7 +359,7 @@ const extractTrendInsights = (tract: TractResult): LocationInsights => {
     };
   }
 
-  // Overall outlook assessment (same logic as TrendIndicators)
+  // Overall outlook assessment
   const increasingTrends = [insights.footTraffic, insights.safety].filter(t => t.trend === 'increasing').length;
   const decreasingTrends = [insights.footTraffic, insights.safety].filter(t => t.trend === 'decreasing').length;
   
@@ -286,7 +431,7 @@ Please provide a comprehensive business analysis in this EXACT format:
 
 **BOTTOM LINE**: [Clear recommendation with confidence level: high/medium/low]
 
-Be specific, use actual data points, and focus on actionable business intelligence. Reference the neighborhood characteristics and explain WHY this location works (or doesn&apos;t) for business.`;
+Be specific, use actual data points, and focus on actionable business intelligence. Reference the neighborhood characteristics and explain WHY this location works (or doesn't) for business.`;
 };
 
 // Parse AI response into structured business analysis
@@ -534,13 +679,60 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
   const [analysis, setAnalysis] = useState<AIBusinessAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasTriggered, setHasTriggered] = useState(false); // Prevent multiple API calls
+  const [hasTriggered, setHasTriggered] = useState(false);
+  
+  // Image debugging states
+  const [imageLoadStatus, setImageLoadStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [imageError, setImageError] = useState<string>('');
+  const [currentPathIndex, setCurrentPathIndex] = useState(0);
+  
+  // Array of possible image paths for debugging
+  const imagePaths = [
+    '/bricky.png',
+    '/assets/bricky.png',
+    '/public/bricky.png',
+    './bricky.png'
+  ];
+  
+  // Function to cycle through image paths for debugging
+  const tryNextPath = () => {
+    setCurrentPathIndex((prev) => (prev + 1) % imagePaths.length);
+    setImageLoadStatus('loading');
+    setImageError('');
+  };
   
   // Stable snapshot of filter data to prevent constant re-renders
   const filterSnapshot = useRef<FilterStoreSlice | null>(null);
   const weightsSnapshot = useRef<Weight[] | null>(null);
+
+  // Image debugging handlers
+  const handleImageLoad = () => {
+    console.log('✅ [Bricky Image] Successfully loaded');
+    setImageLoadStatus('loaded');
+    setImageError('');
+  };
+
+  const handleImageError = (e: any) => {
+    const errorMsg = `Image failed to load`;
+    console.error('❌ [Bricky Image] Failed to load:', errorMsg);
+    setImageLoadStatus('error');
+    setImageError(errorMsg);
+  };
+
+  // Use the current image path from the array
+  const currentImagePath = imagePaths[currentPathIndex];
   
   const generateAIAnalysis = useCallback(async () => {
+    const tractId = tract.geoid;
+    
+    // First check cache
+    const cachedResult = getCachedAnalysis(tractId);
+    if (cachedResult) {
+      setAnalysis(cachedResult);
+      setHasTriggered(true);
+      return;
+    }
+    
     // Prevent multiple API calls for the same tract
     if (loading || hasTriggered || !isVisible) {
       return;
@@ -551,7 +743,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
       setError(null);
       setHasTriggered(true);
       
-      console.log('🧠 [AI Summary] Starting analysis for tract:', tract.geoid);
+      console.log('🧠 [AI Summary] Starting analysis for tract:', tractId);
       
       // Use snapshots to avoid dependency issues
       const currentFilter = filterSnapshot.current || (filterStore as FilterStoreSlice);
@@ -590,6 +782,10 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
       
       // Parse the AI response into structured business analysis
       const businessAnalysis = parseAIResponse(aiResponse, tract);
+      
+      // Cache the result for future use
+      setCachedAnalysis(tractId, businessAnalysis);
+      
       setAnalysis(businessAnalysis);
       
       console.log('✅ [AI Summary] Analysis complete:', businessAnalysis.headline);
@@ -601,7 +797,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     } finally {
       setLoading(false);
     }
-  }, [tract.geoid, isVisible, loading, hasTriggered]); // Simplified dependencies
+  }, [tract.geoid, isVisible, loading, hasTriggered, sendToGemini]);
   
   // Update snapshots when props change but only once
   useEffect(() => {
@@ -611,9 +807,23 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
   
   // Reset state when tract changes
   useEffect(() => {
-    setHasTriggered(false);
-    setAnalysis(null);
-    setError(null);
+    const tractId = tract.geoid;
+    
+    // Check if we have cached results first
+    const cachedResult = getCachedAnalysis(tractId);
+    if (cachedResult) {
+      console.log('💾 [AI Summary] Loading cached analysis for tract:', tractId);
+      setAnalysis(cachedResult);
+      setHasTriggered(true);
+      setError(null);
+      setLoading(false);
+    } else {
+      // Reset for new tract
+      setHasTriggered(false);
+      setAnalysis(null);
+      setError(null);
+      setLoading(false);
+    }
   }, [tract.geoid]);
   
   // Only trigger when becomes visible and hasn't been triggered yet
@@ -628,9 +838,41 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     return (
       <Box bg="white" borderRadius="xl" p={6} boxShadow="sm" border="1px solid" borderColor="gray.100">
         <VStack spacing={4} align="center" py={8}>
-          <Text fontSize="sm" color="gray.500" textAlign="center">
-            🧠 Scroll down to see Bricky's AI business analysis
-          </Text>
+          <VStack spacing={2}>
+            <HStack spacing={3} align="center">
+              <Image 
+                src={currentImagePath}
+                alt="Bricky the owl mascot"
+                w="24px" 
+                h="24px"
+                objectFit="contain"
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                fallback={<Text fontSize="lg">🦉</Text>}
+              />
+              <Text fontSize="sm" color="gray.500" textAlign="center">
+                Scroll down to see Bricky's AI business analysis
+              </Text>
+            </HStack>
+            {/* Debug info for placeholder */}
+            <Box 
+              onClick={tryNextPath}
+              cursor="pointer"
+              bg="gray.100"
+              px={2}
+              py={1}
+              borderRadius="md"
+              _hover={{ bg: "gray.200" }}
+            >
+              <Text fontSize="9px" color="gray.600" textAlign="center">
+                {imageLoadStatus === 'loaded' ? '✅' : imageLoadStatus === 'error' ? '❌' : '⏳'} 
+                Debug: Path {currentPathIndex + 1}/{imagePaths.length} - Click to cycle
+              </Text>
+              <Text fontSize="8px" color="gray.500" textAlign="center">
+                {currentImagePath}
+              </Text>
+            </Box>
+          </VStack>
         </VStack>
       </Box>
     );
@@ -642,12 +884,22 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
         <VStack spacing={4} align="center" py={8}>
           <HStack spacing={3}>
             <Spinner size="sm" color="#FF492C" />
+            <Image 
+              src={currentImagePath}
+              alt="Bricky the owl mascot"
+              w="24px" 
+              h="24px"
+              objectFit="contain"
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+              fallback={<Text fontSize="md">🦉</Text>}
+            />
             <Text fontSize="sm" color="gray.600" fontWeight="medium">
-              🧠 Bricky is analyzing this location...
+              Bricky is crafting your personalized analysis...
             </Text>
           </HStack>
           <Text fontSize="xs" color="gray.500" textAlign="center" maxW="300px">
-            Researching market trends, competitor landscape, and business viability
+            Analyzing location data and your business needs to provide tailored insights
           </Text>
         </VStack>
       </Box>
@@ -658,9 +910,21 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     return (
       <Box bg="white" borderRadius="xl" p={6} boxShadow="sm" border="1px solid" borderColor="gray.100">
         <VStack spacing={2} align="center" py={4}>
-          <Text fontSize="sm" color="gray.600">
-            🤖 Unable to generate AI business analysis
-          </Text>
+          <HStack spacing={2} align="center">
+            <Image 
+              src={currentImagePath}
+              alt="Bricky the owl mascot"
+              w="20px" 
+              h="20px"
+              objectFit="contain"
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+              fallback={<Text fontSize="md">🦉</Text>}
+            />
+            <Text fontSize="sm" color="gray.600">
+              Unable to generate personalized analysis
+            </Text>
+          </HStack>
           <Text fontSize="xs" color="gray.500">
             Please try refreshing or check your connection
           </Text>
@@ -671,10 +935,10 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
   
   const getConfidenceColor = (confidence: string) => {
     switch (confidence) {
-      case 'high': return 'green';
-      case 'medium': return 'blue';
-      case 'low': return 'orange';
-      default: return 'gray';
+      case 'high': return { bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.3)', color: 'green.100' };
+      case 'medium': return { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.3)', color: 'yellow.100' };
+      case 'low': return { bg: 'rgba(239, 68, 68, 0.2)', border: 'rgba(239, 68, 68, 0.3)', color: 'red.100' };
+      default: return { bg: 'rgba(156, 163, 175, 0.2)', border: 'rgba(156, 163, 175, 0.3)', color: 'gray.100' };
     }
   };
   
@@ -696,37 +960,77 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
           p={6} 
           color="white"
         >
-          <Flex justify="space-between" align="center">
-            <VStack align="start" spacing={2}>
-              <HStack spacing={3}>
-                <Box bg="rgba(255,255,255,0.2)" p={2} borderRadius="lg">
-                  <Text fontSize="xl">🧠</Text>
-                </Box>
-                <VStack align="start" spacing={0}>
-                  <Text fontSize="xl" fontWeight="bold">
-                    Bricky's Business Intelligence
-                  </Text>
-                  <Text fontSize="sm" opacity={0.9}>
-                    AI-powered market analysis for {tract.nta_name}
-                  </Text>
-                </VStack>
-              </HStack>
+          <VStack spacing={6} align="center">
+            {/* Title Section - Full Width */}
+            <VStack spacing={2} w="full">
+              <Text fontSize="2xl" fontWeight="bold" lineHeight="1.2" textAlign="center" w="full">
+                Bricky's Business Intelligence
+              </Text>
+              <Text fontSize="md" opacity={0.9} lineHeight="1.3" textAlign="center" w="full">
+                AI-powered market analysis for {tract.nta_name}
+              </Text>
             </VStack>
             
-            <Badge 
-              bg="rgba(255,255,255,0.2)"
-              color="white"
-              px={4}
-              py={2}
-              borderRadius="full"
-              textTransform="capitalize"
-              fontSize="sm"
-              fontWeight="bold"
-              border="1px solid rgba(255,255,255,0.3)"
-            >
-              {analysis.confidence} confidence
-            </Badge>
-          </Flex>
+            {/* Bricky with Speech Bubble - Horizontal Layout */}
+            <HStack spacing={4} align="center" justify="center" w="full">
+              {/* Bricky with Liquid Glass Background */}
+              <Box position="relative" flexShrink={0}>
+                {/* Liquid Glass Circle Background */}
+                <Box
+                  position="absolute"
+                  top="50%"
+                  left="50%"
+                  transform="translate(-50%, -50%)"
+                  w="100px"
+                  h="100px"
+                  borderRadius="full"
+                  bg="rgba(255, 255, 255, 0.15)"
+                  backdropFilter="blur(20px)"
+                  border="1px solid rgba(255, 255, 255, 0.2)"
+                  boxShadow="0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.3)"
+                  _before={{
+                    content: '""',
+                    position: "absolute",
+                    top: "10%",
+                    left: "10%",
+                    w: "30%",
+                    h: "30%",
+                    borderRadius: "full",
+                    bg: "rgba(255, 255, 255, 0.2)",
+                    filter: "blur(10px)",
+                  }}
+                />
+                
+                {/* Bricky Image */}
+                <Box position="relative" zIndex={2}>
+                  <Image 
+                    src={currentImagePath}
+                    alt="Bricky the owl mascot"
+                    w="70px" 
+                    h="70px"
+                    objectFit="contain"
+                    onLoad={handleImageLoad}
+                    onError={handleImageError}
+                    fallback={<Text fontSize="3xl">🦉</Text>}
+                    filter="drop-shadow(0 4px 8px rgba(0,0,0,0.2))"
+                  />
+                </Box>
+              </Box>
+              
+              {/* Custom Speech Bubble */}
+              <Box flex="1" maxW="300px">
+                <SpeechBubble
+                  bg={getConfidenceColor(analysis.confidence).bg}
+                  borderColor={getConfidenceColor(analysis.confidence).border}
+                  color="white"
+                  size="md"
+                  direction="left"
+                >
+                  {generatePersonalizedSpeechText(analysis, tract, filterSnapshot.current || (filterStore as FilterStoreSlice))}
+                </SpeechBubble>
+              </Box>
+            </HStack>
+          </VStack>
         </Box>
 
         <Box p={6}>
@@ -786,7 +1090,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
                 {analysis.insights.map((insight, index) => (
                   <Box 
                     key={index}
-                    p={5} 
+                    p={6} 
                     bg="white"
                     borderRadius="xl"
                     border="2px solid"
@@ -799,45 +1103,50 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
                     }}
                     transition="all 0.2s"
                   >
-                    {/* Insight type indicator */}
-                    <Box
-                      position="absolute"
-                      top="4"
-                      right="4"
-                      bg={`${getInsightColor(insight.type)}.100`}
-                      px={3}
-                      py={1}
-                      borderRadius="full"
-                      fontSize="xs"
-                      fontWeight="semibold"
-                      color={`${getInsightColor(insight.type)}.700`}
-                      textTransform="capitalize"
-                    >
-                      {insight.type}
-                    </Box>
+                    <VStack spacing={4} align="stretch">
+                      {/* Header Section - Title and Badge */}
+                      <HStack spacing={4} align="center" justify="space-between">
+                        <HStack spacing={3} flex="1">
+                          <Box
+                            bg={`${getInsightColor(insight.type)}.100`}
+                            p={3}
+                            borderRadius="xl"
+                            fontSize="xl"
+                          >
+                            {insight.icon}
+                          </Box>
+                          <Text fontSize="lg" fontWeight="bold" color="gray.800" flex="1">
+                            {insight.title}
+                          </Text>
+                        </HStack>
+                        
+                        {/* Insight Type Badge */}
+                        <Box
+                          bg={`${getInsightColor(insight.type)}.100`}
+                          px={3}
+                          py={1}
+                          borderRadius="full"
+                          fontSize="xs"
+                          fontWeight="semibold"
+                          color={`${getInsightColor(insight.type)}.700`}
+                          textTransform="capitalize"
+                        >
+                          {insight.type}
+                        </Box>
+                      </HStack>
 
-                    <HStack spacing={4} align="start">
-                      <Box
-                        bg={`${getInsightColor(insight.type)}.100`}
-                        p={3}
-                        borderRadius="xl"
-                        fontSize="xl"
-                      >
-                        {insight.icon}
-                      </Box>
-                      <VStack align="start" spacing={3} flex="1" pr={16}>
-                        <Text fontSize="md" fontWeight="bold" color="gray.800">
-                          {insight.title}
-                        </Text>
+                      {/* Description Section */}
+                      <Box w="full">
                         <Text 
                           fontSize="sm" 
                           color="gray.600"
                           lineHeight="1.6"
+                          w="full"
                         >
                           {insight.description}
                         </Text>
-                      </VStack>
-                    </HStack>
+                      </Box>
+                    </VStack>
                   </Box>
                 ))}
               </VStack>
@@ -852,10 +1161,10 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
                 </Text>
               </HStack>
 
-              <HStack spacing={6} align="start">
+              <VStack spacing={6} align="stretch">
                 {/* Business Types */}
                 <Box 
-                  flex="1" 
+                  w="full"
                   p={6} 
                   bg="linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.05) 100%)"
                   borderRadius="xl" 
@@ -872,7 +1181,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
                         Recommended Business Types
                       </Text>
                     </HStack>
-                    <VStack align="start" spacing={2}>
+                    <VStack align="start" spacing={2} w="full">
                       {analysis.businessTypes.map((type, index) => (
                         <HStack key={index} spacing={2}>
                           <Box w="2" h="2" bg="purple.400" borderRadius="full" />
@@ -887,7 +1196,7 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
                 
                 {/* Market Strategy */}
                 <Box 
-                  flex="1" 
+                  w="full"
                   p={6} 
                   bg="linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%)"
                   borderRadius="xl" 
@@ -904,12 +1213,12 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
                         Market Strategy
                       </Text>
                     </HStack>
-                    <Text fontSize="sm" color="blue.700" lineHeight="1.6">
+                    <Text fontSize="sm" color="blue.700" lineHeight="1.6" w="full">
                       {analysis.marketStrategy}
                     </Text>
                   </VStack>
                 </Box>
-              </HStack>
+              </VStack>
             </VStack>
             
             {/* Competitor Examples - Enhanced if available */}
