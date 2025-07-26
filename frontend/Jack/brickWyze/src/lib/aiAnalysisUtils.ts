@@ -252,9 +252,9 @@ export const buildBusinessIntelligencePrompt = (
     }
     
     if (tract.gender_match_pct !== null && tract.gender_match_pct !== undefined) {
-      // ✅ FIXED: Gender filter is only active if it's a meaningful subset (not both or neither)
+      // ✅ UPDATED: Keep gender filter active when any genders are selected (user preference)
       const selectedGenders = filterStore.selectedGenders || [];
-      const hasGenderFilter = selectedGenders.length > 0 && selectedGenders.length < 2; // Only if exactly 1 gender selected
+      const hasGenderFilter = selectedGenders.length > 0; // Active if any genders selected
       components.push({
         name: 'Gender',
         percentage: tract.gender_match_pct,

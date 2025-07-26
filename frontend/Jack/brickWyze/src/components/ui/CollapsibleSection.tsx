@@ -1,4 +1,4 @@
-// src/components/ui/CollapsibleSection.tsx - ENHANCED: Better Progressive Disclosure + Mobile-First
+// src/components/ui/CollapsibleSection.tsx - ENHANCED: Better Progressive Disclosure + Mobile-First (No Show More)
 'use client';
 
 import {
@@ -181,13 +181,6 @@ export default function CollapsibleSection({
               </Text>
             )}
           </Flex>
-
-          {/* Show more indicator */}
-          {!isOpen && (
-            <Text fontSize="xs" color="blue.500" fontWeight="medium">
-              Show more
-            </Text>
-          )}
         </Flex>
 
         <IconButton
