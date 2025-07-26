@@ -230,15 +230,80 @@ export const extractTrendInsights = (tract: TractResult): LocationInsights => {
   return insights;
 };
 
-// Build comprehensive context for AI analysis with business intelligence focus
+// ✅ FIXED: Build comprehensive context for AI analysis with business intelligence focus
 export const buildBusinessIntelligencePrompt = (
   tract: TractResult, 
   weights: Weight[], 
   trendInsights: LocationInsights, 
   filterStore: FilterStoreSlice
 ): string => {
-  const demographics = tract.demographic_match_pct ? 
-    (tract.demographic_match_pct > 1 ? tract.demographic_match_pct : tract.demographic_match_pct * 100) : 0;
+  // ✅ FIXED: Calculate combined demographic score from all applied filters
+  const calculateCombinedDemographicScore = (): { percentage: number; details: string } => {
+    const components: Array<{ name: string; percentage: number; hasFilter: boolean }> = [];
+    
+    // Check each demographic component
+    if (tract.demographic_match_pct !== null && tract.demographic_match_pct !== undefined) {
+      const hasEthnicityFilter = !!(filterStore.selectedEthnicities && filterStore.selectedEthnicities.length > 0);
+      components.push({
+        name: 'Ethnicity',
+        percentage: tract.demographic_match_pct,
+        hasFilter: hasEthnicityFilter
+      });
+    }
+    
+    if (tract.gender_match_pct !== null && tract.gender_match_pct !== undefined) {
+      const hasGenderFilter = !!(filterStore.selectedGenders && filterStore.selectedGenders.length > 0);
+      components.push({
+        name: 'Gender',
+        percentage: tract.gender_match_pct,
+        hasFilter: hasGenderFilter
+      });
+    }
+    
+    if (tract.age_match_pct !== null && tract.age_match_pct !== undefined) {
+      const hasAgeFilter = !!(filterStore.ageRange && (filterStore.ageRange[0] > 25 || filterStore.ageRange[1] < 65));
+      components.push({
+        name: 'Age',
+        percentage: tract.age_match_pct,
+        hasFilter: hasAgeFilter
+      });
+    }
+    
+    if (tract.income_match_pct !== null && tract.income_match_pct !== undefined) {
+      const hasIncomeFilter = !!(filterStore.incomeRange && (filterStore.incomeRange[0] > 50000 || filterStore.incomeRange[1] < 150000));
+      components.push({
+        name: 'Income',
+        percentage: tract.income_match_pct,
+        hasFilter: hasIncomeFilter
+      });
+    }
+    
+    // Only include components where user has actually applied filters
+    const activeComponents = components.filter(comp => comp.hasFilter);
+    
+    if (activeComponents.length === 0) {
+      return { percentage: 0, details: "No demographic filters applied" };
+    }
+    
+    // Calculate average of active components
+    const combinedPercentage = activeComponents.reduce((sum, comp) => sum + comp.percentage, 0) / activeComponents.length;
+    
+    const details = activeComponents.map(comp => `${comp.name}: ${comp.percentage.toFixed(1)}%`).join(', ');
+    
+    console.log('🎯 [AI Analysis] Combined demographic calculation:', {
+      activeComponents: activeComponents.map(c => `${c.name}: ${c.percentage}%`),
+      combinedPercentage,
+      details
+    });
+    
+    return { 
+      percentage: combinedPercentage,
+      details: `Combined from ${details}`
+    };
+  };
+  
+  const demographicData = calculateCombinedDemographicScore();
+  const demographics = demographicData.percentage;
   
   const topWeight = weights.length > 0 ? 
     weights.reduce((prev, current) => (prev.value > current.value) ? prev : current) : null;
@@ -263,6 +328,9 @@ USER'S BUSINESS PRIORITIES:
 • **Target Demographics**: ${filterStore.ageRange?.[0] ?? 25}-${filterStore.ageRange?.[1] ?? 65} years old, ${(filterStore.incomeRange?.[0] ?? 50000)/1000}K-${(filterStore.incomeRange?.[1] ?? 150000)/1000}K income
 • **Time Focus**: ${filterStore.selectedTimePeriods?.join(', ') || 'All day periods'}
 • **Cultural Focus**: ${filterStore.selectedEthnicities?.join(', ') || 'No specific ethnicity targeting'}
+
+DEMOGRAPHIC BREAKDOWN:
+${demographicData.details}
 
 MARKET TRENDS:
 ${trendInsights.overallOutlook}

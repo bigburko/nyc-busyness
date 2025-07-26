@@ -1,4 +1,5 @@
-// src/components/features/search/TractDetailPanel/AdvancedDemographics.tsx
+// Fixed AdvancedDemographics.tsx - Handles data correctly without double scoring
+
 'use client';
 
 import { 
@@ -27,9 +28,12 @@ interface DemographicComponent {
   };
 }
 
-// Helper function to get research-backed score from percentage
+// FIXED: Helper function to get research-backed score from percentage
+// This should match the backend logic exactly
 const getResearchScore = (percentage: number): number => {
+  // Input is already a percentage (0-100), not decimal (0-1)
   const pct = percentage;
+  
   if (pct >= 30) return Math.min(100, 80 + (pct - 30) / 20 * 20);
   if (pct >= 25) return 70 + (pct - 25) / 5 * 9;
   if (pct >= 20) return 60 + (pct - 20) / 5 * 9;
@@ -63,6 +67,15 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
   const filterStore = useFilterStore() as FilterStore;
   const demographicScoring: DemographicScoring | undefined = filterStore.demographicScoring;
   
+  // FIXED: Add debugging to see what data we're receiving
+  console.log('🔍 [AdvancedDemographics] Received tract data:', {
+    geoid: tract.geoid,
+    demographic_match_pct: tract.demographic_match_pct,
+    gender_match_pct: tract.gender_match_pct,
+    age_match_pct: tract.age_match_pct,
+    income_match_pct: tract.income_match_pct
+  });
+  
   // Collect demographic components
   const components: DemographicComponent[] = [];
   
@@ -81,12 +94,20 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
   const penalties = demographicScoring?.penalties || [];
   const reasoning = demographicScoring?.reasoning;
   
-  // Process each demographic component with weighting
-  if (tract.demographic_match_pct) {
-    const ethPercent = Math.round((tract.demographic_match_pct > 1 ? tract.demographic_match_pct : tract.demographic_match_pct * 100));
+  // FIXED: Process each demographic component with proper data handling
+  if (tract.demographic_match_pct !== null && tract.demographic_match_pct !== undefined) {
+    // Backend sends percentage as number (e.g., 45 for 45%)
+    const ethPercent = Math.round(tract.demographic_match_pct);
     const ethScore = Math.round(getResearchScore(ethPercent));
     const ethThreshold = getThresholdLabel(ethPercent);
     const ethWeight = weights.ethnicity;
+    
+    console.log('🔍 [AdvancedDemographics] Ethnicity processing:', {
+      raw_value: tract.demographic_match_pct,
+      processed_percentage: ethPercent,
+      calculated_score: ethScore
+    });
+    
     components.push({
       id: 'ethnicity',
       name: 'Ethnicity Match',
@@ -99,11 +120,18 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
     });
   }
   
-  if (tract.gender_match_pct) {
-    const genPercent = Math.round((tract.gender_match_pct > 1 ? tract.gender_match_pct : tract.gender_match_pct * 100));
+  if (tract.gender_match_pct !== null && tract.gender_match_pct !== undefined) {
+    const genPercent = Math.round(tract.gender_match_pct);
     const genScore = Math.round(getResearchScore(genPercent));
     const genThreshold = getThresholdLabel(genPercent);
     const genWeight = weights.gender;
+    
+    console.log('🔍 [AdvancedDemographics] Gender processing:', {
+      raw_value: tract.gender_match_pct,
+      processed_percentage: genPercent,
+      calculated_score: genScore
+    });
+    
     components.push({
       id: 'gender',
       name: 'Gender Match',
@@ -116,11 +144,18 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
     });
   }
   
-  if (tract.age_match_pct) {
-    const agePercent = Math.round((tract.age_match_pct > 1 ? tract.age_match_pct : tract.age_match_pct * 100));
+  if (tract.age_match_pct !== null && tract.age_match_pct !== undefined) {
+    const agePercent = Math.round(tract.age_match_pct);
     const ageScore = Math.round(getResearchScore(agePercent));
     const ageThreshold = getThresholdLabel(agePercent);
     const ageWeight = weights.age;
+    
+    console.log('🔍 [AdvancedDemographics] Age processing:', {
+      raw_value: tract.age_match_pct,
+      processed_percentage: agePercent,
+      calculated_score: ageScore
+    });
+    
     components.push({
       id: 'age',
       name: 'Age Match',
@@ -133,11 +168,18 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
     });
   }
   
-  if (tract.income_match_pct) {
-    const incPercent = Math.round((tract.income_match_pct > 1 ? tract.income_match_pct : tract.income_match_pct * 100));
+  if (tract.income_match_pct !== null && tract.income_match_pct !== undefined) {
+    const incPercent = Math.round(tract.income_match_pct);
     const incScore = Math.round(getResearchScore(incPercent));
     const incThreshold = getThresholdLabel(incPercent);
     const incWeight = weights.income;
+    
+    console.log('🔍 [AdvancedDemographics] Income processing:', {
+      raw_value: tract.income_match_pct,
+      processed_percentage: incPercent,
+      calculated_score: incScore
+    });
+    
     components.push({
       id: 'income',
       name: 'Income Match',
@@ -149,6 +191,8 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
       threshold: incThreshold
     });
   }
+  
+  console.log('🔍 [AdvancedDemographics] Final components:', components.length, components.map(c => `${c.name}: ${c.percentage}% → ${c.score} pts`));
   
   if (components.length === 0) {
     return (
@@ -192,6 +236,13 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
   const overallThreshold = getThresholdLabel(
     components.reduce((sum, comp) => sum + comp.percentage, 0) / components.length
   );
+  
+  console.log('🔍 [AdvancedDemographics] Final calculation:', {
+    totalWeight,
+    weightedScore,
+    finalScore,
+    components_count: components.length
+  });
   
   return (
     <Box p={6}>
