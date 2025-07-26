@@ -1,4 +1,4 @@
-// src/components/features/search/components/TrendAnalysis.tsx
+// src/components/features/search/TractDetailPanel/TrendAnalysis.tsx
 'use client';
 
 import { Box, VStack, Text, SimpleGrid, HStack } from '@chakra-ui/react';
@@ -144,7 +144,7 @@ const TrendIndicators = ({ tract }: { tract: TractResult }) => {
     });
   }
   
-  // Crime/Safety Trend
+  // Crime/Safety Trend - ENHANCED WITH MORE DATA
   if (tract.crime_score) {
     let crimeSparkline: number[] = [];
     let crimeTrend: TrendData['trend'] = tract.crime_trend_direction as TrendData['trend'] || 'unknown';
@@ -159,6 +159,15 @@ const TrendIndicators = ({ tract }: { tract: TractResult }) => {
         timeline.pred_2026 || 0,
         timeline.pred_2027 || 0
       ].filter(val => val > 0);
+      
+      // If we have real timeline data, calculate actual trend
+      if (crimeSparkline.length >= 2) {
+        const recent = crimeSparkline[crimeSparkline.length - 2];
+        const current = crimeSparkline[crimeSparkline.length - 1];
+        if (current > recent * 1.05) crimeTrend = 'increasing';
+        else if (current < recent * 0.95) crimeTrend = 'decreasing';
+        else crimeTrend = 'stable';
+      }
     } else {
       // Generate realistic sparkline based on current score
       const current = tract.crime_score;
@@ -284,7 +293,7 @@ const TrendIndicators = ({ tract }: { tract: TractResult }) => {
 export function TrendAnalysis({ tract }: TrendAnalysisProps) {
   return (
     <VStack spacing={6} align="stretch" w="full">
-      {/* Trend Indicators - Quick Overview */}
+      {/* Trend Indicators - Quick Overview with BOTH foot traffic AND crime data */}
       <Box>
         <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
           📊 Trend Summary
@@ -292,7 +301,7 @@ export function TrendAnalysis({ tract }: TrendAnalysisProps) {
         <TrendIndicators tract={tract} />
       </Box>
 
-      {/* Detailed Charts */}
+      {/* Detailed Charts - BOTH foot traffic AND crime charts */}
       <Box>
         <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
           📈 Detailed Charts
