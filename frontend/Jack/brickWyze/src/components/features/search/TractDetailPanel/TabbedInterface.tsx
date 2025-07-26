@@ -154,7 +154,7 @@ export default function TabbedInterface({
     { id: 0, label: 'Overview' },
     { id: 1, label: 'Trends' },
     { id: 2, label: 'Demographics' },
-    { id: 3, label: 'Details' }
+    { id: 3, label: 'Scoring' }
   ];
 
   return (
@@ -325,17 +325,17 @@ export default function TabbedInterface({
           </VStack>
         )}
 
-        {/* 🔍 DETAILS TAB - For Power Users */}
+        {/* 🔍 SCORING TAB - For Power Users */}
         {activeTab === 3 && (
           <VStack spacing={6} align="stretch" w="full">
             <Box>
               <Flex align="center" gap={2} mb={2}>
                 <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                  Detailed Analysis
+                  Scoring Methodology
                 </Text>
               </Flex>
               <Text fontSize="sm" color="gray.600">
-                Complete methodology breakdown and calculations
+                Complete methodology breakdown and score calculations
               </Text>
             </Box>
             

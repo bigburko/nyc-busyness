@@ -90,12 +90,12 @@ export default function TractDetailPanel({
     return "red.500";
   };
 
-  // Tab configuration
+  // Tab configuration - FIXED: Changed 'details' to 'scoring'
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'trends', label: 'Trends' },
     { id: 'demographics', label: 'Demographics' },
-    { id: 'details', label: 'Details' }
+    { id: 'scoring', label: 'Scoring' }
   ];
 
   // Log when detail panel opens (for debugging)
@@ -218,10 +218,10 @@ export default function TractDetailPanel({
           </Box>
         );
 
-      case 'details':
+      case 'scoring':  // FIXED: Changed from 'details' to 'scoring'
         return (
           <Box p={headerPadding} bg="gray.50" minH="100vh">
-            <Text fontSize="xl" fontWeight="bold" mb={6}>Detailed Analysis</Text>
+            <Text fontSize="xl" fontWeight="bold" mb={6}>Scoring Methodology</Text>
             <VStack spacing={6}>
               <ScoreCalculation 
                 tract={tract}
