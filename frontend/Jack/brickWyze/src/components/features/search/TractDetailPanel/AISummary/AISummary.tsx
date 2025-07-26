@@ -308,6 +308,72 @@ export function AISummary({ tract, weights, isVisible = false }: AISummaryProps)
     );
   }
 
+  // ✅ SIMPLE FIX: Show loading immediately when visible and idle (prevents white flash)
+  if (isVisible && state === 'idle') {
+    return (
+      <Box 
+        bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)" 
+        borderRadius="2xl" 
+        borderBottomRadius="xl"
+        p={6} 
+        boxShadow="lg" 
+        border="1px solid" 
+        borderColor="gray.100" 
+        overflow="hidden"
+        color="white"
+      >
+        <VStack spacing={6} align="center">
+          <VStack spacing={2} w="full">
+            <Text fontSize="2xl" fontWeight="bold" lineHeight="1.2" textAlign="center" w="full">
+              Bricky's Business Intelligence
+            </Text>
+            <Text fontSize="md" opacity={0.9} lineHeight="1.3" textAlign="center" w="full">
+              AI-powered market analysis for {tract.nta_name}
+            </Text>
+          </VStack>
+          
+          <VStack spacing={1} align="center" w="full">
+            <Box maxW="450px" w="full" display="flex" justifyContent="center">
+              <SpeechBubble
+                bg="rgba(255, 255, 255, 0.15)"
+                borderColor="rgba(255, 255, 255, 0.3)"
+                color="white"
+                size="md"
+                direction="down"
+              >
+                <HStack spacing={2} justify="center" align="center">
+                  <Text color="inherit" fontSize="inherit">Preparing analysis</Text>
+                  <Box
+                    as="span"
+                    sx={{
+                      _after: {
+                        content: '"..."',
+                        animation: `${dots} 1.5s infinite`,
+                        fontWeight: "bold"
+                      }
+                    }}
+                  />
+                </HStack>
+              </SpeechBubble>
+            </Box>
+            
+            <Box
+              sx={{
+                animation: `${thinkingPulse} 2s ease-in-out infinite`
+              }}
+            >
+              <BrickyAvatar 
+                size="lg" 
+                withGlassBackground={true}
+                showDebugInfo={false}
+              />
+            </Box>
+          </VStack>
+        </VStack>
+      </Box>
+    );
+  }
+
   // Loading state
   if (state === 'loading') {
     return (

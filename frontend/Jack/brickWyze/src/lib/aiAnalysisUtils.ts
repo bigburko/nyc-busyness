@@ -58,13 +58,13 @@ export const setCachedAnalysis = (tractId: string, analysis: AIBusinessAnalysis)
   console.log('💾 [AI Summary] Cached analysis for tract:', tractId);
 };
 
-// Generate personalized speech text for Bricky with rounded down scores
+// Generate personalized speech text for Bricky with properly rounded scores
 export const generatePersonalizedSpeechText = (
   analysis: AIBusinessAnalysis, 
   tract: TractResult, 
   filterStore: FilterStoreSlice
 ): string => {
-  const score = Math.floor(tract.custom_score || 0); // Round down to whole number
+  const score = Math.round(tract.custom_score || 0); // ✅ FIXED: Use proper rounding instead of floor
   const topWeight = filterStore.demographicScoring?.weights ? 
     Object.entries(filterStore.demographicScoring.weights).reduce((a, b) => a[1] > b[1] ? a : b)[0] : 'foot_traffic';
   
