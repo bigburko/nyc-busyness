@@ -1,8 +1,8 @@
-// src/components/features/search/TractDetailPanel/QuickStats.tsx - Modern Version
+// src/components/features/search/TractDetailPanel/QuickStats.tsx
 'use client';
 
-import { Box, VStack, Text, SimpleGrid } from '@chakra-ui/react';
-import { TractResult, WeightConfig } from '../../../../types/TractTypes';
+import { Box, VStack, SimpleGrid, Text } from '@chakra-ui/react';
+import { TractResult } from '../../../../types/TractTypes';
 import { Weight } from '../../../../types/WeightTypes';
 
 interface QuickStatsProps {
@@ -12,130 +12,162 @@ interface QuickStatsProps {
   rentRange?: [number, number];
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 80) return "#10B981"; // Green
-  if (score >= 60) return "#3B82F6"; // Blue  
-  if (score >= 40) return "#F59E0B"; // Orange
-  if (score >= 20) return "#F97316"; // Dark Orange
-  return "#EF4444"; // Red
+interface WeightConfig {
+  id: string;
+  label: string;
+  icon: string;
+  getValue: (tract: TractResult) => number;
+  color: string;
 }
 
-function getDemographicMatchInfo(matchPercent: number) {
-  // Based on research-backed scoring thresholds from the system
-  let label = 'Average';
-  let color = '#F59E0B'; // Orange
-  
-  if (matchPercent >= 30) {
-    label = 'High';
-    color = '#10B981'; // Green - Excellent (30%+ match)
-  } else if (matchPercent >= 20) {
-    label = 'Medium';
-    color = '#3B82F6'; // Blue - Good (20-29% match)
-  } else if (matchPercent < 15) {
-    label = 'Low';
-    color = '#EF4444'; // Red - Poor/Very Poor (0-14% match)
-  }
-  // 15-19% stays as Average/Orange
-  
-  return { label, color };
+interface RentInfo {
+  label: string;
+  color: string;
 }
 
-function getRentPositionInfo(currentRent: number, rentRange: [number, number]) {
+interface DemographicMatchInfo {
+  label: string;
+  color: string;
+}
+
+// Helper function to get score color
+const getScoreColor = (score: number): string => {
+  if (score >= 80) return 'green.600';
+  if (score >= 60) return 'blue.600';
+  if (score >= 40) return 'orange.600';
+  return 'red.600';
+};
+
+// Helper function to get rent position info
+const getRentPositionInfo = (currentRent: number, rentRange: [number, number]): RentInfo => {
   const [min, max] = rentRange;
-  const range = max - min;
-  const position = ((currentRent - min) / range) * 100;
+  const midpoint = (min + max) / 2;
   
-  let label = 'Medium';
-  let color = '#3B82F6'; // Blue
-  let bgColor = 'blue.50';
-  
-  if (position <= 33) {
-    label = 'Low';
-    color = '#10B981'; // Green
-    bgColor = 'green.50';
-  } else if (position >= 67) {
-    label = 'High';
-    color = '#F59E0B'; // Orange
-    bgColor = 'orange.50';
+  if (currentRent <= min + (max - min) * 0.25) {
+    return { label: 'Low-cost area', color: 'green.600' };
   }
-  
-  return { 
-    label, 
-    color, 
-    bgColor, 
-    percentage: Math.round(Math.max(0, Math.min(100, position))) 
-  };
-}
+  if (currentRent <= midpoint) {
+    return { label: 'Affordable', color: 'blue.600' };
+  }
+  if (currentRent <= max - (max - min) * 0.25) {
+    return { label: 'Premium area', color: 'orange.600' };
+  }
+  return { label: 'High-end market', color: 'red.600' };
+};
 
-// Define all possible weight configurations
+// Helper function for demographic match info
+const getDemographicMatchInfo = (score: number): DemographicMatchInfo => {
+  if (score >= 70) return { label: 'Excellent', color: 'green.600' };
+  if (score >= 50) return { label: 'Good', color: 'blue.600' };
+  if (score >= 30) return { label: 'Fair', color: 'orange.600' };
+  return { label: 'Poor', color: 'red.600' };
+};
+
+// Weight configurations
 const WEIGHT_CONFIGS: WeightConfig[] = [
   {
     id: 'foot_traffic',
     label: 'Foot Traffic',
-    icon: '', // Clean design without emojis
+    icon: '',
     getValue: (tract) => tract.foot_traffic_score || 0,
     color: '#F59E0B'
   },
   {
     id: 'demographic',
     label: 'Demographics',
-    icon: '', // Clean design without emojis
+    icon: '',
     getValue: (tract) => tract.demographic_score || 0,
     color: '#8B5CF6'
   },
   {
     id: 'crime',
     label: 'Safety',
-    icon: '', // Clean design without emojis
+    icon: '',
     getValue: (tract) => tract.crime_score || 0,
     color: '#10B981'
   },
   {
     id: 'flood_risk',
     label: 'Flood Risk',
-    icon: '', // Clean design without emojis
+    icon: '',
     getValue: (tract) => tract.flood_risk_score || 0,
     color: '#06B6D4'
   },
   {
     id: 'rent_score',
     label: 'Rent Score',
-    icon: '', // Clean design without emojis
+    icon: '',
     getValue: (tract) => tract.rent_score || 0,
     color: '#EF4444'
   },
   {
     id: 'poi',
     label: 'POI Score',
-    icon: '', // Clean design without emojis
+    icon: '',
     getValue: (tract) => tract.poi_score || 0,
     color: '#F97316'
   }
 ];
 
 export function QuickStats({ tract, rentText, weights, rentRange = [26, 160] }: QuickStatsProps) {
-  // Get top 3 weighted metrics, or use defaults
+  // ✅ FIXED: Complete safety checks for all potential undefined/null values
   const getTopMetrics = (): WeightConfig[] => {
-    // Filter and sort weights by value (highest first)
+    // Add comprehensive null checks for weights array
+    if (!weights || !Array.isArray(weights) || weights.length === 0) {
+      console.warn('⚠️ [QuickStats] Weights is undefined or empty, using default metrics');
+      return WEIGHT_CONFIGS.filter(config => 
+        ['foot_traffic', 'demographic', 'crime'].includes(config.id)
+      );
+    }
+
+    // Filter and sort weights by value (highest first) with additional safety checks
     const activeWeights = weights
-      .filter((w: Weight) => w.value > 0)
+      .filter((w: Weight) => {
+        // ✅ FIXED: Enhanced validation for weight objects
+        return w && 
+               typeof w === 'object' && 
+               typeof w.id === 'string' && 
+               typeof w.value === 'number' && 
+               w.value > 0 &&
+               w.id.length > 0; // Ensure id is not empty string
+      })
       .sort((a: Weight, b: Weight) => b.value - a.value)
       .slice(0, 3);
     
-    // If no weights are set, use defaults
+    // If no valid weights are found, use defaults
     if (activeWeights.length === 0) {
+      console.warn('⚠️ [QuickStats] No valid weights found, using default metrics');
       return WEIGHT_CONFIGS.filter(config => 
         ['foot_traffic', 'demographic', 'crime'].includes(config.id)
       );
     }
     
     // Map active weights to configs and filter out undefined values
-    return activeWeights
+    const mappedConfigs = activeWeights
       .map((weight: Weight) => WEIGHT_CONFIGS.find(config => config.id === weight.id))
       .filter((config): config is WeightConfig => config !== undefined) // Type-safe filter
       .slice(0, 3); // Ensure we only have 3
+
+    // If mapping failed, fallback to defaults
+    if (mappedConfigs.length === 0) {
+      console.warn('⚠️ [QuickStats] Weight mapping failed, using default metrics');
+      return WEIGHT_CONFIGS.filter(config => 
+        ['foot_traffic', 'demographic', 'crime'].includes(config.id)
+      );
+    }
+
+    return mappedConfigs;
   };
   
+  // ✅ FIXED: Add null check for tract as well
+  if (!tract) {
+    return (
+      <Box bg="white" borderRadius="xl" p={6} boxShadow="sm" border="1px solid" borderColor="gray.100">
+        <Text color="gray.500">Loading tract data...</Text>
+      </Box>
+    );
+  }
+
   const topMetrics = getTopMetrics();
   const currentRent = tract.avg_rent || 0;
   const rentInfo = getRentPositionInfo(currentRent, rentRange);
@@ -162,8 +194,17 @@ export function QuickStats({ tract, rentText, weights, rentRange = [26, 160] }: 
         
         {/* Top 3 weighted metrics */}
         {topMetrics.slice(0, 3).map((metric: WeightConfig, index: number) => {
-          const value = Math.round(metric.getValue(tract));
-          const isPercentage = metric.id === 'demographic' && tract.demographic_match_pct;
+          // ✅ FIXED: Add safety checks for metric object and tract values
+          if (!metric || typeof metric.getValue !== 'function') {
+            console.warn(`⚠️ [QuickStats] Invalid metric at index ${index}`);
+            return null;
+          }
+
+          const value = Math.round(metric.getValue(tract) || 0); // Default to 0 if getValue returns undefined
+          const isPercentage = metric.id === 'demographic' && 
+                              tract.demographic_match_pct !== null && 
+                              tract.demographic_match_pct !== undefined;
+          
           const displayValue = isPercentage 
             ? (() => {
                 const rawValue = tract.demographic_match_pct || 0;
@@ -178,7 +219,7 @@ export function QuickStats({ tract, rentText, weights, rentRange = [26, 160] }: 
             : value;
           const scoreColor = getScoreColor(scoreForColor);
           
-          // Get demographic match info for special styling using research-backed thresholds
+          // Get demographic match info for special styling
           const isDemographic = metric.id === 'demographic';
           const demographicInfo = isDemographic && isPercentage 
             ? getDemographicMatchInfo(scoreForColor) 
@@ -204,7 +245,7 @@ export function QuickStats({ tract, rentText, weights, rentRange = [26, 160] }: 
               </VStack>
             </Box>
           );
-        })}
+        }).filter(Boolean)} {/* ✅ FIXED: Filter out any null components */}
       </SimpleGrid>
     </Box>
   );

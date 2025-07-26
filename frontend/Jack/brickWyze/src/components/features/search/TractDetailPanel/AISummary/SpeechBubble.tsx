@@ -99,14 +99,18 @@ export const SpeechBubble = ({
     `;
   };
 
+  // ✅ FIXED: Calculate explicit SVG height instead of using "auto"
+  const svgHeight = direction === "down" ? bubbleHeight + 35 : bubbleHeight;
+  const svgViewBox = `0 0 380 ${svgHeight}`;
+
   return (
     <Box position="relative" display="inline-block" w="fit-content" h="fit-content">
       {/* SVG Speech Bubble - Dynamic height */}
       <Box position="relative" w="100%" maxW={currentSize.maxW} minW={currentSize.minW}>
         <svg
           width="100%"
-          height="auto"
-          viewBox={direction === "down" ? `0 0 380 ${bubbleHeight + 35}` : `0 0 380 ${bubbleHeight}`}
+          height={`${svgHeight}px`} // ✅ FIXED: Use explicit pixel height instead of "auto"
+          viewBox={svgViewBox}
           style={{ 
             filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))',
             display: 'block'

@@ -4,15 +4,6 @@ import html2canvas from 'html2canvas';
 import { TractResult } from '../types/TractTypes';
 import { Weight } from '../types/WeightTypes';
 import { AIBusinessAnalysis } from '../types/AIAnalysisTypes';
-import { generateLoopNetUrl } from '../components/features/search/TractDetailPanel/LoopNetIntegration';
-
-interface PDFExportOptions {
-  tract: TractResult;
-  weights: Weight[];
-  aiAnalysis?: AIBusinessAnalysis | null;
-  streetViewUrl?: string;
-  includeLogo?: boolean;
-}
 
 interface ChartDataForPDF {
   chartElement: HTMLElement;
@@ -37,9 +28,12 @@ export class PDFExportService {
     this.lineHeight = 7;
   }
 
-  async generateTractReport(options: PDFExportOptions): Promise<void> {
-    const { tract, weights, aiAnalysis, streetViewUrl } = options;
-
+  async generateTractReport(
+    tract: TractResult,
+    weights: Weight[],
+    aiAnalysis?: AIBusinessAnalysis | null,
+    filename?: string
+  ): Promise<void> {
     try {
       // Add header
       this.addHeader(tract);
@@ -51,9 +45,7 @@ export class PDFExportService {
       this.addKeyMetrics(tract, weights);
       
       // Add Street View image if available
-      if (streetViewUrl) {
-        await this.addStreetViewImage(tract);
-      }
+      await this.addStreetViewImage(tract);
       
       // Add AI analysis if available
       if (aiAnalysis) {
@@ -71,6 +63,10 @@ export class PDFExportService {
       
       // Add footer with links
       this.addFooterWithLinks(tract);
+      
+      // Save the PDF
+      const finalFilename = filename || `${tract.nta_name?.replace(/[^a-zA-Z0-9]/g, '_')}_tract_${tract.geoid.slice(-6)}_report.pdf`;
+      this.pdf.save(finalFilename);
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -94,6 +90,10 @@ export class PDFExportService {
     this.pdf.setFontSize(12);
     this.pdf.setTextColor(100, 100, 100);
     this.pdf.text(`Census Tract ${tract.geoid.slice(-6)}`, this.margin, this.currentY);
+    this.currentY += 8;
+
+    // Add date
+    this.pdf.text(`Generated: ${new Date().toLocaleDateString()}`, this.margin, this.currentY);
     this.currentY += 10;
 
     // Score badge
@@ -116,26 +116,31 @@ export class PDFExportService {
   }
 
   private addExecutiveSummary(tract: TractResult, aiAnalysis?: AIBusinessAnalysis | null): void {
+    this.checkPageBreak(40);
+    
     this.pdf.setFontSize(16);
     this.pdf.setFont('helvetica', 'bold');
     this.pdf.text('Executive Summary', this.margin, this.currentY);
-    this.currentY += 10;
+    this.currentY += 12;
+
+    if (aiAnalysis?.headline) {
+      this.pdf.setFontSize(12);
+      this.pdf.setFont('helvetica', 'bold');
+      const wrappedHeadline = this.pdf.splitTextToSize(aiAnalysis.headline, this.pageWidth - 2 * this.margin);
+      this.pdf.text(wrappedHeadline, this.margin, this.currentY);
+      this.currentY += wrappedHeadline.length * this.lineHeight + 5;
+    }
+
+    // Default summary if no AI analysis
+    const summaryText = aiAnalysis?.reasoning || 
+      `This location in ${tract.nta_name} has an overall business viability score of ${Math.round(tract.custom_score || 0)}/100. 
+       Key factors include foot traffic patterns, safety metrics, demographic alignment, and rental costs.`;
 
     this.pdf.setFontSize(11);
     this.pdf.setFont('helvetica', 'normal');
-
-    if (aiAnalysis && aiAnalysis.headline) {
-      // Use AI-generated summary
-      const wrappedText = this.pdf.splitTextToSize(aiAnalysis.headline, this.pageWidth - 2 * this.margin);
-      this.pdf.text(wrappedText, this.margin, this.currentY);
-      this.currentY += wrappedText.length * this.lineHeight + 5;
-    } else {
-      // Fallback summary
-      const summary = this.generateFallbackSummary(tract);
-      const wrappedText = this.pdf.splitTextToSize(summary, this.pageWidth - 2 * this.margin);
-      this.pdf.text(wrappedText, this.margin, this.currentY);
-      this.currentY += wrappedText.length * this.lineHeight + 5;
-    }
+    const wrappedSummary = this.pdf.splitTextToSize(summaryText, this.pageWidth - 2 * this.margin);
+    this.pdf.text(wrappedSummary, this.margin, this.currentY);
+    this.currentY += wrappedSummary.length * this.lineHeight + 15;
 
     this.addSeparator();
   }
@@ -149,9 +154,7 @@ export class PDFExportService {
     this.currentY += 12;
 
     this.pdf.setFontSize(11);
-    this.pdf.setFont('helvetica', 'normal');
 
-    // Create metrics grid
     const metrics = [
       { label: 'Foot Traffic Score', value: `${Math.round(tract.foot_traffic_score || 0)}/100` },
       { label: 'Safety Score', value: `${Math.round(tract.crime_score || 0)}/100` },
@@ -194,21 +197,26 @@ export class PDFExportService {
 
     try {
       // Try to capture the Google Maps image from the DOM
-      const imageElement = document.querySelector('[data-testid="google-maps-image"]') as HTMLImageElement;
+      const imageElement = document.querySelector('[data-testid="google-maps-image"]') as HTMLElement;
       
-      if (imageElement && imageElement.complete) {
+      if (imageElement) {
         const canvas = await html2canvas(imageElement, {
           useCORS: true,
           allowTaint: false,
-          scale: 1
+          scale: 1,
+          backgroundColor: '#ffffff'
         });
         
         const imgData = canvas.toDataURL('image/jpeg', 0.8);
         const imgWidth = this.pageWidth - 2 * this.margin;
         const imgHeight = (canvas.height / canvas.width) * imgWidth;
         
-        this.pdf.addImage(imgData, 'JPEG', this.margin, this.currentY, imgWidth, imgHeight);
-        this.currentY += imgHeight + 10;
+        // Limit height
+        const maxHeight = 60;
+        const finalHeight = Math.min(imgHeight, maxHeight);
+        
+        this.pdf.addImage(imgData, 'JPEG', this.margin, this.currentY, imgWidth, finalHeight);
+        this.currentY += finalHeight + 10;
       } else {
         // Fallback text if image not available
         this.pdf.setFontSize(11);
@@ -235,47 +243,70 @@ export class PDFExportService {
     this.pdf.text('AI Business Analysis', this.margin, this.currentY);
     this.currentY += 12;
 
-    // Add reasoning
-    if (aiAnalysis.reasoning) {
-      this.pdf.setFontSize(11);
-      this.pdf.setFont('helvetica', 'normal');
-      const wrappedReasoning = this.pdf.splitTextToSize(aiAnalysis.reasoning, this.pageWidth - 2 * this.margin);
-      this.pdf.text(wrappedReasoning, this.margin, this.currentY);
-      this.currentY += wrappedReasoning.length * this.lineHeight + 8;
-    }
-
-    // Add insights
+    // Business insights
     if (aiAnalysis.insights && aiAnalysis.insights.length > 0) {
       this.pdf.setFontSize(14);
       this.pdf.setFont('helvetica', 'bold');
       this.pdf.text('Key Insights:', this.margin, this.currentY);
       this.currentY += 8;
 
-      aiAnalysis.insights.forEach((insight, index) => {
+      aiAnalysis.insights.forEach(insight => {
         this.checkPageBreak(15);
         
         this.pdf.setFontSize(11);
         this.pdf.setFont('helvetica', 'bold');
-        
-        // Color code by type
-        if (insight.type === 'strength') this.pdf.setTextColor(34, 197, 94);
-        else if (insight.type === 'opportunity') this.pdf.setTextColor(59, 130, 246);
-        else this.pdf.setTextColor(249, 115, 22);
-
-        this.pdf.text(`${insight.icon} ${insight.title}`, this.margin + 5, this.currentY);
+        this.pdf.text(`• ${insight.title}`, this.margin, this.currentY);
         this.currentY += this.lineHeight;
 
-        this.pdf.setTextColor(0, 0, 0);
         this.pdf.setFont('helvetica', 'normal');
-        const wrappedText = this.pdf.splitTextToSize(insight.description, this.pageWidth - 2 * this.margin - 10);
-        this.pdf.text(wrappedText, this.margin + 5, this.currentY);
-        this.currentY += wrappedText.length * this.lineHeight + 5;
+        const wrappedDesc = this.pdf.splitTextToSize(insight.description, this.pageWidth - 2 * this.margin - 10);
+        this.pdf.text(wrappedDesc, this.margin + 5, this.currentY);
+        this.currentY += wrappedDesc.length * this.lineHeight + 3;
       });
+
+      this.currentY += 5;
     }
 
-    // Add bottom line
+    // Business types
+    if (aiAnalysis.businessTypes && aiAnalysis.businessTypes.length > 0) {
+      this.checkPageBreak(20);
+      
+      this.pdf.setFontSize(14);
+      this.pdf.setFont('helvetica', 'bold');
+      this.pdf.text('Recommended Business Types:', this.margin, this.currentY);
+      this.currentY += 8;
+
+      this.pdf.setFontSize(11);
+      this.pdf.setFont('helvetica', 'normal');
+      aiAnalysis.businessTypes.forEach(type => {
+        this.pdf.text(`• ${type}`, this.margin, this.currentY);
+        this.currentY += this.lineHeight;
+      });
+
+      this.currentY += 5;
+    }
+
+    // Market strategy
+    if (aiAnalysis.marketStrategy) {
+      this.checkPageBreak(20);
+      
+      this.pdf.setFontSize(14);
+      this.pdf.setFont('helvetica', 'bold');
+      this.pdf.text('Market Strategy:', this.margin, this.currentY);
+      this.currentY += 8;
+
+      this.pdf.setFontSize(11);
+      this.pdf.setFont('helvetica', 'normal');
+      const wrappedStrategy = this.pdf.splitTextToSize(aiAnalysis.marketStrategy, this.pageWidth - 2 * this.margin);
+      this.pdf.text(wrappedStrategy, this.margin, this.currentY);
+      this.currentY += wrappedStrategy.length * this.lineHeight + 5;
+    }
+
+    // Bottom line
     if (aiAnalysis.bottomLine) {
-      this.pdf.setFontSize(12);
+      this.checkPageBreak(15);
+      
+      this.pdf.setFontSize(14);
       this.pdf.setFont('helvetica', 'bold');
       this.pdf.text('Bottom Line:', this.margin, this.currentY);
       this.currentY += 8;
@@ -397,47 +428,48 @@ export class PDFExportService {
   }
 
   private addFooterWithLinks(tract: TractResult): void {
+    // Calculate total pages using internal property access
+    const totalPages = (this.pdf.internal as any).getNumberOfPages?.() || this.pdf.internal.pages?.length - 1 || 1;
+    
     // Go to last page
-    const pageCount = this.pdf.getNumberOfPages();
-    this.pdf.setPage(pageCount);
+    this.pdf.setPage(totalPages);
     
     // Start from near bottom of page
     this.currentY = this.pageHeight - 40;
-
+    
     this.pdf.setFontSize(14);
     this.pdf.setFont('helvetica', 'bold');
-    this.pdf.text('Useful Links', this.margin, this.currentY);
+    this.pdf.text('Quick Links', this.margin, this.currentY);
     this.currentY += 10;
+
+    // Get coordinates for Street View
+    const coords = this.getTractCoordinates(tract);
+    const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${coords.lat},${coords.lng}`;
+    
+    // Generate LoopNet URL
+    const loopNetUrl = this.generateLoopNetUrl(tract);
 
     this.pdf.setFontSize(11);
     this.pdf.setFont('helvetica', 'normal');
+    this.pdf.setTextColor(0, 0, 255); // Blue for links
 
-    // Street View link
-    const streetViewUrl = this.generateStreetViewUrl(tract);
-    this.pdf.setTextColor(0, 0, 255);
-    this.pdf.textWithLink('📍 Google Street View', this.margin, this.currentY, { url: streetViewUrl });
-    this.currentY += this.lineHeight;
+    this.pdf.text('Street View:', this.margin, this.currentY);
+    this.pdf.text(streetViewUrl, this.margin + 25, this.currentY);
+    this.currentY += this.lineHeight + 2;
 
-    // LoopNet link
-    const loopNetUrl = generateLoopNetUrl(tract);
-    this.pdf.textWithLink('🏢 View Properties on LoopNet', this.margin, this.currentY, { url: loopNetUrl });
-    this.currentY += this.lineHeight + 5;
+    this.pdf.text('LoopNet Search:', this.margin, this.currentY);
+    this.pdf.text(loopNetUrl, this.margin + 30, this.currentY);
+    this.currentY += this.lineHeight + 2;
 
     // Reset color
     this.pdf.setTextColor(0, 0, 0);
-
-    // Add generation timestamp
-    this.pdf.setFontSize(9);
-    this.pdf.setTextColor(100, 100, 100);
-    this.pdf.text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, this.margin, this.currentY);
-  }
-
-  private generateStreetViewUrl(tract: TractResult): string {
-    // Get coordinates from the tract data or use a default
-    const lat = 40.7589; // Default to midtown Manhattan
-    const lng = -73.9851;
     
-    return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+    // Add page numbers
+    for (let i = 1; i <= totalPages; i++) {
+      this.pdf.setPage(i);
+      this.pdf.setFontSize(10);
+      this.pdf.text(`Page ${i} of ${totalPages}`, this.pageWidth - this.margin - 20, this.pageHeight - 10);
+    }
   }
 
   private checkPageBreak(requiredSpace: number): void {
@@ -448,57 +480,45 @@ export class PDFExportService {
   }
 
   private addSeparator(): void {
-    this.currentY += 5;
+    this.pdf.setLineWidth(0.5);
     this.pdf.setDrawColor(200, 200, 200);
     this.pdf.line(this.margin, this.currentY, this.pageWidth - this.margin, this.currentY);
     this.currentY += 10;
   }
 
-  private generateFallbackSummary(tract: TractResult): string {
-    const score = Math.round(tract.custom_score || 0);
-    const rent = tract.avg_rent;
-    
-    if (score >= 80) {
-      return `Excellent location with strong fundamentals (${score}/100 score). ${rent ? `Rent at $${rent}/sqft is competitive for this quality area.` : ''} Ideal for premium businesses with high foot traffic and good safety metrics.`;
-    } else if (score >= 60) {
-      return `Good business opportunity with solid metrics (${score}/100 score). ${rent ? `Monthly rent of $${rent}/sqft offers good value.` : ''} Suitable for most business types with balanced risk-reward profile.`;
-    } else if (score >= 40) {
-      return `Fair location with mixed indicators (${score}/100 score). ${rent ? `Consider rent costs ($${rent}/sqft) vs potential returns.` : ''} May work for specific business models with careful planning.`;
-    } else {
-      return `Lower scoring area with challenges (${score}/100 score). ${rent ? `Despite lower rent ($${rent}/sqft),` : ''} Detailed analysis recommended before making investment decisions.`;
-    }
-  }
-
-  private analyzeTrends(timeline: Record<string, number>): string {
-    const values = Object.values(timeline).filter(v => v != null && v > 0);
+  private analyzeTrends(timeline: Record<string, number | undefined>): string {
+    const values = Object.values(timeline).filter(v => v !== undefined) as number[];
     if (values.length < 2) return 'Insufficient data';
-    
-    const recent = values.slice(-2);
-    const change = ((recent[1] - recent[0]) / recent[0]) * 100;
-    
-    if (change > 5) return `Improving (+${change.toFixed(1)}%)`;
-    if (change < -5) return `Declining (${change.toFixed(1)}%)`;
-    return `Stable (${change > 0 ? '+' : ''}${change.toFixed(1)}%)`;
+
+    const latest = values[values.length - 1];
+    const previous = values[values.length - 2];
+    const change = ((latest - previous) / previous) * 100;
+
+    if (change > 5) return `Increasing (+${change.toFixed(1)}%)`;
+    if (change < -5) return `Decreasing (${change.toFixed(1)}%)`;
+    return 'Stable';
   }
 
-  private analyzeCrimeTrends(timeline: Record<string, number>): string {
-    // For crime, lower numbers are better
-    const values = Object.values(timeline).filter(v => v != null && v > 0);
+  private analyzeCrimeTrends(timeline: Record<string, number | undefined>): string {
+    const values = Object.values(timeline).filter(v => v !== undefined) as number[];
     if (values.length < 2) return 'Insufficient data';
-    
-    const recent = values.slice(-2);
-    const change = ((recent[1] - recent[0]) / recent[0]) * 100;
-    
-    if (change < -5) return `Improving (Safety up ${Math.abs(change).toFixed(1)}%)`;
-    if (change > 5) return `Declining (Safety down ${change.toFixed(1)}%)`;
-    return `Stable (${change > 0 ? '+' : ''}${change.toFixed(1)}%)`;
+
+    const latest = values[values.length - 1];
+    const previous = values[values.length - 2];
+    const change = ((latest - previous) / previous) * 100;
+
+    if (change > 5) return `Improving safety (+${change.toFixed(1)}% crime reduction)`;
+    if (change < -5) return `Safety concerns (${Math.abs(change).toFixed(1)}% crime increase)`;
+    return 'Stable safety conditions';
   }
 
-  public download(filename: string): void {
-    this.pdf.save(filename);
+  private getTractCoordinates(tract: TractResult): { lat: number; lng: number } {
+    // Fallback to center of Manhattan if no specific coordinates
+    return { lat: 40.7589, lng: -73.9851 };
   }
 
-  public getBlob(): Blob {
-    return this.pdf.output('blob');
+  private generateLoopNetUrl(tract: TractResult): string {
+    const locationQuery = encodeURIComponent(tract.nta_name || 'NYC');
+    return `https://www.loopnet.com/search/commercial-real-estate/${locationQuery.toLowerCase().replace(/\s+/g, '-')}/`;
   }
 }

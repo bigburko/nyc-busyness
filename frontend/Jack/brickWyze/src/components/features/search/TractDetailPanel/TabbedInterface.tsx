@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel/TabbedInterface.tsx
+// src/components/features/search/TractDetailPanel/TabbedInterface.tsx - Restored Original Layout
 'use client';
 
 import React, { useState } from 'react';
@@ -18,6 +18,8 @@ import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
 import { SmartInsights } from './SmartInsights';
 import { DemographicCharts } from './DemographicCharts';
+import GoogleMapsImage from './GoogleMapsImage';
+import { LoopNetButton } from './LoopNetIntegration';
 
 // Define proper demographic data types
 interface DemographicDataItem {
@@ -290,6 +292,22 @@ export default function TabbedInterface({
                   </Badge>
                 )}
               </Flex>
+            </VStack>
+
+            {/* Street View */}
+            <VStack spacing={3} align="stretch">
+              <Text fontSize="md" fontWeight="semibold" color="gray.700">
+                📍 Street View
+              </Text>
+              <GoogleMapsImage tract={tract} />
+            </VStack>
+
+            {/* LoopNet Integration */}
+            <VStack spacing={3} align="stretch">
+              <Text fontSize="md" fontWeight="semibold" color="gray.700">
+                🏢 Properties
+              </Text>
+              <LoopNetButton tract={tract} />
             </VStack>
           </VStack>
         )}

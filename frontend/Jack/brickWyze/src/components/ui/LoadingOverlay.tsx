@@ -8,9 +8,9 @@ import {
   Spinner, 
   Portal,
   useColorModeValue,
-  keyframes,
   Progress
 } from '@chakra-ui/react';
+import { keyframes } from '@emotion/react'; // ✅ FIXED: Import from @emotion/react
 import { useState, useEffect } from 'react';
 
 const fadeIn = keyframes`
@@ -29,7 +29,7 @@ interface LoadingOverlayProps {
   message?: string;
   progress?: number;
   steps?: string[];
-  currentStep?: number;
+  currentStep?: number; // ✅ CONFIRMED: Expects number (step index)
 }
 
 export function LoadingOverlay({ 
@@ -44,7 +44,7 @@ export function LoadingOverlay({
     "Compiling PDF report",
     "Finalizing document"
   ],
-  currentStep = 0
+  currentStep = 0 // ✅ CONFIRMED: Default to step index 0
 }: LoadingOverlayProps) {
   const [dots, setDots] = useState('');
   const [currentStepIndex, setCurrentStepIndex] = useState(currentStep);
@@ -68,6 +68,11 @@ export function LoadingOverlay({
     return () => clearInterval(interval);
   }, [isOpen]);
 
+  // ✅ FIXED: Update internal step index when prop changes
+  useEffect(() => {
+    setCurrentStepIndex(currentStep);
+  }, [currentStep]);
+
   // Auto-progress through steps if no explicit progress provided
   useEffect(() => {
     if (!isOpen || progress !== undefined) return;
@@ -87,6 +92,7 @@ export function LoadingOverlay({
   if (!isOpen) return null;
 
   const currentProgress = progress ?? ((currentStepIndex + 1) / steps.length) * 100;
+  const displayStep = steps[currentStepIndex] || steps[0];
 
   return (
     <Portal>
@@ -97,57 +103,71 @@ export function LoadingOverlay({
         right="0"
         bottom="0"
         bg={bgColor}
+        backdropFilter="blur(8px)"
+        zIndex={2000}
         display="flex"
         alignItems="center"
         justifyContent="center"
-        zIndex={9999}
-        backdropFilter="blur(8px)"
         animation={`${fadeIn} 0.3s ease-out`}
       >
         <Box
           bg={cardBg}
           borderRadius="2xl"
-          p={10}
-          maxW="400px"
-          w="90%"
           boxShadow="2xl"
-          border="1px solid"
-          borderColor="whiteAlpha.200"
-          textAlign="center"
-          animation={`${fadeIn} 0.4s ease-out 0.1s both`}
+          p={8}
+          maxW="480px"
+          w="90%"
+          mx="auto"
+          animation={`${pulse} 2s ease-in-out infinite`}
         >
-          <VStack spacing={6}>
+          <VStack spacing={6} align="center">
             {/* Spinner */}
-            <Box position="relative">
-              <Spinner
-                size="xl"
-                thickness="4px"
-                speed="0.65s"
-                color="blue.500"
-                emptyColor="gray.200"
-              />
-              <Box
-                position="absolute"
-                top="50%"
-                left="50%"
-                transform="translate(-50%, -50%)"
-                fontSize="2xl"
-                animation={`${pulse} 2s ease-in-out infinite`}
-              >
-                📊
-              </Box>
-            </Box>
+            <Spinner
+              size="xl"
+              color="orange.500"
+              thickness="4px"
+              speed="0.8s"
+            />
 
             {/* Title */}
-            <VStack spacing={2}>
+            <Text 
+              fontSize="2xl" 
+              fontWeight="bold" 
+              color={textColor}
+              textAlign="center"
+            >
+              {title}
+            </Text>
+
+            {/* Progress Bar */}
+            <Box w="full">
+              <Progress 
+                value={currentProgress} 
+                colorScheme="orange" 
+                borderRadius="full"
+                bg="gray.100"
+                h="3"
+              />
               <Text 
-                fontSize="xl" 
-                fontWeight="bold" 
-                color={textColor}
+                fontSize="sm" 
+                color={subtextColor}
+                textAlign="center"
+                mt={2}
               >
-                {title}{dots}
+                {Math.round(currentProgress)}% Complete
               </Text>
-              
+            </Box>
+
+            {/* Current Step */}
+            <VStack spacing={2} align="center" w="full">
+              <Text 
+                fontSize="md" 
+                color={textColor}
+                textAlign="center"
+                fontWeight="medium"
+              >
+                {displayStep}{dots}
+              </Text>
               <Text 
                 fontSize="sm" 
                 color={subtextColor}
@@ -158,92 +178,36 @@ export function LoadingOverlay({
               </Text>
             </VStack>
 
-            {/* Progress Bar */}
-            <Box w="100%">
-              <Progress 
-                value={currentProgress} 
-                colorScheme="blue" 
-                borderRadius="full"
-                bg="gray.100"
-                size="sm"
-                hasStripe
-                isAnimated
-              />
-              <Text 
-                fontSize="xs" 
-                color={subtextColor} 
-                mt={2}
-                textAlign="center"
-              >
-                {Math.round(currentProgress)}% Complete
-              </Text>
-            </Box>
-
-            {/* Current Step */}
-            <VStack spacing={2} w="100%">
-              <Text 
-                fontSize="sm" 
-                fontWeight="semibold" 
-                color={textColor}
-              >
-                Current Step:
-              </Text>
-              
-              <Box
-                bg="blue.50"
-                color="blue.700"
-                px={4}
-                py={2}
-                borderRadius="lg"
-                fontSize="sm"
-                fontWeight="medium"
-                w="100%"
-                textAlign="center"
-                border="1px solid"
-                borderColor="blue.200"
-              >
-                {steps[currentStepIndex] || steps[steps.length - 1]}
-              </Box>
-
-              {/* Step indicators */}
-              <Box 
-                display="flex" 
-                justifyContent="center" 
-                gap={2} 
-                mt={2}
-                flexWrap="wrap"
-              >
-                {steps.map((_, index) => (
+            {/* Step Indicator */}
+            <Box w="full">
+              <VStack spacing={1} align="stretch">
+                {steps.map((step, index) => (
                   <Box
                     key={index}
-                    w={3}
-                    h={3}
-                    borderRadius="full"
-                    bg={index <= currentStepIndex ? "blue.500" : "gray.200"}
+                    display="flex"
+                    alignItems="center"
+                    opacity={index <= currentStepIndex ? 1 : 0.4}
                     transition="all 0.3s ease"
-                  />
+                  >
+                    <Box
+                      w="3"
+                      h="3"
+                      borderRadius="full"
+                      bg={index <= currentStepIndex ? "orange.500" : "gray.300"}
+                      mr={3}
+                      transition="all 0.3s ease"
+                      flexShrink={0}
+                    />
+                    <Text 
+                      fontSize="sm" 
+                      color={index <= currentStepIndex ? textColor : subtextColor}
+                      transition="all 0.3s ease"
+                    >
+                      {step}
+                    </Text>
+                  </Box>
                 ))}
-              </Box>
-            </VStack>
-
-            {/* Tips */}
-            <Box
-              bg="gray.50"
-              p={3}
-              borderRadius="lg"
-              w="100%"
-              border="1px solid"
-              borderColor="gray.200"
-            >
-              <Text 
-                fontSize="xs" 
-                color="gray.600"
-                textAlign="center"
-                lineHeight="1.4"
-              >
-                💡 Your report will include AI analysis, charts, Street View links, 
-                and property recommendations all in one comprehensive PDF
-              </Text>
+              </VStack>
             </Box>
           </VStack>
         </Box>
@@ -252,40 +216,35 @@ export function LoadingOverlay({
   );
 }
 
-// Hook for managing loading state
+// Hook for easier usage
 export function useLoadingOverlay() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [message, setMessage] = useState('');
+  const [state, setState] = useState({
+    isOpen: false,
+    title: "Loading",
+    message: "Please wait...",
+    progress: 0,
+    currentStep: 0
+  });
 
-  const showLoading = (initialMessage?: string) => {
-    setIsLoading(true);
-    setProgress(0);
-    setCurrentStep(0);
-    if (initialMessage) setMessage(initialMessage);
+  const showLoading = (options?: Partial<typeof state>) => {
+    setState(prev => ({ ...prev, isOpen: true, ...options }));
   };
 
-  const updateProgress = (newProgress: number, stepIndex?: number, newMessage?: string) => {
-    setProgress(newProgress);
-    if (stepIndex !== undefined) setCurrentStep(stepIndex);
-    if (newMessage) setMessage(newMessage);
+  const updateProgress = (progress: number, currentStep?: number) => {
+    setState(prev => ({ ...prev, progress, currentStep: currentStep ?? prev.currentStep }));
   };
 
   const hideLoading = () => {
-    setIsLoading(false);
-    setProgress(0);
-    setCurrentStep(0);
-    setMessage('');
+    setState(prev => ({ ...prev, isOpen: false }));
   };
 
   return {
-    isLoading,
-    progress,
-    currentStep,
-    message,
+    LoadingOverlay: (props: Omit<LoadingOverlayProps, 'isOpen'>) => (
+      <LoadingOverlay {...props} isOpen={state.isOpen} />
+    ),
     showLoading,
     updateProgress,
-    hideLoading
+    hideLoading,
+    isLoading: state.isOpen
   };
 }
