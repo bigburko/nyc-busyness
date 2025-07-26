@@ -13,7 +13,6 @@ import { TractResult } from '../../../../types/TractTypes';
 import { Weight } from '../../../../types/WeightTypes';
 
 // Import existing components
-import { KeyMetricPills } from './KeyMetricPills';
 import { TrendAnalysis } from './TrendAnalysis';
 import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
@@ -53,6 +52,95 @@ const getQuickInsights = (tract: TractResult): string => {
   } else {
     return `Lower scoring area with challenges. ${rent ? `Despite lower rent ($${rent.toLocaleString()}/month),` : ''} Careful analysis recommended before committing.`;
   }
+};
+
+// Key Metric Pills Component
+const KeyMetricPills = ({ 
+  tract, 
+  rentText, 
+  weights 
+}: { 
+  tract: TractResult; 
+  rentText: string; 
+  weights: Weight[]; 
+}) => {
+  return (
+    <VStack spacing={3} align="stretch">
+      <Text fontSize="md" fontWeight="semibold" color="gray.700">
+        Key Metrics
+      </Text>
+      
+      <Flex wrap="wrap" gap={3}>
+        {/* Resilience Score */}
+        <Box 
+          bg={tract.custom_score && tract.custom_score >= 70 ? 'green.50' : 
+              tract.custom_score && tract.custom_score >= 50 ? 'yellow.50' : 'red.50'}
+          border="1px solid"
+          borderColor={tract.custom_score && tract.custom_score >= 70 ? 'green.200' : 
+                      tract.custom_score && tract.custom_score >= 50 ? 'yellow.200' : 'red.200'}
+          borderRadius="lg"
+          p={3}
+          minW="120px"
+        >
+          <Text fontSize="xs" color="gray.600" mb={1}>Overall Score</Text>
+          <Text fontSize="xl" fontWeight="bold" 
+                color={tract.custom_score && tract.custom_score >= 70 ? 'green.700' : 
+                      tract.custom_score && tract.custom_score >= 50 ? 'yellow.700' : 'red.700'}>
+            {Math.round(tract.custom_score || 0)}
+          </Text>
+        </Box>
+
+        {/* Rent */}
+        <Box 
+          bg="blue.50"
+          border="1px solid"
+          borderColor="blue.200"
+          borderRadius="lg"
+          p={3}
+          minW="120px"
+        >
+          <Text fontSize="xs" color="gray.600" mb={1}>Avg Rent</Text>
+          <Text fontSize="xl" fontWeight="bold" color="blue.700">
+            ${rentText}
+          </Text>
+        </Box>
+
+        {/* Foot Traffic */}
+        {tract.foot_traffic_score && (
+          <Box 
+            bg="purple.50"
+            border="1px solid"
+            borderColor="purple.200"
+            borderRadius="lg"
+            p={3}
+            minW="120px"
+          >
+            <Text fontSize="xs" color="gray.600" mb={1}>Foot Traffic</Text>
+            <Text fontSize="xl" fontWeight="bold" color="purple.700">
+              {Math.round(tract.foot_traffic_score)}
+            </Text>
+          </Box>
+        )}
+
+        {/* Safety */}
+        {tract.crime_score && (
+          <Box 
+            bg="green.50"
+            border="1px solid"
+            borderColor="green.200"
+            borderRadius="lg"
+            p={3}
+            minW="120px"
+          >
+            <Text fontSize="xs" color="gray.600" mb={1}>Safety</Text>
+            <Text fontSize="xl" fontWeight="bold" color="green.700">
+              {Math.round(tract.crime_score)}
+            </Text>
+          </Box>
+        )}
+      </Flex>
+    </VStack>
+  );
 };
 
 export default function TabbedInterface({ 
@@ -209,23 +297,9 @@ export default function TabbedInterface({
           </VStack>
         )}
 
-        {/* 📈 TRENDS TAB - For Analysts */}
+        {/* 📈 TRENDS TAB - Clean and Focused */}
         {activeTab === 1 && (
-          <VStack spacing={6} align="stretch" w="full">
-            <Box>
-              <Flex align="center" gap={2} mb={2}>
-                <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                  Historical Trends & Predictions
-                </Text>
-              </Flex>
-              <Text fontSize="sm" color="gray.600">
-                Analyze historical patterns and future projections
-              </Text>
-            </Box>
-            
-            {/* Trends content - Contained width */}
-            <TrendAnalysis tract={tract} />
-          </VStack>
+          <TrendAnalysis tract={tract} />
         )}
 
         {/* 👥 DEMOGRAPHICS TAB - For Market Researchers */}
