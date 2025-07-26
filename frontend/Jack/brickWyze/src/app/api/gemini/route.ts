@@ -209,27 +209,9 @@ export async function POST(request: NextRequest) {
           };
         }
 
-        // 🎯 SCORE ROUNDING FIX: Ensure proper rounding in the message itself
-        let enhancedMessage = message;
-        // Look for tract scores in the message and round them properly
-        enhancedMessage = enhancedMessage.replace(/custom_score[":"]\s*(\d+\.?\d*)/g, (match, score) => {
-          const numericScore = parseFloat(score);
-          const roundedScore = Math.round(numericScore);
-          console.log(`🎯 [Score Rounding] Fixed: ${score} → ${roundedScore}`);
-          return match.replace(score, roundedScore.toString());
-        });
-
-        // Also check for any score patterns like "score: 82.7" and round them
-        enhancedMessage = enhancedMessage.replace(/\b(\d+\.\d+)\/100\b/g, (match, score) => {
-          const numericScore = parseFloat(score);
-          const roundedScore = Math.round(numericScore);
-          console.log(`🎯 [Score Rounding] Fixed score/100: ${score} → ${roundedScore}`);
-          return `${roundedScore}/100`;
-        });
-
-        // Step 2: Create context-aware prompt with enhanced demographics and rounded scores
+        // Step 2: Create context-aware prompt with enhanced demographics
         const contextPrompt = TimeBasedPromptService.createContextPrompt(
-          enhancedMessage, 
+          message, 
           enhancedCurrentState, 
           businessContext
         );
@@ -252,10 +234,10 @@ CRITICAL SCORE DISPLAY INSTRUCTIONS:
 
 In your analysis, always refer to ethnicities by their proper names (e.g., "Korean", "Mexican", "African American") rather than database codes (e.g., "AEA", "HMex", "BAfrAm"). Make the demographic analysis clear and business-friendly.`;
 
-        // Step 3: Call OpenRouter API with enhanced prompt and message
+        // Step 3: Call OpenRouter API with enhanced prompt
         const response = await OpenRouterService.callWithRetry({
           prompt: enhancedPrompt,
-          message: enhancedMessage,
+          message: message,
           model: 'google/gemini-2.5-flash',
           temperature: 0.3,
           maxTokens: 2000
