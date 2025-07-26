@@ -121,7 +121,7 @@ export const SpeechBubble = ({
           />
         </svg>
         
-        {/* Dynamic text container */}
+        {/* Responsive text container */}
         <Box
           position="absolute"
           top="10px"
@@ -132,22 +132,31 @@ export const SpeechBubble = ({
           alignItems="center"
           justifyContent="center"
           minH="40px"
+          fontSize={currentSize.fontSize}
+          fontWeight="medium"
+          textAlign="center"
+          lineHeight="1.4"
+          color={color}
         >
-          <Text 
+          <Box 
             ref={textRef}
-            fontSize={currentSize.fontSize}
-            fontWeight="medium"
-            textAlign="center"
-            lineHeight="1.4"
-            color={color}
             whiteSpace="normal"
             wordBreak="break-word"
             overflowWrap="break-word"
             maxW="100%"
             w="100%"
+            sx={{
+              '& *': {
+                color: 'inherit',
+                fontSize: 'inherit',
+                fontWeight: 'inherit',
+                textAlign: 'inherit',
+                lineHeight: 'inherit'
+              }
+            }}
           >
             {children}
-          </Text>
+          </Box>
         </Box>
       </Box>
     </Box>
