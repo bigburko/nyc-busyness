@@ -166,9 +166,19 @@
 
 .whoWeAreTitle {
   font-size: 2.2rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   color: #2c3e50;
   font-weight: 700;
+  position: relative;
+}
+
+.whoWeAreTitle::after {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 3px;
+  background: #e74c3c;
+  margin: 1rem auto 2rem;
 }
 
 .whoWeAreDescription {
@@ -181,11 +191,12 @@
 }
 
 .whoWeAreIcons {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 3rem 2rem;
-  max-width: 1000px;
-  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 3rem 1rem;
+  width: 100%;
+  padding: 0 2rem;
 }
 
 .iconItem {
@@ -194,6 +205,8 @@
   align-items: center;
   padding: 1rem;
   transition: transform 0.3s ease;
+  flex: 0 1 auto;
+  min-width: 120px;
 }
 
 .iconItem:hover {
@@ -215,25 +228,55 @@
 
 /* Welcome Section */
 .welcomeSection {
-  display: flex;
-  align-items: center;
-  gap: 4rem;
-  padding: 5rem 2rem;
+  background: linear-gradient(135deg, #ffb3ba 0%, #ffc3d0 50%, #ffcccb 100%);
+  padding: 6rem 2rem;
+  position: relative;
+}
+
+.welcomeSection::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 179, 186, 0.8) 0%, rgba(255, 195, 208, 0.9) 100%);
+  pointer-events: none;
+}
+
+.welcomeContainer {
   max-width: 1200px;
   margin: 0 auto;
-  background: linear-gradient(135deg, rgba(255, 182, 193, 0.15), rgba(173, 216, 230, 0.15));
-  border-radius: 20px;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
+  position: relative;
+  z-index: 2;
+  height: 400px;
 }
 
 .welcomeCard {
-  flex: 1;
-  padding: 2rem;
+  position: absolute;
+  top: 50%;
+  left: 5%;
+  transform: translateY(-50%);
+  width: 45%;
+  background: white;
+  padding: 2.5rem 2rem;
+  border-radius: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  z-index: 3;
+}
+
+.welcomeCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 60px;
+  background: #e74c3c;
 }
 
 .welcomeCard h1 {
-  font-size: 2.2rem;
+  font-size: 2rem;
   margin-bottom: 1.5rem;
   color: #2c3e50;
   font-weight: 700;
@@ -245,29 +288,34 @@
 }
 
 .intro {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   margin-bottom: 1.5rem;
   color: #2c3e50;
   font-weight: 600;
+  line-height: 1.6;
 }
 
 .welcomeCard p {
   line-height: 1.6;
   color: #555;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .welcomeImageContainer {
-  flex: 1;
-  display: flex;
-  justify-content: center;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 70%;
+  height: 100%;
+  z-index: 2;
 }
 
 .welcomeImage {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   border-radius: 15px;
-  max-width: 400px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
 /* Why Choose Us Section */
@@ -525,15 +573,33 @@
   }
   
   .whoWeAreIcons {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    justify-content: center;
     gap: 2rem 1rem;
   }
   
-  .welcomeSection {
+  .iconItem {
+    min-width: 100px;
+    flex: 0 1 calc(50% - 0.5rem);
+  }
+  
+  .welcomeContainer {
+    height: auto;
+    display: flex;
     flex-direction: column;
-    text-align: center;
     gap: 2rem;
-    padding: 3rem 1rem;
+  }
+  
+  .welcomeCard {
+    position: static;
+    transform: none;
+    width: 100%;
+    padding: 2rem 1.5rem;
+  }
+  
+  .welcomeImageContainer {
+    position: static;
+    width: 100%;
+    height: 250px;
   }
   
   .howItWorksContainer {
@@ -555,5 +621,28 @@
     flex-direction: column;
     gap: 1rem;
     text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .whoWeAreIcons {
+    gap: 1.5rem 0.5rem;
+  }
+  
+  .iconItem {
+    flex: 0 1 calc(33.333% - 0.33rem);
+    min-width: 80px;
+  }
+  
+  .welcomeSection {
+    padding: 4rem 1rem;
+  }
+  
+  .welcomeCard {
+    padding: 1.5rem 1rem;
+  }
+  
+  .welcomeCard h1 {
+    font-size: 1.8rem;
   }
 }
