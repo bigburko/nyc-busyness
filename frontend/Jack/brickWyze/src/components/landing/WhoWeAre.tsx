@@ -14,10 +14,8 @@ const items: IconItem[] = [
   { icon: 'Transit_Access.png', label: "Transit Access" },
   { icon: 'Foot_Traffic_Proxy.png', label: "Foot Traffic Proxy" },
   { icon: 'Crime_Rates.png', label: "Crime Rates" },
-  { icon: 'BID_Presence.png', label: "BID Presence" },
   { icon: 'Demographic_Alignment.png', label: "Demographic Alignment" },
   { icon: 'Flood_Risk.png', label: "Flood Risk" },
-  { icon: 'Zoning_Compatibility.png', label: "Zoning Compatibility" },
 ];
 
 const WhoWeAre: React.FC = () => {
