@@ -1,4 +1,4 @@
-// src/components/features/search/TractDetailPanel/TractDetailPanel.tsx - Updated with PDF Export Integration
+// src/components/features/search/TractDetailPanel/TractDetailPanel.tsx - Updated with Chart Export Support
 'use client';
 
 import { 
@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useFilterStore } from '../../../../stores/filterStore';
 import { TractResult } from '../../../../types/TractTypes';
 import { FilterStore, Weight } from '../../../../types/WeightTypes';
-import { TrendAnalysis } from './TrendAnalysis';
+import TrendAnalysis from './TrendAnalysis';
 import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
 import { DemographicCharts } from './DemographicCharts';
@@ -20,9 +20,10 @@ import { AISummary } from './AISummary/AISummary';
 import GoogleMapsImage from './GoogleMapsImage';
 import { LoopNetButton } from './LoopNetIntegration';
 
-// 🆕 PDF Export imports
+// 🆕 PDF Export imports - FIXED IMPORT PATH
 import { usePDFExport } from '../../../../hooks/usePDFExport';
 import { LoadingOverlay } from '../../../ui/LoadingOverlay';
+import { exportPDFWithAllCharts } from '../../../../lib/exportUtils'; // ✅ FIXED: Correct path
 
 // Define proper demographic data types
 interface DemographicDataItem {
@@ -57,9 +58,12 @@ export default function TractDetailPanel({
   const [activeTab, setActiveTab] = useState('overview');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
+  // 🆕 Chart Export State
+  const [isExporting, setIsExporting] = useState(false);
+  
   // 🆕 PDF Export functionality
   const { 
-    isExporting, 
+    isExporting: isPDFExporting, 
     error: exportError, 
     progress: exportProgress,
     currentStep,
@@ -126,36 +130,56 @@ export default function TractDetailPanel({
     return "red.500";
   };
 
-  // 🆕 PDF Export handlers
+  // 🆕 Enhanced PDF Export handlers with chart support
   const handleQuickExport = async () => {
     onAlertClose();
     try {
-      await downloadQuick(tract, weights);
+      // Use the enhanced chart export function
+      await exportPDFWithAllCharts(tract, weights, undefined, setIsExporting);
       toast({
         title: 'Report Downloaded',
-        description: 'Quick report exported successfully!',
+        description: 'Quick report with charts exported successfully!',
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
     } catch (error) {
       console.error('Export failed:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Please try again or contact support',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
   const handleFullExport = async () => {
     onAlertClose();
     try {
+      // First generate AI analysis if needed, then export with charts
+      setIsExporting(true);
       await downloadWithAI(tract, weights);
+      // Note: downloadWithAI should be updated to use the chart export function
       toast({
         title: 'Full Report Downloaded',
-        description: 'Complete report with AI analysis exported successfully!',
+        description: 'Complete report with AI analysis and charts exported successfully!',
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
     } catch (error) {
       console.error('Export failed:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Please try again or contact support',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -266,13 +290,26 @@ export default function TractDetailPanel({
 
               <Box h="200px" />
             </Box>
+
+            {/* 🆕 Hidden Charts for Export - Render all charts when exporting */}
+            {isExporting && (
+              <Box position="absolute" top="-10000px" left="-10000px" width="800px" bg="white">
+                <Box p={6}>
+                  <Text fontSize="lg" fontWeight="bold" mb={4}>Export Charts</Text>
+                  <VStack spacing={6}>
+                    <DemographicCharts tract={tract} rawDemographicData={rawDemographicData} isExporting={true} />
+                    <TrendAnalysis tract={tract} isExporting={true} />
+                  </VStack>
+                </Box>
+              </Box>
+            )}
           </Box>
         );
 
       case 'trends':
         return (
           <Box p={headerPadding} bg="gray.50" minH="100vh">
-            <TrendAnalysis tract={tract} />
+            <TrendAnalysis tract={tract} isExporting={isExporting} />
           </Box>
         );
 
@@ -281,7 +318,7 @@ export default function TractDetailPanel({
           <Box p={headerPadding} bg="gray.50" minH="100vh">
             <Text fontSize="xl" fontWeight="bold" mb={6}>Demographics Analysis</Text>
             <VStack spacing={6}>
-              <DemographicCharts tract={tract} rawDemographicData={rawDemographicData} />
+              <DemographicCharts tract={tract} rawDemographicData={rawDemographicData} isExporting={isExporting} />
               <AdvancedDemographics tract={tract} />
             </VStack>
           </Box>
@@ -305,6 +342,9 @@ export default function TractDetailPanel({
         return null;
     }
   };
+  
+  // 🆕 Combined loading state (either PDF export or chart export)
+  const isAnyExporting = isPDFExporting || isExporting;
   
   return (
     <Box position="relative" h="100vh" w="100%" bg="white" overflow="hidden">
@@ -517,8 +557,9 @@ export default function TractDetailPanel({
             boxShadow="0 8px 32px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(255,255,255,0.3)"
             transition="all 0.3s ease"
             onClick={onAlertOpen}  // 🔄 CHANGED: Opens export dialog
-            isLoading={isExporting}
-            loadingText="Exporting..."
+            isLoading={isAnyExporting}
+            loadingText={isExporting ? "Capturing Charts..." : "Exporting..."}
+            disabled={isAnyExporting}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -557,7 +598,7 @@ export default function TractDetailPanel({
                       Includes AI analysis, detailed insights, charts, Street View links, and property recommendations.
                     </Text>
                     <Text fontSize="xs" color="gray.500">
-                      Takes 15-30 seconds • Generates AI analysis if needed
+                      Takes 15-30 seconds • Generates AI analysis if needed • Captures all charts
                     </Text>
                   </Box>
                   
@@ -569,7 +610,7 @@ export default function TractDetailPanel({
                       Basic metrics, charts, and links without AI analysis.
                     </Text>
                     <Text fontSize="xs" color="gray.500">
-                      Takes 5-10 seconds • No AI generation
+                      Takes 5-10 seconds • No AI generation • Includes charts
                     </Text>
                   </Box>
                 </VStack>
@@ -577,13 +618,25 @@ export default function TractDetailPanel({
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onAlertClose}>
+              <Button ref={cancelRef} onClick={onAlertClose} disabled={isAnyExporting}>
                 Cancel
               </Button>
-              <Button colorScheme="green" onClick={handleQuickExport} ml={3}>
+              <Button 
+                colorScheme="green" 
+                onClick={handleQuickExport} 
+                ml={3}
+                disabled={isAnyExporting}
+                isLoading={isExporting}
+              >
                 Quick Export
               </Button>
-              <Button colorScheme="blue" onClick={handleFullExport} ml={3}>
+              <Button 
+                colorScheme="blue" 
+                onClick={handleFullExport} 
+                ml={3}
+                disabled={isAnyExporting}
+                isLoading={isPDFExporting}
+              >
                 Full Export
               </Button>
             </AlertDialogFooter>
@@ -593,11 +646,11 @@ export default function TractDetailPanel({
 
       {/* 🆕 Loading Overlay */}
       <LoadingOverlay 
-        isOpen={isExporting}
-        title="Generating Report"
-        message="Creating your comprehensive location analysis with AI insights, charts, and property links..."
-        progress={exportProgress}
-        currentStep={currentStep}
+        isOpen={isAnyExporting}
+        title={isExporting ? "Capturing Charts" : "Generating Report"}
+        message={isExporting ? "Rendering all charts for PDF capture..." : "Creating your comprehensive location analysis with AI insights, charts, and property links..."}
+        progress={isExporting ? 50 : exportProgress}
+        currentStep={isExporting ? "Capturing chart visualizations..." : currentStep}
         variant="pdf-export"
       />
     </Box>

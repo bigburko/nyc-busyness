@@ -7,9 +7,10 @@ import { TractResult } from '../../../../types/TractTypes';
 
 interface CrimeTrendChartProps {
   tract: TractResult;
+  isExporting?: boolean; // Add export support
 }
 
-export function CrimeTrendChart({ tract }: CrimeTrendChartProps) {
+export function CrimeTrendChart({ tract, isExporting = false }: CrimeTrendChartProps) {
   const currentScore = Math.round(tract.crime_score || 50);
   
   const hasRealData = tract.crime_timeline && Object.keys(tract.crime_timeline).length > 0;
@@ -45,24 +46,30 @@ export function CrimeTrendChart({ tract }: CrimeTrendChartProps) {
     const range = maxValue - minValue;
     if (range === 0) return 80;
     
-    // Less aggressive scaling - reduced multiplier and smaller base range
     const normalizedValue = (value - minValue) / range;
-    return Math.max(30, 50 + (normalizedValue * 80)); // Reduced from 40 + 120 to 50 + 80
+    return Math.max(30, 50 + (normalizedValue * 80));
   };
 
   return (
-    <Box w="full" data-testid="crime-trend-chart" data-chart="crime-trend" data-chart-content="true">
+    <Box 
+      w="full" 
+      data-testid="crime-trend-chart" 
+      data-chart="crime-trend" 
+      data-chart-content="true"
+      className="crime-trend-container"
+    >
       <HStack mb={4} align="center" spacing={3}>
         <Text fontSize="lg" fontWeight="bold" color="gray.800">
           Safety Score Trend
         </Text>
-        <MyToolTip label="Safety Score Trend">
-          Shows how safe this area is trending over time, with higher scores indicating better safety conditions
-        </MyToolTip>
+        {!isExporting && (
+          <MyToolTip label="Safety Score Trend">
+            Shows how safe this area is trending over time, with higher scores indicating better safety conditions
+          </MyToolTip>
+        )}
       </HStack>
 
       <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm" data-chart-content="true">
-        {/* Chart - Clean version with reduced white space */}
         <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
           {chartData.map((item, chartIndex) => {
             const isPast = chartIndex < 3;
@@ -71,7 +78,6 @@ export function CrimeTrendChart({ tract }: CrimeTrendChartProps) {
             
             return (
               <VStack key={`crime-chart-${item.year}`} spacing={1} flex="1" align="center" position="relative">
-                {/* Blue background box - positioned behind content */}
                 {isCurrent && (
                   <Box 
                     position="absolute"
@@ -87,7 +93,6 @@ export function CrimeTrendChart({ tract }: CrimeTrendChartProps) {
                   />
                 )}
                 
-                {/* Content - same structure for all years */}
                 <VStack spacing={2} align="center" position="relative" zIndex={1}>
                     <Box w="14px" textAlign="center">
                       <Text 

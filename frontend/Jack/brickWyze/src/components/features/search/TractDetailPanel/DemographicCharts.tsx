@@ -24,6 +24,7 @@ interface RawDemographicData {
 interface DemographicChartsProps {
   tract: TractResult;
   rawDemographicData?: RawDemographicData;
+  isExporting?: boolean; // Add export support
 }
 
 interface FilterStoreType {
@@ -207,7 +208,7 @@ const getQualityLabel = (percentage: number): string => {
   return 'Very Poor';
 };
 
-export function DemographicCharts({ tract, rawDemographicData }: DemographicChartsProps) {
+export function DemographicCharts({ tract, rawDemographicData, isExporting = false }: DemographicChartsProps) {
   const filterStore = useFilterStore();
   
   console.log(`📊 DemographicCharts rendering for tract ${tract.geoid}`);

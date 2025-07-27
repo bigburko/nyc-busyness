@@ -8,9 +8,10 @@ import { TractResult } from '../../../../types/TractTypes';
 
 interface FootTrafficChartProps {
   tract: TractResult;
+  isExporting?: boolean; // Add export support
 }
 
-export function FootTrafficChart({ tract }: FootTrafficChartProps) {
+export function FootTrafficChart({ tract, isExporting = false }: FootTrafficChartProps) {
   const currentScore = Math.round(tract.foot_traffic_score || 50);
   const { selectedTimePeriods } = useFilterStore();
   
@@ -295,9 +296,11 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
         <Text fontSize="lg" fontWeight="bold" color="gray.800">
           Foot Traffic Score
         </Text>
-        <MyToolTip label="Foot Traffic Score">
-          Current foot traffic score for this area based on pedestrian activity data
-        </MyToolTip>
+        {!isExporting && (
+          <MyToolTip label="Foot Traffic Score">
+            Current foot traffic score for this area based on pedestrian activity data
+          </MyToolTip>
+        )}
       </HStack>
       <Text fontSize="3xl" fontWeight="bold" color="#4299E1" textAlign="center">
         {currentScore}/100
