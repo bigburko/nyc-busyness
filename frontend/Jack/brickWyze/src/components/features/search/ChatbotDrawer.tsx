@@ -1,4 +1,4 @@
-// src/components/features/search/ChatbotDrawer.tsx - FIXED TypeScript errors
+// src/components/features/search/ChatbotDrawer.tsx - FIXED TypeScript errors + Added Tract Panel Closing
 
 'use client';
 
@@ -11,6 +11,13 @@ import { useRef, useState, useEffect } from 'react';
 import { useGeminiStore } from '../../../stores/geminiStore';
 import { useFilterStore, FilterState } from '../../../stores/filterStore';
 import { resolveEthnicities } from '../../../lib/resolveEthnicities';
+
+// 🆕 ADD THIS: Global window interface for tract panel closing
+declare global {
+  interface Window {
+    closeTractDetailPanel?: () => void;
+  }
+}
 
 // ✅ FIXED: Use FilterState directly instead of creating incompatible type
 interface ChatMessage {
@@ -53,6 +60,12 @@ export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: Chatb
   const handleSend = async () => {
     const userMsg = input.trim();
     if (!userMsg || isLoading) return;
+
+    // 🆕 ADD THIS: Close tract detail panel when user actively searches
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [ChatbotDrawer] Closed tract detail panel - user is actively searching');
+    }
 
     setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
@@ -191,7 +204,45 @@ export default function ChatbotDrawer({ isOpen, onClose, onSearchSubmit }: Chatb
             <Button size="xs" onClick={() => setInput("High foot traffic")} bg="orange.100" color="orange.800" _hover={{ bg: "orange.200" }}>🚶 Busy</Button>
           </Flex>
         </Box>
-        <Collapse in={!isCollapsed} animateOpacity><DrawerBody display="flex" flexDirection="column" gap={4} pb={4}><Box ref={chatBodyRef} flex="1" overflowY="auto" maxH="400px">{messages.length === 0 ? (<Text color="gray.500" textAlign="center" mt={10}>No messages yet. Start chatting below.</Text>) : (messages.map((msg, idx) => (<Box key={idx} bg={msg.role === 'user' ? 'orange.100' : 'gray.100'} borderRadius="md" p={2} mb={2} maxW="80%" ml={msg.role === 'user' ? 'auto' : '0'}><Text>{msg.content}</Text></Box>)))}{isLoading && (<Box textAlign="center" mt={2}><Spinner color="orange.400" size="sm" /></Box>)}</Box><Flex gap={2}><Input ref={inputRef} placeholder="Ask Bricky..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} bg="gray.50" borderRadius="full" px={4} /><IconButton icon={<SearchIcon />} aria-label="Send" onClick={handleSend} colorScheme="orange" borderRadius="full" /></Flex></DrawerBody></Collapse>
+        <Collapse in={!isCollapsed} animateOpacity>
+          <DrawerBody display="flex" flexDirection="column" gap={4} pb={4}>
+            <Box ref={chatBodyRef} flex="1" overflowY="auto" maxH="400px">
+              {messages.length === 0 ? (
+                <Text color="gray.500" textAlign="center" mt={10}>No messages yet. Start chatting below.</Text>
+              ) : (
+                messages.map((msg, idx) => (
+                  <Box key={idx} bg={msg.role === 'user' ? 'orange.100' : 'gray.100'} borderRadius="md" p={2} mb={2} maxW="80%" ml={msg.role === 'user' ? 'auto' : '0'}>
+                    <Text>{msg.content}</Text>
+                  </Box>
+                ))
+              )}
+              {isLoading && (
+                <Box textAlign="center" mt={2}>
+                  <Spinner color="orange.400" size="sm" />
+                </Box>
+              )}
+            </Box>
+            <Flex gap={2}>
+              <Input 
+                ref={inputRef} 
+                placeholder="Ask Bricky..." 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)} 
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+                bg="gray.50" 
+                borderRadius="full" 
+                px={4} 
+              />
+              <IconButton 
+                icon={<SearchIcon />} 
+                aria-label="Send" 
+                onClick={handleSend} 
+                colorScheme="orange" 
+                borderRadius="full" 
+              />
+            </Flex>
+          </DrawerBody>
+        </Collapse>
       </DrawerContent>
     </Drawer>
   );

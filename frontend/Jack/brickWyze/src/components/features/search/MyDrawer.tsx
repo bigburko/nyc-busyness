@@ -1,4 +1,4 @@
-// src/components/features/search/MyDrawer.tsx - FIXED: Updated to use EdgeFunctionResponse interface
+// src/components/features/search/MyDrawer.tsx - FIXED: Updated to use EdgeFunctionResponse interface + Added Tract Panel Closing
 
 'use client';
 
@@ -27,6 +27,13 @@ import MyToolTip from '../../ui/MyToolTip';
 // ✅ NEW: Import both justification components
 import OverallJustificationDisplay from '../../ui/OverallJustificationDisplay';
 import DemographicReasoningDisplay from '../../ui/DemographicReasoningDisplay';
+
+// 🆕 ADD THIS: Global window interface for tract panel closing
+declare global {
+  interface Window {
+    closeTractDetailPanel?: () => void;
+  }
+}
 
 // ✅ FIXED: Extended FilterState interface for submission data with topN
 interface SubmissionData extends FilterState {
@@ -205,9 +212,17 @@ export default function MyDrawer({
   const handleIncomeRangeChange = useCallback((newVal: [number, number]) => setFilters({ incomeRange: newVal }), [setFilters]);
   const handleGenderChange = useCallback((newVal: string[]) => setFilters({ selectedGenders: newVal }), [setFilters]);
   const handleEthnicityChange = useCallback((newVal: string[]) => setFilters({ selectedEthnicities: newVal }), [setFilters]);
+  
+  // 🆕 UPDATED: Add tract panel closing logic to handleTimePeriodChange
   const handleTimePeriodChange = useCallback((newVal: string[]) => {
     console.log('🕐 [MyDrawer] Time period change:', newVal);
     setFilters({ selectedTimePeriods: newVal });
+    
+    // 🆕 ADD THIS: Close tract detail panel when time period triggers auto-search
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [MyDrawer] Closed tract detail panel - time period auto-search triggered');
+    }
     
     // ✅ AUTO-SUBMIT: Trigger search when time periods change (like TopN does)
     const currentState = useFilterStore.getState();
@@ -230,9 +245,15 @@ export default function MyDrawer({
     });
   }, [setDemographicScoring]);
 
-  // ✅ FIXED: Handle TopN changes and trigger search
+  // 🆕 UPDATED: Add tract panel closing logic to handleTopNChange
   const handleTopNChange = useCallback((newValue: number) => {
     setTopN(newValue);
+    
+    // 🆕 ADD THIS: Close tract detail panel when TopN triggers auto-search
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [MyDrawer] Closed tract detail panel - TopN auto-search triggered');
+    }
     
     // Auto-submit search when topN changes (with current filters)
     const currentState = useFilterStore.getState();
@@ -243,10 +264,17 @@ export default function MyDrawer({
     onSearchSubmit(submissionData);
   }, [onSearchSubmit]);
 
+  // 🆕 UPDATED: Add tract panel closing logic to handleSubmit
   const handleSubmit = () => {
     if (!selectedGenders.length) {
       alert('Please select at least one gender.');
       return;
+    }
+    
+    // 🆕 ADD THIS: Close tract detail panel when search is submitted
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [MyDrawer] Closed tract detail panel - user submitted search');
     }
     
     // ✅ DEBUG: Log current state before submission
