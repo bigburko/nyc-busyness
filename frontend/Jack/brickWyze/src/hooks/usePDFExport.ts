@@ -1,10 +1,17 @@
-// src/hooks/usePDFExport.ts - HOOK ONLY (Fixed TypeScript issues)
+// src/hooks/usePDFExport.ts - FIXED: Actually uses AI response instead of defaults
 import { useState, useCallback } from 'react';
 import { TractResult } from '../types/TractTypes';
 import { Weight } from '../types/WeightTypes';
 import { AIBusinessAnalysis } from '../types/AIAnalysisTypes';
-import { EnhancedPDFService } from '../lib/enhancedPDFService'; // Import the service
-import { getCachedAnalysis, setCachedAnalysis } from '../lib/aiAnalysisUtils';
+import { EnhancedPDFService } from '../lib/enhancedPDFService';
+import { 
+  getCachedAnalysis, 
+  setCachedAnalysis,
+  extractTrendInsights,
+  buildBusinessIntelligencePrompt,
+  parseAIResponse
+} from '../lib/aiAnalysisUtils';
+import { useFilterStore } from '../stores/filterStore';
 
 interface ExportOptions {
   includeAI?: boolean;
@@ -20,7 +27,6 @@ interface ExportState {
   currentStep: string;
 }
 
-// ✅ MAIN EXPORT - This is what your component imports
 export function usePDFExport() {
   const [exportState, setExportState] = useState<ExportState>({
     isExporting: false,
@@ -45,37 +51,38 @@ export function usePDFExport() {
         return cachedAnalysis;
       }
 
-      console.log('🧠 [PDF Export] Generating new AI analysis for tract:', tract.geoid);
+      console.log('🧠 [PDF Export] Using EXACT AISummary logic for tract:', tract.geoid);
       
-      // ✅ FIXED: Use the exact same API format as AISummary component
-      const businessPrompt = `Generate a comprehensive business intelligence report for this NYC location:
+      // ✅ FIXED: Use exact same logic as AISummary component
       
-Location: ${tract.nta_name || 'Unknown'} (Census Tract ${tract.geoid.slice(-6)})
-Overall Score: ${Math.round(tract.custom_score || 0)}/100
-
-Key Metrics:
-- Foot Traffic Score: ${Math.round(tract.foot_traffic_score || 0)}/100
-- Safety Score: ${Math.round(tract.crime_score || 0)}/100
-- Demographics Match: ${Math.round(tract.demographic_match_pct || 0)}%
-- Average Rent: ${tract.avg_rent ? `${tract.avg_rent}/sqft` : 'N/A'}
-
-Please provide a business analysis with specific insights, recommended business types, market strategy, and a clear bottom line recommendation.`;
-
-      // ✅ FIXED: Use exact same API call format as AISummary
+      // Step 1: Extract trend insights (like AISummary does)
+      const trendInsights = extractTrendInsights(tract);
+      console.log('📊 [PDF Export] Extracted trend insights');
+      
+      // Step 2: Get current filter context (like AISummary does)
+      const currentFilter = useFilterStore.getState();
+      console.log('🎯 [PDF Export] Got filter context');
+      
+      // Step 3: Build sophisticated prompt (like AISummary does)
+      const businessPrompt = buildBusinessIntelligencePrompt(tract, weights, trendInsights, currentFilter);
+      console.log('📤 [PDF Export] Using exact AISummary prompt and context');
+      
+      // Step 4: Make API call with exact same format as AISummary
       const response = await fetch('/api/gemini', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: businessPrompt, // ✅ FIXED: Use 'message' field like AISummary
-          currentState: {          // ✅ FIXED: Use 'currentState' field like AISummary
-            selectedTimePeriods: ['morning', 'afternoon', 'evening'],
-            selectedEthnicities: [],
-            selectedGenders: [],
-            ageRange: [25, 65],
-            incomeRange: [50000, 150000],
-            rentRange: [26, 160],
+          message: businessPrompt, // ✅ FIXED: Use sophisticated prompt
+          currentState: {          // ✅ FIXED: Use full filter context
+            selectedTimePeriods: currentFilter.selectedTimePeriods,
+            selectedEthnicities: currentFilter.selectedEthnicities,
+            selectedGenders: currentFilter.selectedGenders,
+            ageRange: currentFilter.ageRange,
+            incomeRange: currentFilter.incomeRange,
+            rentRange: currentFilter.rentRange || [26, 160],
+            demographicScoring: currentFilter.demographicScoring,
             weights: weights.map(w => ({ id: w.id, value: w.value }))
           },
           readOnly: true // ✅ FIXED: Prevents filter updates like AISummary
@@ -87,100 +94,85 @@ Please provide a business analysis with specific insights, recommended business 
       }
 
       const result = await response.json();
-      console.log('📥 [PDF Export] AI response received:', result);
+      console.log('📥 [PDF Export] AI response received via AISummary logic');
       
-      // ✅ FIXED: Parse the response like AISummary does
+      // ✅ FIXED: Actually parse the AI response (this was the missing piece!)
       if (result.reply) {
-        // Import the parseAIResponse function or create a simple parser
-        const analysis: AIBusinessAnalysis = {
-          headline: `${tract.nta_name}: Business Analysis`,
-          reasoning: `AI-generated analysis for ${tract.nta_name} based on current metrics.`,
-          insights: [
-            {
-              type: 'strength',
-              icon: '📍',
-              title: 'Location Analysis Complete',
-              description: `Overall score of ${Math.round(tract.custom_score || 0)}/100 indicates ${(tract.custom_score || 0) >= 70 ? 'strong' : (tract.custom_score || 0) >= 50 ? 'moderate' : 'challenging'} business potential.`
-            },
-            {
-              type: tract.foot_traffic_score && tract.foot_traffic_score > 60 ? 'strength' : 'consideration',
-              icon: '🚶‍♀️',
-              title: 'Foot Traffic Analysis',
-              description: `Foot traffic score of ${Math.round(tract.foot_traffic_score || 0)}/100 suggests ${tract.foot_traffic_score && tract.foot_traffic_score > 60 ? 'good pedestrian activity' : 'moderate foot traffic levels'}.`
-            },
-            {
-              type: tract.crime_score && tract.crime_score > 70 ? 'strength' : 'consideration',
-              icon: '🛡️',
-              title: 'Safety Assessment',
-              description: `Safety score of ${Math.round(tract.crime_score || 0)}/100 indicates ${tract.crime_score && tract.crime_score > 70 ? 'a safe environment' : 'standard safety considerations'}.`
-            }
-          ],
-          businessTypes: [
-            ...(tract.custom_score && tract.custom_score > 70 ? ['Premium Retail', 'Professional Services'] : []),
-            ...(tract.foot_traffic_score && tract.foot_traffic_score > 60 ? ['Food & Beverage', 'Quick Service'] : []),
-            'Local Business', 'Service Industry'
-          ],
-          marketStrategy: `Focus on leveraging the area's ${tract.custom_score && tract.custom_score > 70 ? 'strong fundamentals' : 'available opportunities'}. ${tract.foot_traffic_score && tract.foot_traffic_score > 60 ? 'High foot traffic supports retail and food service.' : 'Consider digital marketing to build awareness.'} Monitor local competition and adapt to neighborhood preferences.`,
-          competitorExamples: ['Local businesses', 'Area services', 'Neighborhood retail'],
-          bottomLine: `${tract.nta_name} shows ${(tract.custom_score || 0) >= 70 ? 'strong' : (tract.custom_score || 0) >= 50 ? 'moderate' : 'challenging'} business potential. ${(tract.custom_score || 0) >= 70 ? 'Recommended for investment' : (tract.custom_score || 0) >= 50 ? 'Suitable with proper strategy' : 'Requires careful analysis'}.`,
-          confidence: 'medium'
-        };
-
+        console.log('🔄 [PDF Export] Parsing AI response with parseAIResponse function...');
+        
+        // This is what was missing - actually using the AI response!
+        const businessAnalysis = parseAIResponse(result.reply, tract);
+        
+        console.log('✅ [PDF Export] Successfully parsed AI response:', {
+          headline: businessAnalysis.headline,
+          insightsCount: businessAnalysis.insights?.length || 0,
+          businessTypesCount: businessAnalysis.businessTypes?.length || 0,
+          hasStrategy: !!businessAnalysis.marketStrategy,
+          confidence: businessAnalysis.confidence
+        });
+        
         // Cache the analysis for future use
-        setCachedAnalysis(tract.geoid, analysis);
-        return analysis;
+        setCachedAnalysis(tract.geoid, businessAnalysis);
+        
+        console.log('✅ [PDF Export] Analysis generated using AISummary logic:', businessAnalysis.headline);
+        return businessAnalysis;
+      } else {
+        console.warn('⚠️ [PDF Export] No reply in AI response, using fallback');
+        throw new Error('No AI response received');
       }
 
-      return null;
     } catch (error) {
       console.error('❌ [PDF Export] AI generation failed:', error);
       
-      // Return fallback analysis instead of null
-      return {
+      // Return comprehensive fallback analysis instead of null
+      const fallbackAnalysis: AIBusinessAnalysis = {
         headline: `${tract.nta_name ?? 'Unknown Location'}: Business Analysis`,
-        reasoning: 'Analysis generated from available tract data due to AI service unavailability.',
+        reasoning: 'Analysis generated from available tract data due to AI service limitations.',
         insights: [
           {
             type: 'strength' as const,
-            icon: '📍',
+            icon: '📊',
             title: 'Location Data Available',
-            description: `Score: ${Math.round(tract.custom_score ?? 0)}/100 based on foot traffic, safety, and demographics.`
+            description: `Overall score: ${Math.round(tract.custom_score ?? 0)}/100 based on comprehensive metrics including foot traffic, safety, and demographics.`
           },
           {
             type: tract.foot_traffic_score && tract.foot_traffic_score > 60 ? 'strength' : 'consideration' as const,
             icon: '🚶‍♀️',
             title: 'Foot Traffic Analysis',
-            description: `Foot traffic score of ${Math.round(tract.foot_traffic_score ?? 0)}/100 ${tract.foot_traffic_score && tract.foot_traffic_score > 60 ? 'indicates good pedestrian activity' : 'suggests moderate pedestrian activity'}.`
+            description: `Foot traffic score of ${Math.round(tract.foot_traffic_score ?? 0)}/100 ${tract.foot_traffic_score && tract.foot_traffic_score > 60 ? 'indicates strong pedestrian activity' : 'suggests moderate pedestrian activity'}.`
           },
           {
             type: tract.crime_score && tract.crime_score > 70 ? 'strength' : 'consideration' as const,
             icon: '🛡️',
-            title: 'Safety Metrics',
-            description: `Safety score of ${Math.round(tract.crime_score ?? 0)}/100 ${tract.crime_score && tract.crime_score > 70 ? 'indicates a safe area' : 'requires safety consideration'}.`
+            title: 'Safety Assessment',
+            description: `Safety score of ${Math.round(tract.crime_score ?? 0)}/100 ${tract.crime_score && tract.crime_score > 70 ? 'indicates a secure environment' : 'requires standard safety considerations'}.`
           },
           {
             type: tract.demographic_match_pct && tract.demographic_match_pct > 60 ? 'strength' : 'consideration' as const,
             icon: '👥',
-            title: 'Demographics',
-            description: `${Math.round(tract.demographic_match_pct ?? 0)}% demographic alignment ${tract.demographic_match_pct && tract.demographic_match_pct > 60 ? 'shows good target market fit' : 'indicates mixed target market alignment'}.`
+            title: 'Demographics Analysis',
+            description: `${Math.round(tract.demographic_match_pct ?? 0)}% demographic alignment ${tract.demographic_match_pct && tract.demographic_match_pct > 60 ? 'shows excellent target market fit' : 'indicates potential market opportunities'}.`
           }
         ],
         businessTypes: [
           ...(tract.custom_score && tract.custom_score > 70 ? ['Premium Retail', 'Professional Services'] : []),
           ...(tract.foot_traffic_score && tract.foot_traffic_score > 60 ? ['Food & Beverage', 'Quick Service'] : []),
           ...(tract.demographic_match_pct && tract.demographic_match_pct > 60 ? ['Target Market Business'] : ['General Services']),
-          'Local Business'
+          'Local Business', 'Community Services'
         ],
-        marketStrategy: `Focus on ${tract.custom_score && tract.custom_score > 70 ? 'premium positioning and' : ''} local market engagement. ${tract.foot_traffic_score && tract.foot_traffic_score > 60 ? 'Leverage high foot traffic with visible storefront.' : 'Consider digital marketing to drive awareness.'} Monitor local competition and adapt offerings to neighborhood preferences.`,
+        marketStrategy: `Focus on ${tract.custom_score && tract.custom_score > 70 ? 'premium positioning and ' : ''}leveraging the area's demographic profile. ${tract.foot_traffic_score && tract.foot_traffic_score > 60 ? 'High foot traffic supports retail and food service operations.' : 'Consider digital marketing and community engagement to build awareness.'} Monitor local competition and adapt offerings to neighborhood preferences.`,
         competitorExamples: [
-          'Local retail businesses',
-          'Neighborhood services',
+          'Local retail establishments',
+          'Neighborhood service providers',
           'Area restaurants and cafes',
-          'Regional chain locations'
+          'Regional business locations'
         ],
-        bottomLine: `This ${tract.nta_name ?? 'location'} shows ${(tract.custom_score ?? 0) >= 70 ? 'strong' : (tract.custom_score ?? 0) >= 50 ? 'moderate' : 'challenging'} business potential. ${(tract.custom_score ?? 0) >= 70 ? 'Recommended for business investment' : (tract.custom_score ?? 0) >= 50 ? 'Suitable with proper market strategy' : 'Requires careful analysis and niche positioning'} based on current metrics.`,
+        bottomLine: `This ${tract.nta_name ?? 'location'} shows ${(tract.custom_score ?? 0) >= 70 ? 'strong' : (tract.custom_score ?? 0) >= 50 ? 'moderate' : 'developing'} business potential with an overall score of ${Math.round(tract.custom_score ?? 0)}/100. ${(tract.custom_score ?? 0) >= 70 ? 'Recommended for business investment with good fundamentals.' : (tract.custom_score ?? 0) >= 50 ? 'Suitable for business with proper market strategy and positioning.' : 'Requires careful analysis and may benefit from niche market positioning.'} Consider local market dynamics and competition before proceeding.`,
         confidence: 'medium' as const
       };
+      
+      console.log('🚀 [PDF Export] Using comprehensive fallback analysis:', fallbackAnalysis.headline);
+      return fallbackAnalysis;
     }
   }, []);
 
@@ -198,14 +190,6 @@ Please provide a business analysis with specific insights, recommended business 
       });
 
       console.log('📊 [PDF Export] Starting export for tract:', tract.geoid);
-      console.log('🔍 [Enhanced PDF] Passing to PDF service:', {
-        hasAI: options.includeAI,
-        aiHeadline: options.includeAI ? 'Will generate if needed' : 'Not included',
-        includeAI: options.includeAI,
-        includeCharts: options.includeCharts,
-        includeStreetView: options.includeStreetView,
-        tractName: tract.nta_name ?? 'Unknown'
-      });
 
       let aiAnalysis: AIBusinessAnalysis | null = null;
 
@@ -218,7 +202,7 @@ Please provide a business analysis with specific insights, recommended business 
         }
       }
 
-      // Step 3: Generate beautiful PDF using HTML template
+      // Generate PDF
       updateExportState({ progress: 75, currentStep: 'Creating beautiful document...' });
       
       const pdfService = new EnhancedPDFService();
@@ -254,7 +238,6 @@ Please provide a business analysis with specific insights, recommended business 
         currentStep: 'Export failed'
       });
 
-      // Re-throw to allow component to handle the error
       throw new Error(`PDF export failed: ${errorMessage}`);
     }
   }, [updateExportState, generateAIAnalysisIfNeeded]);
@@ -290,7 +273,6 @@ Please provide a business analysis with specific insights, recommended business 
     });
   }, [updateExportState]);
 
-  // ✅ RETURN OBJECT - These are the exports your component uses
   return {
     // State
     isExporting: exportState.isExporting,
