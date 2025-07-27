@@ -139,10 +139,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - **Jack** - Frontend Lead
 - **Jen** - Data Lead
 
-## Live Demo
-
-Experience Brickwyze at: **[https://brickwyze.com/](https://brickwyze.com/)**
-
 ---
 
 *Built with ❤️ for NYC entrepreneurs and businesses*
