@@ -1,4 +1,4 @@
-// src/lib/enhancedPDFService.ts - Beautiful design + Multipage support + Clickable links
+// src/lib/enhancedPDFService.ts - Beautiful design + Multipage support + Charts + Clickable links
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { TractResult } from '../types/TractTypes';
@@ -16,13 +16,71 @@ interface ExportOptions {
   filename?: string;
 }
 
+interface ChartConfig {
+  selector: string;
+  title: string;
+  description: string;
+  category: string;
+}
+
 export class EnhancedPDFService {
   
-  // 🎨 Beautiful HTML template generation with multipage support
-  private generateHTMLReport(options: ExportOptions, streetViewUrl: string, loopNetUrl: string): string {
-    const { tract, weights, aiAnalysis } = options;
+  // 🚀 Chart configurations for capture
+  private readonly chartConfigs: ChartConfig[] = [
+    {
+      selector: '[data-chart="demographic-overview"]',
+      title: 'Demographic Overview',
+      description: 'Complete demographic breakdown including ethnicity, age, gender, and income distributions',
+      category: 'Demographics'
+    },
+    {
+      selector: '[data-chart="ethnicity-distribution"]',
+      title: 'Ethnicity Distribution',
+      description: 'Population ethnicity breakdown with target market alignment analysis',
+      category: 'Demographics'
+    },
+    {
+      selector: '[data-chart="age-gender-distribution"]',
+      title: 'Age & Gender Distribution',
+      description: 'Age and gender demographics showing target market fit percentages',
+      category: 'Demographics'
+    },
+    {
+      selector: '[data-chart="income-distribution"]',
+      title: 'Income Distribution',
+      description: 'Household income levels and target economic alignment analysis',
+      category: 'Demographics'
+    },
+    {
+      selector: '[data-chart="foot-traffic-timeline"]',
+      title: 'Foot Traffic Trends',
+      description: 'Historical and projected pedestrian activity patterns over time',
+      category: 'Traffic Analysis'
+    },
+    {
+      selector: '[data-chart="foot-traffic-periods"]',
+      title: 'Foot Traffic by Time Period',
+      description: 'Daily foot traffic patterns broken down by morning, afternoon, and evening',
+      category: 'Traffic Analysis'
+    },
+    {
+      selector: '[data-chart="crime-trend"]',
+      title: 'Safety Score Trends',
+      description: 'Historical safety trends and future projections for the area',
+      category: 'Safety Analysis'
+    },
+    {
+      selector: '[data-chart="trend-indicators"]',
+      title: 'Key Performance Indicators',
+      description: 'Summary of all key metrics with trend sparklines and performance indicators',
+      category: 'Overview'
+    }
+  ];
+
+  // 🎨 Beautiful HTML template generation with multipage support + Charts
+  private generateHTMLReport(options: ExportOptions, streetViewUrl: string, loopNetUrl: string, chartImages: { [key: string]: string } = {}): string {
+    const { tract, weights, aiAnalysis, includeCharts = true } = options;
     
-    // 🔍 DEBUG: Simple logging to avoid TypeScript issues
     console.log('🔍 [HTML Template] AI Analysis status:', {
       hasAI: !!aiAnalysis,
       type: typeof aiAnalysis,
@@ -44,11 +102,62 @@ export class EnhancedPDFService {
       return '#ef4444'; // Red
     };
 
-    const getScoreGradient = (score: number) => {
-      if (score >= 80) return 'linear-gradient(135deg, #10b981, #34d399)';
-      if (score >= 60) return 'linear-gradient(135deg, #3b82f6, #60a5fa)';
-      if (score >= 40) return 'linear-gradient(135deg, #f59e0b, #fbbf24)';
-      return 'linear-gradient(135deg, #ef4444, #f87171)';
+    // Generate charts section HTML
+    const generateChartsHTML = () => {
+      if (!includeCharts) return '';
+
+      const chartsByCategory = this.groupChartsByCategory(chartImages);
+      if (Object.keys(chartsByCategory).length === 0) {
+        return `
+          <div class="section page-break">
+            <h2 class="section-title">
+              <span class="section-icon">📊</span>
+              Data Visualizations
+            </h2>
+            <div style="background: #f8fafc; border-radius: 8px; padding: 20px; text-align: center;">
+              <p style="color: #6b7280; font-style: italic;">No charts are currently available to display.</p>
+              <p style="color: #6b7280; font-size: 0.9rem; margin-top: 8px;">Charts will appear when demographic filters are applied in the interface.</p>
+            </div>
+          </div>
+        `;
+      }
+
+      let chartsHTML = `
+        <div class="section page-break">
+          <h2 class="section-title">
+            <span class="section-icon">📊</span>
+            Data Visualizations
+          </h2>
+          <p style="color: #6b7280; margin-bottom: 30px;">Key metrics and trends visualization from the web interface</p>
+      `;
+
+      Object.entries(chartsByCategory).forEach(([category, charts]) => {
+        chartsHTML += `
+          <div class="chart-category">
+            <h3 style="color: #1e40af; font-size: 1.25rem; font-weight: 600; margin: 30px 0 20px 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">
+              ${category}
+            </h3>
+        `;
+
+        charts.forEach(({ config, imageData }) => {
+          chartsHTML += `
+            <div class="chart-item" style="margin-bottom: 40px; page-break-inside: avoid;">
+              <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                <h4 style="color: #374151; font-size: 1.1rem; font-weight: 600; margin-bottom: 8px;">${config.title}</h4>
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">${config.description}</p>
+                <div style="text-align: center;">
+                  <img src="${imageData}" style="max-width: 100%; height: auto; border-radius: 8px;" alt="${config.title}" />
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        chartsHTML += `</div>`;
+      });
+
+      chartsHTML += `</div>`;
+      return chartsHTML;
     };
 
     return `
@@ -123,12 +232,10 @@ export class EnhancedPDFService {
           font-size: 0.95rem;
           opacity: 0.8;
         }
-        
 
-        
         .content {
           padding: 40px;
-          padding-top: 60px; /* Extra space at top for clickable buttons */
+          padding-top: 60px;
         }
         
         .section {
@@ -319,8 +426,16 @@ export class EnhancedPDFService {
           page-break-before: always;
           margin-top: 40px;
         }
-        
-        /* 🔍 DEBUG SECTION */
+
+        .chart-category {
+          margin-bottom: 40px;
+        }
+
+        .chart-item {
+          page-break-inside: avoid;
+          margin-bottom: 30px;
+        }
+
         .debug-section {
           background: #fef3c7;
           border: 2px solid #f59e0b;
@@ -441,6 +556,9 @@ export class EnhancedPDFService {
               </tbody>
             </table>
           </div>
+
+          <!-- 🚀 Charts Section -->
+          ${generateChartsHTML()}
           
           ${aiAnalysis ? `
           <!-- AI Analysis -->
@@ -489,7 +607,6 @@ export class EnhancedPDFService {
             </div>
           </div>
           ` : `
-          <!-- 🔍 DEBUG: No AI Analysis Available -->
           <div class="debug-section">
             <div class="debug-title">🔍 DEBUG: AI Analysis Status</div>
             <div class="debug-content">
@@ -528,8 +645,6 @@ export class EnhancedPDFService {
               </div>
             </div>
           </div>
-
-
         </div>
         
         <!-- Footer -->
@@ -547,14 +662,165 @@ export class EnhancedPDFService {
     `;
   }
 
-  // 🚀 MULTIPAGE PDF generation
+  // 🚀 NEW: Capture charts from DOM
+  private async captureCharts(): Promise<{ [key: string]: string }> {
+    console.log('📊 [Enhanced PDF] Starting chart capture...');
+    
+    // Add data attributes to chart elements
+    this.addChartDataAttributes();
+    
+    const chartImages: { [key: string]: string } = {};
+    let capturedCount = 0;
+
+    for (const config of this.chartConfigs) {
+      try {
+        const element = document.querySelector(config.selector) as HTMLElement;
+        
+        if (!element) {
+          console.log(`📊 [Chart Capture] Not found: ${config.selector}`);
+          continue;
+        }
+
+        if (!this.isElementVisible(element)) {
+          console.log(`📊 [Chart Capture] Not visible: ${config.selector}`);
+          continue;
+        }
+
+        // Wait for chart to be ready
+        await this.waitForChartReady(element);
+
+        // Capture chart
+        const canvas = await html2canvas(element, {
+          useCORS: true,
+          allowTaint: false,
+          scale: 2, // High quality
+          backgroundColor: '#ffffff',
+          logging: false,
+          width: element.offsetWidth,
+          height: element.offsetHeight
+        });
+
+        const imageData = canvas.toDataURL('image/png', 0.95);
+        chartImages[config.selector] = imageData;
+        capturedCount++;
+
+        console.log(`✅ [Chart Capture] Captured: ${config.title}`);
+
+      } catch (error) {
+        console.warn(`⚠️ [Chart Capture] Failed ${config.selector}:`, error);
+      }
+    }
+
+    console.log(`📊 [Enhanced PDF] Captured ${capturedCount}/${this.chartConfigs.length} charts`);
+    return chartImages;
+  }
+
+  // 🚀 NEW: Group charts by category
+  private groupChartsByCategory(chartImages: { [key: string]: string }): { [category: string]: { config: ChartConfig; imageData: string }[] } {
+    const grouped: { [category: string]: { config: ChartConfig; imageData: string }[] } = {};
+
+    this.chartConfigs.forEach(config => {
+      if (chartImages[config.selector]) {
+        if (!grouped[config.category]) {
+          grouped[config.category] = [];
+        }
+        grouped[config.category].push({
+          config,
+          imageData: chartImages[config.selector]
+        });
+      }
+    });
+
+    return grouped;
+  }
+
+  // 🚀 NEW: Add chart data attributes
+  private addChartDataAttributes(): void {
+    const attributeMap = [
+      { selector: '.demographic-charts-container, [data-testid="demographic-charts"]', attribute: 'demographic-overview' },
+      { selector: '.ethnicity-chart-section', attribute: 'ethnicity-distribution' },
+      { selector: '.age-gender-chart-section', attribute: 'age-gender-distribution' },
+      { selector: '.income-chart-section', attribute: 'income-distribution' },
+      { selector: '[data-testid="foot-traffic-chart"]', attribute: 'foot-traffic-timeline' },
+      { selector: '.foot-traffic-periods-container', attribute: 'foot-traffic-periods' },
+      { selector: '[data-testid="crime-trend-chart"]', attribute: 'crime-trend' },
+      { selector: '.trend-indicators-container', attribute: 'trend-indicators' }
+    ];
+
+    attributeMap.forEach(({ selector, attribute }) => {
+      try {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+          el.setAttribute('data-chart', attribute);
+        });
+        if (elements.length > 0) {
+          console.log(`📊 [Chart Attributes] Added data-chart="${attribute}" to ${elements.length} elements`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ [Chart Attributes] Failed to add attribute to ${selector}:`, error);
+      }
+    });
+  }
+
+  // 🚀 NEW: Wait for chart to be ready
+  private async waitForChartReady(element: HTMLElement, timeout: number = 3000): Promise<void> {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      
+      const checkReady = () => {
+        // Check for chart indicators
+        const hasRechart = element.querySelector('.recharts-wrapper, .recharts-surface');
+        const hasCanvas = element.querySelector('canvas');
+        const hasSvg = element.querySelector('svg');
+        const hasChartContent = element.querySelector('[data-chart-content]');
+        
+        if (hasRechart || hasCanvas || hasSvg || hasChartContent) {
+          setTimeout(resolve, 500); // Small delay for animations
+          return;
+        }
+
+        if (Date.now() - startTime > timeout) {
+          resolve();
+          return;
+        }
+
+        setTimeout(checkReady, 100);
+      };
+
+      checkReady();
+    });
+  }
+
+  // 🚀 NEW: Check if element is visible
+  private isElementVisible(element: HTMLElement): boolean {
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    
+    return (
+      rect.width > 0 && 
+      rect.height > 0 && 
+      style.display !== 'none' && 
+      style.visibility !== 'hidden' &&
+      style.opacity !== '0'
+    );
+  }
+
+  // 🚀 MULTIPAGE PDF generation with charts
   public async generateLocationReport(options: ExportOptions): Promise<void> {
-    const { filename = 'location-report.pdf' } = options;
+    const { filename = 'location-report.pdf', includeCharts = true } = options;
     
     try {
-      console.log('🎨 [Enhanced PDF] Generating beautiful HTML template...');
+      console.log('🎨 [Enhanced PDF] Generating beautiful HTML template with charts...');
       
-      // ✅ Generate URLs for both HTML and clickable links
+      // Capture charts first if requested
+      let chartImages: { [key: string]: string } = {};
+      if (includeCharts) {
+        console.log('📊 [Enhanced PDF] Capturing charts...');
+        chartImages = await this.captureCharts();
+        console.log(`📊 [Enhanced PDF] Captured ${Object.keys(chartImages).length} charts`);
+      }
+      
+      // Generate URLs for both HTML and clickable links
       const streetViewUrl = generateStreetViewUrlSync(options.tract);
       const loopNetUrl = generateLoopNetUrl(options.tract, 'commercial-real-estate', 'for-lease');
       
@@ -563,8 +829,8 @@ export class EnhancedPDFService {
         loopNet: loopNetUrl
       });
       
-      // Create HTML content with the generated URLs
-      const htmlContent = this.generateHTMLReport(options, streetViewUrl, loopNetUrl);
+      // Create HTML content with the generated URLs and charts
+      const htmlContent = this.generateHTMLReport(options, streetViewUrl, loopNetUrl, chartImages);
       
       // Create temporary container with proper sizing
       const tempContainer = document.createElement('div');
@@ -583,17 +849,17 @@ export class EnhancedPDFService {
       // Add to DOM for rendering
       document.body.appendChild(tempContainer);
       
-      // 🎯 KEY FIX: Capture FULL HEIGHT of content (not fixed height)
+      // Capture FULL HEIGHT of content
       const fullHeight = tempContainer.scrollHeight;
       console.log('📏 [Enhanced PDF] Full content height:', fullHeight, 'pixels');
       
       // Wait for any images/content to load
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Longer wait for charts
       
-      // 🚀 MULTIPAGE CAPTURE: Capture with full content height
+      // MULTIPAGE CAPTURE: Capture with full content height
       const canvas = await html2canvas(tempContainer, {
         width: 794,
-        height: fullHeight, // ✅ CHANGED: Use full height instead of fixed height
+        height: fullHeight,
         scale: 1.5, // Good balance of quality and performance
         useCORS: true,
         allowTaint: true,
@@ -605,7 +871,7 @@ export class EnhancedPDFService {
       // Clean up
       document.body.removeChild(tempContainer);
       
-      // 📄 CREATE PDF with proper page handling
+      // CREATE PDF with proper page handling
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -620,7 +886,7 @@ export class EnhancedPDFService {
       console.log('📄 [Enhanced PDF] PDF size:', pdfWidth, 'x', pdfHeight, 'mm');
       console.log('📏 [Enhanced PDF] Scaled content height:', scaledHeight, 'mm');
       
-      // 🎯 MULTIPAGE LOGIC: Split content across multiple pages
+      // MULTIPAGE LOGIC: Split content across multiple pages
       const totalPages = Math.ceil(scaledHeight / pdfHeight);
       console.log('📚 [Enhanced PDF] Will create', totalPages, 'pages');
       
@@ -652,12 +918,12 @@ export class EnhancedPDFService {
         console.log(`✅ [Enhanced PDF] Added page ${page + 1}/${totalPages}`);
       }
       
-      // ✅ ADD CLICKABLE LINKS to the PDF
+      // ADD CLICKABLE LINKS to the PDF
       this.addClickableLinks(pdf, options.tract, streetViewUrl, loopNetUrl, totalPages);
       
       // Save the PDF
       pdf.save(filename);
-      console.log('🎉 [Enhanced PDF] Multi-page PDF saved successfully!');
+      console.log('🎉 [Enhanced PDF] Multi-page PDF with charts saved successfully!');
       
     } catch (error) {
       console.error('❌ [Enhanced PDF] Generation failed:', error);
@@ -723,12 +989,6 @@ export class EnhancedPDFService {
       pdf.setTextColor(0, 0, 0);
       
       console.log('✅ [PDF Links] Successfully added clickable link buttons at top of PDF');
-      console.log(`🔗 [PDF Links] Button positions:
-        LoopNet: ${loopNetX}, ${loopNetY}, ${linkWidth}x${linkHeight}
-        Street View: ${streetViewX}, ${streetViewY}, ${linkWidth}x${linkHeight}`);
-      console.log(`🔗 [PDF Links] URLs added:
-        LoopNet: ${loopNetUrl}
-        Street View: ${streetViewUrl.substring(0, 100)}...`);
       
     } catch (error) {
       console.warn('⚠️ [PDF Links] Failed to add clickable links:', error);
@@ -736,7 +996,7 @@ export class EnhancedPDFService {
     }
   }
 
-  // ✅ FIXED: Utility methods with proper TypeScript
+  // ✅ Utility methods
   private formatWeightLabel(id: string): string {
     const labels: Record<string, string> = {
       'foot_traffic': 'Foot Traffic',

@@ -238,7 +238,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
   // If no meaningful data, show appropriate message
   if (!hasRealData && !hasProvidedData) {
     return (
-      <Box p={6} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+      <Box p={6} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200" data-chart="demographic-overview" data-chart-content="true">
         <VStack spacing={4}>
           <Text fontSize="xl" fontWeight="bold" color="gray.800">
             📊 Neighborhood Demographics
@@ -306,7 +306,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
           <Text fontSize="md" fontWeight="semibold" color="gray.700" mb={3} textAlign="center">
             Ethnicity Distribution
           </Text>
-          <Box height="320px" w="full">
+          <Box height="320px" w="full" data-chart-content="true">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -369,7 +369,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
           <Text fontSize="md" fontWeight="semibold" color="gray.700" mb={3} textAlign="center">
             Age & Gender Distribution
           </Text>
-          <Box height="300px" w="full">
+          <Box height="300px" w="full" data-chart-content="true">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={demographicsData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                 <XAxis 
@@ -437,7 +437,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
           <Text fontSize="md" fontWeight="semibold" color="black" mb={3} textAlign="center">
             Income Distribution
           </Text>
-          <Box height="320px" w="full">
+          <Box height="320px" w="full" data-chart-content="true">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -489,13 +489,13 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
   );
 
   return (
-    <Box maxW="100%" overflow="hidden">
+    <Box maxW="100%" overflow="hidden" className="demographic-charts-container" data-chart="demographic-overview" data-chart-content="true">
       <VStack spacing={4}>
         {/* Stacked Charts */}
         <VStack spacing={4} w="full" maxW="100%">
           {/* Ethnicity Section */}
           {availableTabs.some(tab => tab.id === 'ethnicity') && (
-            <Box w="full" p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" maxW="100%" overflow="hidden">
+            <Box w="full" p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" maxW="100%" overflow="hidden" className="ethnicity-chart-section" data-chart="ethnicity-distribution" data-chart-content="true">
               <VStack spacing={4}>
                 {/* Header */}
                 <VStack spacing={3} w="full">
@@ -538,7 +538,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
 
           {/* Demographics Section */}
           {availableTabs.some(tab => tab.id === 'demographics') && (
-            <Box w="full" p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" maxW="100%" overflow="hidden">
+            <Box w="full" p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" maxW="100%" overflow="hidden" className="age-gender-chart-section" data-chart="age-gender-distribution" data-chart-content="true">
               <VStack spacing={4}>
                 {/* Header */}
                 <VStack spacing={3} w="full">
@@ -606,7 +606,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
 
           {/* Income Section */}
           {availableTabs.some(tab => tab.id === 'income') && (
-            <Box w="full" p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" maxW="100%" overflow="hidden">
+            <Box w="full" p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" maxW="100%" overflow="hidden" className="income-chart-section" data-chart="income-distribution" data-chart-content="true">
               <VStack spacing={4}>
                 {/* Header */}
                 <VStack spacing={3} w="full">
@@ -650,7 +650,7 @@ export function DemographicCharts({ tract, rawDemographicData }: DemographicChar
 
         {/* ✅ UPDATED: Overall assessment using Bricky's EXACT calculation */}
         {hasRealData && (
-          <Box bg="blue.50" p={4} borderRadius="lg" border="1px solid" borderColor="blue.200" w="full">
+          <Box bg="blue.50" p={4} borderRadius="lg" border="1px solid" borderColor="blue.200" w="full" className="combined-demographic-assessment" data-chart="combined-demographic-score" data-chart-content="true">
             <VStack spacing={3} align="stretch">
               <Text fontSize="md" fontWeight="bold" color="blue.700">
                 📋 Overall Demographic Assessment (Bricky&apos;s Analysis)

@@ -32,7 +32,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
     
     if (activePeriods.length === 0) {
       return (
-        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200" data-testid="foot-traffic-chart" data-chart="foot-traffic-timeline" data-chart-content="true">
           <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
             Foot Traffic by Time Period
           </Text>
@@ -60,7 +60,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
     
     if (chartData.length === 0) {
       return (
-        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+        <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200" data-testid="foot-traffic-chart" data-chart="foot-traffic-timeline" data-chart-content="true">
           <Text fontSize="lg" fontWeight="bold" mb={2} color="gray.800">
             Foot Traffic Score
           </Text>
@@ -92,7 +92,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
     };
 
     return (
-      <Box w="full">
+      <Box w="full" data-testid="foot-traffic-chart" className="foot-traffic-periods-container" data-chart="foot-traffic-periods" data-chart-content="true">
         <HStack mb={4} align="center" spacing={3}>
           <Text fontSize="lg" fontWeight="bold" color="gray.800">
             Foot Traffic by Time Period
@@ -102,7 +102,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
           </MyToolTip>
         </HStack>
 
-        <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
+        <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm" data-chart-content="true">
           {/* Chart - Clean version with enough height for bars */}
           <Flex justify="space-around" align="end" h="200px" mb={4} px={2}>
             {chartData.map((item) => {
@@ -226,7 +226,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
     };
 
     return (
-      <Box w="full">
+      <Box w="full" data-testid="foot-traffic-chart" data-chart="foot-traffic-timeline" data-chart-content="true">
         <HStack mb={4} align="center" spacing={3}>
           <Text fontSize="lg" fontWeight="bold" color="gray.800">
             Foot Traffic Trend
@@ -236,7 +236,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
           </MyToolTip>
         </HStack>
 
-        <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
+        <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm" data-chart-content="true">
           <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
             {chartData.map((item, index) => {
               const isPast = index < 3;
@@ -290,7 +290,7 @@ export function FootTrafficChart({ tract }: FootTrafficChartProps) {
 
   // Final fallback: Show current score only
   return (
-    <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+    <Box w="full" p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200" data-testid="foot-traffic-chart" data-chart="foot-traffic-timeline" data-chart-content="true">
       <HStack mb={2} align="center" spacing={3}>
         <Text fontSize="lg" fontWeight="bold" color="gray.800">
           Foot Traffic Score

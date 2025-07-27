@@ -180,7 +180,7 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
   
   if (trends.length === 0) {
     return (
-      <Box p={4} bg="gray.50" borderRadius="md">
+      <Box p={4} bg="gray.50" borderRadius="md" className="trend-indicators-container" data-chart="trend-indicators" data-chart-content="true">
         <Text fontSize="md" fontWeight="semibold" color="gray.700">
           Trend Summary
         </Text>
@@ -203,7 +203,7 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
   }
 
   return (
-    <Box>
+    <Box className="trend-indicators-container" data-chart="trend-indicators" data-chart-content="true">
       <Text fontSize="lg" fontWeight="bold" color="gray.800" mb={4}>
         Trend Summary
       </Text>
@@ -218,6 +218,7 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
             border="1px solid" 
             borderColor="gray.200"
             w="full"
+            data-chart-content="true"
           >
             <HStack justify="space-between" align="center">
               {/* Left: Label and Change */}
@@ -258,6 +259,7 @@ export function TrendIndicators({ tract }: TrendIndicatorsProps) {
         borderRadius="md" 
         border="1px solid" 
         borderColor="blue.200"
+        data-chart-content="true"
       >
         <Text fontSize="sm" color="blue.700" fontWeight="medium">
           Future Outlook: {futureOutlook}

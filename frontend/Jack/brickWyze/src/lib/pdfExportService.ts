@@ -1,12 +1,11 @@
-// src/lib/pdfExportService.ts - FIXED VERSION
+// src/lib/pdfExportService.ts - ENHANCED WITH CHARTS
 import jsPDF from 'jspdf';
-// 🔄 FIXED: Use default import for autoTable with newer versions
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import { TractResult } from '../types/TractTypes';
 import { Weight } from '../types/WeightTypes';
 import { AIBusinessAnalysis } from '../types/AIAnalysisTypes';
 
-// 🔄 FIXED: Extended type declaration for newer versions
 declare module 'jspdf' {
   interface jsPDF {
     autoTable: typeof autoTable;
@@ -22,16 +21,65 @@ interface ExportOptions {
   filename?: string;
 }
 
+interface ChartConfig {
+  selector: string;
+  title: string;
+  maxHeight?: number;
+}
+
 export class PDFExportService {
   private doc: jsPDF;
   private currentY: number = 20;
-  private pageWidth: number = 210; // A4 width in mm
+  private pageWidth: number = 210;
   private margin: number = 20;
-  private contentWidth: number = 170; // pageWidth - 2*margin
+  private contentWidth: number = 170;
+
+  // Chart configurations for capture
+  private readonly chartConfigs: ChartConfig[] = [
+    {
+      selector: '[data-chart="demographic-overview"]',
+      title: 'Demographic Overview',
+      maxHeight: 80
+    },
+    {
+      selector: '[data-chart="ethnicity-distribution"]',
+      title: 'Ethnicity Distribution',
+      maxHeight: 70
+    },
+    {
+      selector: '[data-chart="age-gender-distribution"]',
+      title: 'Age & Gender Distribution',
+      maxHeight: 70
+    },
+    {
+      selector: '[data-chart="income-distribution"]',
+      title: 'Income Distribution',
+      maxHeight: 70
+    },
+    {
+      selector: '[data-chart="foot-traffic-timeline"]',
+      title: 'Foot Traffic Trends',
+      maxHeight: 60
+    },
+    {
+      selector: '[data-chart="foot-traffic-periods"]',
+      title: 'Foot Traffic by Time Period',
+      maxHeight: 70
+    },
+    {
+      selector: '[data-chart="crime-trend"]',
+      title: 'Safety Score Trends',
+      maxHeight: 60
+    },
+    {
+      selector: '[data-chart="trend-indicators"]',
+      title: 'Key Performance Indicators',
+      maxHeight: 80
+    }
+  ];
 
   constructor() {
     this.doc = new jsPDF('p', 'mm', 'a4');
-    // 🔄 FIXED: Manually attach autoTable function for compatibility
     (this.doc as any).autoTable = autoTable.bind(null, this.doc);
   }
 
@@ -54,6 +102,12 @@ export class PDFExportService {
       // Weights Configuration
       this.addWeightsSection(weights);
       this.addSpace(10);
+
+      // Charts Section (NEW!)
+      if (includeCharts) {
+        await this.addChartsSection(tract);
+        this.addSpace(10);
+      }
 
       // AI Business Analysis (if available)
       if (aiAnalysis) {
@@ -84,13 +138,226 @@ export class PDFExportService {
       const finalFilename = filename || `location-report-${tract.geoid}.pdf`;
       this.doc.save(finalFilename);
 
-      console.log('✅ [PDF Export] PDF generated successfully:', finalFilename);
+      console.log('✅ [PDF Export] PDF with charts generated successfully:', finalFilename);
     } catch (error) {
       console.error('❌ [PDF Export] PDF generation failed:', error);
       throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
+  // 🚀 NEW: Charts Section
+  private async addChartsSection(tract: TractResult): Promise<void> {
+    this.checkPageBreak(40);
+    
+    this.doc.setFontSize(16);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(41, 82, 156);
+    this.doc.text('📊 Data Visualizations', this.margin, this.currentY);
+    this.currentY += 8;
+
+    this.doc.setFontSize(11);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(100, 100, 100);
+    this.doc.text('Key metrics and trends visualization from the web interface', this.margin, this.currentY);
+    this.currentY += 12;
+
+    try {
+      // Add data attributes to chart elements for capture
+      this.addChartDataAttributes();
+      
+      // Capture and add charts
+      let chartsAdded = 0;
+      
+      for (const config of this.chartConfigs) {
+        const success = await this.captureAndAddChart(config);
+        if (success) {
+          chartsAdded++;
+        }
+      }
+
+      if (chartsAdded === 0) {
+        this.addNoChartsMessage();
+      } else {
+        console.log(`✅ [PDF Charts] Added ${chartsAdded} charts to PDF`);
+      }
+
+    } catch (error) {
+      console.error('❌ [PDF Charts] Error in charts section:', error);
+      this.addChartErrorMessage();
+    }
+
+    this.currentY += 5;
+    this.addSeparator();
+  }
+
+  // 🚀 NEW: Capture and add individual chart
+  private async captureAndAddChart(config: ChartConfig): Promise<boolean> {
+    try {
+      const element = document.querySelector(config.selector) as HTMLElement;
+      
+      if (!element) {
+        console.log(`📊 [PDF Charts] Chart not found: ${config.selector}`);
+        return false;
+      }
+
+      // Check if element is visible and has content
+      if (!this.isElementVisible(element)) {
+        console.log(`📊 [PDF Charts] Chart not visible: ${config.selector}`);
+        return false;
+      }
+
+      // Wait for chart to be ready
+      await this.waitForChartReady(element);
+
+      // Calculate space needed
+      const titleHeight = 15;
+      const maxChartHeight = config.maxHeight || 60;
+      const marginHeight = 10;
+      const totalHeight = titleHeight + maxChartHeight + marginHeight;
+
+      this.checkPageBreak(totalHeight);
+
+      // Add chart title
+      this.doc.setFontSize(12);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setTextColor(60, 60, 60);
+      this.doc.text(config.title, this.margin, this.currentY);
+      this.currentY += titleHeight;
+
+      // Capture chart
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        allowTaint: false,
+        scale: 1.5,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: element.offsetWidth,
+        height: element.offsetHeight
+      });
+
+      // Add chart to PDF
+      const imgData = canvas.toDataURL('image/png', 0.9);
+      const imgWidth = this.contentWidth;
+      const aspectRatio = canvas.height / canvas.width;
+      let imgHeight = imgWidth * aspectRatio;
+      
+      // Limit height
+      if (imgHeight > maxChartHeight) {
+        imgHeight = maxChartHeight;
+      }
+
+      this.doc.addImage(imgData, 'PNG', this.margin, this.currentY, imgWidth, imgHeight);
+      this.currentY += imgHeight + marginHeight;
+
+      console.log(`✅ [PDF Charts] Added chart: ${config.title}`);
+      return true;
+
+    } catch (error) {
+      console.warn(`⚠️ [PDF Charts] Failed to capture chart ${config.selector}:`, error);
+      return false;
+    }
+  }
+
+  // 🚀 NEW: Add chart data attributes to DOM elements
+  private addChartDataAttributes(): void {
+    const attributeMap = [
+      { selector: '.demographic-charts-container, [data-testid="demographic-charts"]', attribute: 'demographic-overview' },
+      { selector: '.ethnicity-chart-section', attribute: 'ethnicity-distribution' },
+      { selector: '.age-gender-chart-section', attribute: 'age-gender-distribution' },
+      { selector: '.income-chart-section', attribute: 'income-distribution' },
+      { selector: '[data-testid="foot-traffic-chart"]', attribute: 'foot-traffic-timeline' },
+      { selector: '.foot-traffic-periods-container', attribute: 'foot-traffic-periods' },
+      { selector: '[data-testid="crime-trend-chart"]', attribute: 'crime-trend' },
+      { selector: '.trend-indicators-container', attribute: 'trend-indicators' }
+    ];
+
+    attributeMap.forEach(({ selector, attribute }) => {
+      try {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+          el.setAttribute('data-chart', attribute);
+        });
+        if (elements.length > 0) {
+          console.log(`📊 [PDF Charts] Added data-chart="${attribute}" to ${elements.length} elements`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ [PDF Charts] Failed to add attribute to ${selector}:`, error);
+      }
+    });
+  }
+
+  // 🚀 NEW: Wait for chart content to be ready
+  private async waitForChartReady(element: HTMLElement, timeout: number = 3000): Promise<void> {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      
+      const checkReady = () => {
+        // Check for chart indicators
+        const hasRechart = element.querySelector('.recharts-wrapper, .recharts-surface');
+        const hasCanvas = element.querySelector('canvas');
+        const hasSvg = element.querySelector('svg');
+        const hasChartContent = element.querySelector('[data-chart-content]');
+        
+        if (hasRechart || hasCanvas || hasSvg || hasChartContent) {
+          setTimeout(resolve, 500); // Small delay for animations
+          return;
+        }
+
+        if (Date.now() - startTime > timeout) {
+          resolve();
+          return;
+        }
+
+        setTimeout(checkReady, 100);
+      };
+
+      checkReady();
+    });
+  }
+
+  // 🚀 NEW: Check if element is visible
+  private isElementVisible(element: HTMLElement): boolean {
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    
+    return (
+      rect.width > 0 && 
+      rect.height > 0 && 
+      style.display !== 'none' && 
+      style.visibility !== 'hidden' &&
+      style.opacity !== '0'
+    );
+  }
+
+  // 🚀 NEW: No charts message
+  private addNoChartsMessage(): void {
+    this.doc.setFontSize(11);
+    this.doc.setFont('helvetica', 'italic');
+    this.doc.setTextColor(120, 120, 120);
+    this.doc.text('No charts are currently available to display.', this.margin, this.currentY);
+    this.doc.text('Charts will appear when demographic filters are applied in the interface.', this.margin, this.currentY + 7);
+    this.currentY += 20;
+  }
+
+  // 🚀 NEW: Chart error message
+  private addChartErrorMessage(): void {
+    this.doc.setFontSize(11);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(200, 0, 0);
+    this.doc.text('Error: Charts could not be captured at this time.', this.margin, this.currentY);
+    this.doc.setTextColor(120, 120, 120);
+    this.doc.text('Please try exporting again or contact support if the issue persists.', this.margin, this.currentY + 7);
+    this.currentY += 20;
+  }
+
+  // 🚀 NEW: Add separator line
+  private addSeparator(): void {
+    this.doc.setDrawColor(200, 200, 200);
+    this.doc.line(this.margin, this.currentY, this.pageWidth - this.margin, this.currentY);
+    this.currentY += 3;
+  }
+
+  // ✅ EXISTING METHODS (unchanged)
   private addHeader(tract: TractResult): void {
     // Title
     this.doc.setFontSize(24);
@@ -196,7 +463,6 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       ['Resilience Score', `${Math.round(tract.resilience_score || 0)}/100`, 'Long-term stability indicator']
     ];
 
-    // 🔄 FIXED: Use the bound autoTable function
     (this.doc as any).autoTable({
       startY: this.currentY,
       head: [['Metric', 'Value', 'Assessment']],
