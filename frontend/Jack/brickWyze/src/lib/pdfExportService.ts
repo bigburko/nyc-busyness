@@ -1,14 +1,15 @@
-// src/lib/pdfExportService.ts
+// src/lib/pdfExportService.ts - FIXED VERSION
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+// 🔄 FIXED: Use default import for autoTable with newer versions
+import autoTable from 'jspdf-autotable';
 import { TractResult } from '../types/TractTypes';
 import { Weight } from '../types/WeightTypes';
 import { AIBusinessAnalysis } from '../types/AIAnalysisTypes';
 
-// Extend jsPDF type to include autoTable
+// 🔄 FIXED: Extended type declaration for newer versions
 declare module 'jspdf' {
   interface jsPDF {
-    autoTable: (options: any) => jsPDF;
+    autoTable: typeof autoTable;
   }
 }
 
@@ -30,6 +31,8 @@ export class PDFExportService {
 
   constructor() {
     this.doc = new jsPDF('p', 'mm', 'a4');
+    // 🔄 FIXED: Manually attach autoTable function for compatibility
+    (this.doc as any).autoTable = autoTable.bind(null, this.doc);
   }
 
   async generateLocationReport(options: ExportOptions): Promise<void> {
@@ -193,7 +196,8 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       ['Resilience Score', `${Math.round(tract.resilience_score || 0)}/100`, 'Long-term stability indicator']
     ];
 
-    this.doc.autoTable({
+    // 🔄 FIXED: Use the bound autoTable function
+    (this.doc as any).autoTable({
       startY: this.currentY,
       head: [['Metric', 'Value', 'Assessment']],
       body: tableData,
@@ -231,7 +235,7 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       this.getWeightDescription(weight.id)
     ]);
 
-    this.doc.autoTable({
+    (this.doc as any).autoTable({
       startY: this.currentY,
       head: [['Factor', 'Weight', 'Impact']],
       body: weightsData,
@@ -369,7 +373,7 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       ['Tract Name', tract.tract_name || 'N/A']
     ];
 
-    this.doc.autoTable({
+    (this.doc as any).autoTable({
       startY: this.currentY,
       body: locationData,
       theme: 'plain',

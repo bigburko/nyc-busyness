@@ -1,8 +1,10 @@
-// src/components/features/search/TractDetailPanel/TractDetailPanel.tsx - Updated with AI Summary Integration
+// src/components/features/search/TractDetailPanel/TractDetailPanel.tsx - Updated with PDF Export Integration
 'use client';
 
 import { 
-  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text
+  Box, VStack, HStack, Button, IconButton, useBreakpointValue, Text,
+  AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader, 
+  AlertDialogBody, AlertDialogFooter, useDisclosure, useToast
 } from '@chakra-ui/react';
 import { CloseIcon, ArrowBackIcon } from '@chakra-ui/icons';
 import { useState, useEffect, useRef } from 'react';
@@ -14,9 +16,13 @@ import { AdvancedDemographics } from './AdvancedDemographics';
 import { ScoreCalculation } from './ScoreCalculation';
 import { DemographicCharts } from './DemographicCharts';
 import { QuickStats } from './QuickStats';
-import { AISummary } from './AISummary/AISummary'; // 🧠 NEW: Import AI Summary
+import { AISummary } from './AISummary/AISummary';
 import GoogleMapsImage from './GoogleMapsImage';
 import { LoopNetButton } from './LoopNetIntegration';
+
+// 🆕 PDF Export imports
+import { usePDFExport } from '../../../../hooks/usePDFExport';
+import { LoadingOverlay } from '../../../ui/LoadingOverlay';
 
 // Define proper demographic data types
 interface DemographicDataItem {
@@ -44,11 +50,27 @@ export default function TractDetailPanel({
 }: TractDetailPanelProps) {
   const filterStore = useFilterStore() as FilterStore;
   const weights = (filterStore.weights || []) as Weight[];
+  const toast = useToast();
   
   const resilienceScore = Math.round(tract.custom_score || 0);
   const [scrollY, setScrollY] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // 🆕 PDF Export functionality
+  const { 
+    isExporting, 
+    error: exportError, 
+    progress: exportProgress,
+    currentStep,
+    downloadWithAI,
+    downloadQuick,
+    resetExportState 
+  } = usePDFExport();
+
+  // 🆕 Alert dialog for export options
+  const { isOpen: isAlertOpen, onOpen: onAlertOpen, onClose: onAlertClose } = useDisclosure();
+  const cancelRef = useRef<HTMLButtonElement>(null);
   
   // Responsive design
   const isMobile = useBreakpointValue({ base: true, md: false });
@@ -78,6 +100,20 @@ export default function TractDetailPanel({
     setScrollY(0);
   }, [activeTab]);
 
+  // 🆕 Handle export errors
+  useEffect(() => {
+    if (exportError) {
+      toast({
+        title: 'Export Failed',
+        description: exportError,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      resetExportState();
+    }
+  }, [exportError, toast, resetExportState]);
+
   // Calculate if we should show compressed header (only for overview)
   const COMPRESS_THRESHOLD = 150;
   const isScrolled = activeTab === 'overview' && scrollY > COMPRESS_THRESHOLD;
@@ -90,7 +126,40 @@ export default function TractDetailPanel({
     return "red.500";
   };
 
-  // Tab configuration - FIXED: Changed 'details' to 'scoring'
+  // 🆕 PDF Export handlers
+  const handleQuickExport = async () => {
+    onAlertClose();
+    try {
+      await downloadQuick(tract, weights);
+      toast({
+        title: 'Report Downloaded',
+        description: 'Quick report exported successfully!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  const handleFullExport = async () => {
+    onAlertClose();
+    try {
+      await downloadWithAI(tract, weights);
+      toast({
+        title: 'Full Report Downloaded',
+        description: 'Complete report with AI analysis exported successfully!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'trends', label: 'Trends' },
@@ -186,7 +255,7 @@ export default function TractDetailPanel({
                 />
               </Box>
 
-              {/* 🧠 AI SUMMARY - NEW: Real AI business analysis */}
+              {/* 🧠 AI SUMMARY - Real AI business analysis */}
               <Box mt={6} id="ai-summary-section">
                 <AISummary 
                   tract={tract}
@@ -218,7 +287,7 @@ export default function TractDetailPanel({
           </Box>
         );
 
-      case 'scoring':  // FIXED: Changed from 'details' to 'scoring'
+      case 'scoring':
         return (
           <Box p={headerPadding} bg="gray.50" minH="100vh">
             <Text fontSize="xl" fontWeight="bold" mb={6}>Scoring Methodology</Text>
@@ -388,7 +457,7 @@ export default function TractDetailPanel({
         h="100vh"
         overflowY="auto"
         overflowX="hidden"
-        pb={activeTab === 'overview' ? "20px" : "350px"} // ✅ REDUCED: Less padding for overview (100px), keeps 350px for other tabs
+        pb={activeTab === 'overview' ? "20px" : "350px"}
         css={{
           scrollBehavior: 'smooth',
           '&::-webkit-scrollbar': {
@@ -428,7 +497,7 @@ export default function TractDetailPanel({
           {/* Properties Search Button */}
           <LoopNetButton tract={tract} flex="1" />
           
-          {/* Download Report Button */}
+          {/* 🔄 UPDATED: Download Report Button - now opens export dialog */}
           <Button 
             size="lg" 
             bg="linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(74, 222, 128, 0.9) 100%)"
@@ -447,6 +516,9 @@ export default function TractDetailPanel({
             borderColor="rgba(255, 255, 255, 0.3)"
             boxShadow="0 8px 32px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(255,255,255,0.3)"
             transition="all 0.3s ease"
+            onClick={onAlertOpen}  // 🔄 CHANGED: Opens export dialog
+            isLoading={isExporting}
+            loadingText="Exporting..."
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -457,6 +529,77 @@ export default function TractDetailPanel({
           </Button>
         </HStack>
       </Box>
+
+      {/* 🆕 Export Options Alert Dialog */}
+      <AlertDialog
+        isOpen={isAlertOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onAlertClose}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Export Location Report
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              <VStack spacing={4} align="start">
+                <Text>
+                  Choose your export option for <strong>{tract.nta_name}</strong>:
+                </Text>
+                
+                <VStack spacing={3} align="start" w="full">
+                  <Box p={4} border="1px solid" borderColor="gray.200" borderRadius="md" w="full">
+                    <Text fontWeight="semibold" color="blue.600" mb={2}>
+                      📊 Full Report (Recommended)
+                    </Text>
+                    <Text fontSize="sm" color="gray.600" mb={2}>
+                      Includes AI analysis, detailed insights, charts, Street View links, and property recommendations.
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Takes 15-30 seconds • Generates AI analysis if needed
+                    </Text>
+                  </Box>
+                  
+                  <Box p={4} border="1px solid" borderColor="gray.200" borderRadius="md" w="full">
+                    <Text fontWeight="semibold" color="green.600" mb={2}>
+                      ⚡ Quick Report
+                    </Text>
+                    <Text fontSize="sm" color="gray.600" mb={2}>
+                      Basic metrics, charts, and links without AI analysis.
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      Takes 5-10 seconds • No AI generation
+                    </Text>
+                  </Box>
+                </VStack>
+              </VStack>
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onAlertClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="green" onClick={handleQuickExport} ml={3}>
+                Quick Export
+              </Button>
+              <Button colorScheme="blue" onClick={handleFullExport} ml={3}>
+                Full Export
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+
+      {/* 🆕 Loading Overlay */}
+      <LoadingOverlay 
+        isOpen={isExporting}
+        title="Generating Report"
+        message="Creating your comprehensive location analysis with AI insights, charts, and property links..."
+        progress={exportProgress}
+        currentStep={currentStep}
+        variant="pdf-export"
+      />
     </Box>
   );
 }
