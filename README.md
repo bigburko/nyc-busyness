@@ -128,9 +128,12 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Team
 
-- **Jack** - Frontend Development (Next.js)
-- **Joy** - UI/UX Design & Frontend
-- **Additional Contributors** - Data Engineering & Backend
+- **Afsana** - Coordination Lead
+- **Joy** - Customer Lead
+- **Swaraj** - Maintenance
+- **Luke** - Backend
+- **Jack** - Frontend Lead
+- **Jen** - Data Lead
 
 ## Live Demo
 
