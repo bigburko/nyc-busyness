@@ -1,9 +1,11 @@
-// src/lib/enhancedPDFService.ts - Beautiful design + Multipage support + TypeScript fixes
+// src/lib/enhancedPDFService.ts - Beautiful design + Multipage support + Clickable links
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { TractResult } from '../types/TractTypes';
 import { Weight } from '../types/WeightTypes';
 import { AIBusinessAnalysis } from '../types/AIAnalysisTypes';
+import { generateLoopNetUrl } from '../components/features/search/TractDetailPanel/LoopNetIntegration';
+import { generateStreetViewUrlSync } from '../components/features/search/TractDetailPanel/GoogleMapsImage';
 
 interface ExportOptions {
   tract: TractResult;
@@ -17,7 +19,7 @@ interface ExportOptions {
 export class EnhancedPDFService {
   
   // 🎨 Beautiful HTML template generation with multipage support
-  private generateHTMLReport(options: ExportOptions): string {
+  private generateHTMLReport(options: ExportOptions, streetViewUrl: string, loopNetUrl: string): string {
     const { tract, weights, aiAnalysis } = options;
     
     // 🔍 DEBUG: Simple logging to avoid TypeScript issues
@@ -122,22 +124,11 @@ export class EnhancedPDFService {
           opacity: 0.8;
         }
         
-        .score-badge {
-          position: absolute;
-          top: 40px;
-          right: 40px;
-          background: ${getScoreGradient(score)};
-          padding: 16px 24px;
-          border-radius: 12px;
-          font-size: 2rem;
-          font-weight: 800;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-          box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-          border: 2px solid rgba(255,255,255,0.2);
-        }
+
         
         .content {
           padding: 40px;
+          padding-top: 60px; /* Extra space at top for clickable buttons */
         }
         
         .section {
@@ -363,7 +354,6 @@ export class EnhancedPDFService {
             <div class="subtitle">${tract.nta_name || 'NYC Location'} • Census Tract ${tract.geoid.slice(-6)}</div>
             <div class="date">Generated: ${today}</div>
           </div>
-          <div class="score-badge">${score}/100</div>
         </div>
         
         <!-- Content -->
@@ -539,29 +529,7 @@ export class EnhancedPDFService {
             </div>
           </div>
 
-          <!-- Property Research Links -->
-          <div class="section">
-            <h2 class="section-title">
-              <span class="section-icon">🔗</span>
-              Property Research Links
-            </h2>
-            <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
-              <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
-                <strong>🏢 LoopNet Commercial Properties:</strong><br>
-                <a href="https://www.loopnet.com/search/commercial-real-estate/${encodeURIComponent(tract.nta_name || '')}-new-york/" 
-                   style="color: #2563eb; text-decoration: none;">
-                  View available commercial properties in ${tract.nta_name || 'this area'}
-                </a>
-              </div>
-              <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
-                <strong>🗺️ Google Maps Street View:</strong><br>
-                <a href="https://www.google.com/maps/search/${encodeURIComponent(tract.nta_name || 'NYC')}" 
-                   style="color: #2563eb; text-decoration: none;">
-                  Explore the area with Street View
-                </a>
-              </div>
-            </div>
-          </div>
+
         </div>
         
         <!-- Footer -->
@@ -586,8 +554,17 @@ export class EnhancedPDFService {
     try {
       console.log('🎨 [Enhanced PDF] Generating beautiful HTML template...');
       
-      // Create HTML content
-      const htmlContent = this.generateHTMLReport(options);
+      // ✅ Generate URLs for both HTML and clickable links
+      const streetViewUrl = generateStreetViewUrlSync(options.tract);
+      const loopNetUrl = generateLoopNetUrl(options.tract, 'commercial-real-estate', 'for-lease');
+      
+      console.log('🔗 [PDF Links] Generated URLs:', {
+        streetView: streetViewUrl.substring(0, 80) + '...',
+        loopNet: loopNetUrl
+      });
+      
+      // Create HTML content with the generated URLs
+      const htmlContent = this.generateHTMLReport(options, streetViewUrl, loopNetUrl);
       
       // Create temporary container with proper sizing
       const tempContainer = document.createElement('div');
@@ -675,6 +652,9 @@ export class EnhancedPDFService {
         console.log(`✅ [Enhanced PDF] Added page ${page + 1}/${totalPages}`);
       }
       
+      // ✅ ADD CLICKABLE LINKS to the PDF
+      this.addClickableLinks(pdf, options.tract, streetViewUrl, loopNetUrl, totalPages);
+      
       // Save the PDF
       pdf.save(filename);
       console.log('🎉 [Enhanced PDF] Multi-page PDF saved successfully!');
@@ -682,6 +662,77 @@ export class EnhancedPDFService {
     } catch (error) {
       console.error('❌ [Enhanced PDF] Generation failed:', error);
       throw new Error(`Enhanced PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // ✅ ADD CLICKABLE LINKS at the top of the PDF
+  private addClickableLinks(pdf: jsPDF, tract: TractResult, streetViewUrl: string, loopNetUrl: string, totalPages: number): void {
+    try {
+      console.log('🔗 [PDF Links] Adding clickable links at top of PDF...');
+      
+      // Go to the first page
+      pdf.setPage(1);
+      
+      // PDF dimensions (A4: 210mm x 297mm)
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      
+      // Position links right below the header section but before content starts
+      const startY = 75; // Moved up slightly to avoid content overlap
+      const leftMargin = 20;
+      const linkWidth = (pageWidth - 50) / 2; // Split into two columns with margins
+      const linkHeight = 10; // Slightly smaller height
+      
+      // 🏢 LoopNet Link (Left side)
+      const loopNetX = leftMargin;
+      const loopNetY = startY;
+      
+      // Add colored background for LoopNet link
+      pdf.setFillColor(59, 130, 246); // Blue background
+      pdf.rect(loopNetX, loopNetY, linkWidth, linkHeight, 'F');
+      
+      // Add clickable area
+      pdf.link(loopNetX, loopNetY, linkWidth, linkHeight, { url: loopNetUrl });
+      
+      // Add text label (NO EMOJIS - they cause artifacts)
+      pdf.setFontSize(9);
+      pdf.setTextColor(255, 255, 255); // White text
+      pdf.text('LoopNet Commercial Properties', loopNetX + 2, loopNetY + 6.5);
+      
+      // 🗺️ Street View Link (Right side)
+      const streetViewX = loopNetX + linkWidth + 10; // 10mm gap between links
+      const streetViewY = startY;
+      
+      // Add colored background for Street View link
+      pdf.setFillColor(34, 197, 94); // Green background
+      pdf.rect(streetViewX, streetViewY, linkWidth, linkHeight, 'F');
+      
+      // Add clickable area
+      pdf.link(streetViewX, streetViewY, linkWidth, linkHeight, { url: streetViewUrl });
+      
+      // Add text label (NO EMOJIS - they cause artifacts)
+      pdf.setFontSize(9);
+      pdf.setTextColor(255, 255, 255); // White text
+      pdf.text('Google Maps Street View', streetViewX + 2, streetViewY + 6.5);
+      
+      // Add subtitle text below the links
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 100, 100); // Gray text
+      pdf.text('Click buttons above to research this location further', leftMargin, startY + linkHeight + 6);
+      
+      // Reset text color for rest of document
+      pdf.setTextColor(0, 0, 0);
+      
+      console.log('✅ [PDF Links] Successfully added clickable link buttons at top of PDF');
+      console.log(`🔗 [PDF Links] Button positions:
+        LoopNet: ${loopNetX}, ${loopNetY}, ${linkWidth}x${linkHeight}
+        Street View: ${streetViewX}, ${streetViewY}, ${linkWidth}x${linkHeight}`);
+      console.log(`🔗 [PDF Links] URLs added:
+        LoopNet: ${loopNetUrl}
+        Street View: ${streetViewUrl.substring(0, 100)}...`);
+      
+    } catch (error) {
+      console.warn('⚠️ [PDF Links] Failed to add clickable links:', error);
+      // Don't throw error - PDF should still work without clickable links
     }
   }
 

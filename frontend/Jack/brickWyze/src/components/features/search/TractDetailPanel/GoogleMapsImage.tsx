@@ -225,7 +225,7 @@ const generateTractImages = async (tract: TractResult): Promise<CachedImages> =>
   
   const apiKey = process.env.NEXT_PUBLIC_GOOGLEMAPS_API_KEY!;
   
-  // 🎯 CRITICAL FIX: Road-snap coordinates BEFORE generating ANY URLs
+  // Road-snap coordinates BEFORE generating ANY URLs
   console.log(`🎯 [CONSISTENCY] Road-snapping coordinates and calculating direction for ALL images and clicks`);
   const roadSnappedResult = await snapToRoadWithDirection(originalCoords.lat, originalCoords.lng, apiKey);
   
@@ -270,7 +270,7 @@ const generateTractImages = async (tract: TractResult): Promise<CachedImages> =>
 
 // Generate the Street View URL for clicking - USES EXACT SAME COORDINATES AS THUMBNAIL!
 const openStreetView = (tract: TractResult, cachedImages: CachedImages) => {
-  // 🎯 PERFECT CONSISTENCY: Use the EXACT same coordinates as the thumbnail
+  // Use the EXACT same coordinates as the thumbnail
   const { lat, lng } = cachedImages.roadSnappedCoords;
   const heading = cachedImages.roadSnappedCoords.heading;
   
@@ -291,6 +291,62 @@ const openStreetView = (tract: TractResult, cachedImages: CachedImages) => {
   }
   
   window.open(streetViewUrl, '_blank');
+};
+
+// ✅ EXPORT: Generate Street View URL for external use (like PDF service)
+export const generateStreetViewUrl = async (tract: TractResult): Promise<string> => {
+  try {
+    console.log(`🗺️ [URL Export] Generating Street View URL for tract ${tract.geoid}`);
+    
+    // Use the exact same logic as the component
+    const originalCoords = getTractCoordinates(tract.geoid);
+    let finalCoords: RoadSnappedCoords = { lat: originalCoords.lat, lng: originalCoords.lng };
+    
+    // Try to get road-snapped coordinates with heading (same as component)
+    if (checkApiKey()) {
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLEMAPS_API_KEY!;
+      const roadSnappedResult = await snapToRoadWithDirection(originalCoords.lat, originalCoords.lng, apiKey);
+      
+      if (roadSnappedResult) {
+        finalCoords = roadSnappedResult;
+        console.log(`✅ [URL Export] Using road-snapped coordinates: ${finalCoords.lat}, ${finalCoords.lng}`);
+      }
+    }
+    
+    // Generate the EXACT same URL format as openStreetView function
+    let streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${finalCoords.lat},${finalCoords.lng}`;
+    
+    // Add heading parameter if we have road direction data (same logic)
+    if (finalCoords.heading !== undefined) {
+      streetViewUrl += `&heading=${Math.round(finalCoords.heading)}&pitch=-5&fov=85`;
+      console.log(`🧭 [URL Export] Street View URL with road alignment: ${Math.round(finalCoords.heading)}°`);
+    } else {
+      streetViewUrl += `&heading=0&pitch=-5&fov=85`;
+    }
+    
+    console.log(`✅ [URL Export] Generated Street View URL:`, streetViewUrl);
+    return streetViewUrl;
+    
+  } catch (error) {
+    console.warn('⚠️ [URL Export] Street View URL generation failed, using fallback:', error);
+    // Fallback to Manhattan center with default view
+    return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=40.7589,-73.9851&heading=0&pitch=-5&fov=85';
+  }
+};
+
+// ✅ EXPORT: Generate Street View URL synchronously (for when you can't use async)
+export const generateStreetViewUrlSync = (tract: TractResult): string => {
+  try {
+    // Use basic coordinates without road snapping (faster, still accurate)
+    const coords = getTractCoordinates(tract.geoid);
+    const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${coords.lat},${coords.lng}&heading=0&pitch=-5&fov=85`;
+    
+    console.log(`🗺️ [URL Export Sync] Generated basic Street View URL for tract ${tract.geoid}`);
+    return streetViewUrl;
+  } catch (error) {
+    console.warn('⚠️ [URL Export Sync] Fallback to Manhattan center:', error);
+    return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=40.7589,-73.9851&heading=0&pitch=-5&fov=85';
+  }
 };
 
 export default function GoogleMapsImage({ tract }: GoogleMapsImageProps) {
