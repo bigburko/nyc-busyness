@@ -14,7 +14,7 @@ const Welcome: React.FC = () => {
             Welcome to <span className={styles.highlight}>BrickWyze</span>
           </h1>
           <p className={styles.intro}>
-            <strong>BrickWyze</strong> helps NYC entrepreneurs answer one critical question: "If I run a great business, will this place still work against me?"
+            <strong>BrickWyze</strong> helps NYC entrepreneurs answer one critical question: &ldquo;If I run a great business, will this place still work against me?&rdquo;
           </p>
           <p>
             By translating fragmented city data into an easy-to-use resilience score, we give founders the clarity they need to launch with confidence — and avoid the hidden risks that can quietly sink even the best ideas.

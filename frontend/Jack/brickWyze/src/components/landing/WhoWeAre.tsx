@@ -21,9 +21,9 @@ const items: IconItem[] = [
 const WhoWeAre: React.FC = () => {
   return (
     <section className={styles.whoWeAre}>
-      <h2 className={styles.whoWeAreTitle}>Who We're Here For</h2>
+      <h2 className={styles.whoWeAreTitle}>Who We&rsquo;re Here For</h2>
       <p className={styles.whoWeAreDescription}>
-        We support founders who want to build smart from day one — not just with ideas, but with location intelligence. BrickWyze is built for entrepreneurs seeking to understand the factors they can't control, so they can launch in places that set them up to succeed.
+        We support founders who want to build smart from day one — not just with ideas, but with location intelligence. BrickWyze is built for entrepreneurs seeking to understand the factors they can&rsquo;t control, so they can launch in places that set them up to succeed.
       </p>
       <div className={styles.whoWeAreIcons}>
         {items.map((item, idx) => (

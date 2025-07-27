@@ -1,10 +1,11 @@
-// src/app/map/page.tsx - Moved from root page.tsx
+// src/app/map/page.tsx - Updated with clean home button
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import mapboxgl from 'mapbox-gl';
-import { IconButton } from '@chakra-ui/react';
-import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
+import { Box } from '@chakra-ui/react';
 import Map from '../../components/features/Map/Map';
 import TopLeftUI from '../../components/features/search/TopLeftUI';
 import { uiStore } from '@/stores/uiStore';
@@ -198,26 +199,10 @@ export default function MapPage() {
   const [selectedTract, setSelectedTract] = useState<TractResult | undefined>(undefined);
   const [fullSearchResponse, setFullSearchResponse] = useState<EdgeFunctionResponse | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(true); // ✅ Default to fullscreen
   
   // ✅ NEW: AI Justification state
   const [lastQuery, setLastQuery] = useState<string>('');
   const [aiReasoning, setAiReasoning] = useState<string>('');
-
-  const toggleFullscreen = useCallback(() => {
-    setIsFullscreen(prev => {
-      const newFullscreenState = !prev;
-      
-      // Trigger map resize after state change
-      setTimeout(() => {
-        if (window._brickwyzeMapRef) {
-          window._brickwyzeMapRef.resize();
-        }
-      }, 100);
-      
-      return newFullscreenState;
-    });
-  }, []);
 
   // ✅ NEW: Auto-track AI queries and reasoning
   useEffect(() => {
@@ -238,23 +223,6 @@ export default function MapPage() {
       setAiReasoning(currentFilters.lastDemographicReasoning.summary);
     }
   }, [messages]);
-
-  // ✅ NEW: Handle map resize when fullscreen changes
-  useEffect(() => {
-    const resizeMap = () => {
-      if (window._brickwyzeMapRef) {
-        window._brickwyzeMapRef.resize();
-      }
-    };
-
-    // Resize immediately
-    resizeMap();
-
-    // Also resize after a short delay to ensure container has finished resizing
-    const timeoutId = setTimeout(resizeMap, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [isFullscreen]);
 
   const handleFilterUpdate = useCallback((filters: FilterUpdate) => {
     console.log('🔄 [MapPage] Updating map filters - topN:', filters.topN);
@@ -492,46 +460,64 @@ export default function MapPage() {
 
   return (
     <main style={{ 
-      height: isFullscreen ? '100vh' : 'calc(100vh - 80px)', 
+      height: '100vh',
       width: '100vw', 
-      position: isFullscreen ? 'fixed' : 'relative',
-      top: isFullscreen ? '0' : 'auto',
-      left: isFullscreen ? '0' : 'auto',
-      marginTop: isFullscreen ? '0' : '80px',
-      zIndex: isFullscreen ? 9999 : 'auto'
+      position: 'relative',
+      overflow: 'hidden'
     }}>
-      {/* Fullscreen Toggle Button */}
-      <IconButton
-        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        icon={isFullscreen ? <ViewOffIcon /> : <ViewIcon />}
-        onClick={toggleFullscreen}
-        position="absolute"
-        top="20px"
-        right="20px"
-        zIndex={10000}
-        colorScheme="red"
-        variant="solid"
-        size="lg"
-        borderRadius="full"
-        boxShadow="0 4px 12px rgba(0, 0, 0, 0.15)"
-        _hover={{
-          transform: 'scale(1.05)',
-          boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)'
-        }}
-        transition="all 0.2s ease"
-      />
+      {/* Home Button - Clean logo button */}
+      <Link href="/" style={{ textDecoration: 'none' }}>
+        <Box
+          position="fixed"
+          top="20px"
+          right="20px"
+          zIndex={200}
+          bg="white"
+          borderRadius="full"
+          p="12px"
+          boxShadow="0 4px 12px rgba(0, 0, 0, 0.15)"
+          _hover={{
+            transform: 'scale(1.05)',
+            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)',
+          }}
+          transition="all 0.2s ease"
+          cursor="pointer"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          width="60px"
+          height="60px"
+        >
+          <Image 
+            src="/images/logo3.png" 
+            alt="BrickWyze Home" 
+            width={36}
+            height={36}
+            style={{ objectFit: 'contain' }}
+          />
+        </Box>
+      </Link>
       
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}>
+      {/* Map Container - Fullscreen */}
+      <div style={{ 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0
+      }}>
         <Map {...mapProps} />
       </div>
+      
+      {/* UI Overlay - Clean and accessible */}
       <div style={{ 
         position: 'absolute', 
         top: 0, 
         left: 0, 
         right: 0, 
         bottom: 0, 
-        zIndex: 2, 
-        pointerEvents: 'none' 
+        zIndex: 10,
+        pointerEvents: 'none'
       }}>
         <div style={{ pointerEvents: 'auto' }}>
           <TopLeftUI {...topLeftUIProps} />

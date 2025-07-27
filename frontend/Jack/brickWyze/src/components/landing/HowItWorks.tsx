@@ -3,6 +3,7 @@
 
 import React from "react";
 import Image from 'next/image';
+import Link from 'next/link';
 import styles from './landing.module.css';
 
 const HowItWorks: React.FC = () => {
@@ -12,13 +13,15 @@ const HowItWorks: React.FC = () => {
 
       <div className={styles.howItWorksContainer}>
         <div className={styles.mapSection}>
-          <Image 
-            src="/images/map.png" 
-            alt="Manhattan Map" 
-            className={styles.mapImage}
-            width={400}
-            height={600}
-          />
+          <Link href="/map" className={styles.mapLink}>
+            <Image 
+              src="/images/map.png" 
+              alt="Manhattan Map" 
+              className={styles.mapImage}
+              width={400}
+              height={600}
+            />
+          </Link>
         </div>
 
         <div className={styles.stepsSection}>

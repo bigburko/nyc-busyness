@@ -327,8 +327,16 @@ export default function MyDrawer({
         finalFocusRef={btnRef as unknown as React.RefObject<FocusableElement>} 
         placement="left" 
         size="md"
+        blockScrollOnMount={false}
+        preserveScrollBarGap={false}
       >
-        <DrawerOverlay bg="blackAlpha.300" backdropFilter="blur(4px)" />
+        <DrawerOverlay 
+          bg="blackAlpha.300"
+          backdropFilter="blur(4px)"
+          style={{ 
+            zIndex: '9998 !important'
+          }}
+        />
         <DrawerContent 
           bg="linear-gradient(135deg, #FFF5F5 0%, #FFEEE8 100%)"
           maxW="440px"
@@ -336,6 +344,10 @@ export default function MyDrawer({
           display="flex" 
           flexDirection="column" 
           h="100%"
+          position="relative"
+          style={{ 
+            zIndex: '99999 !important'
+          }}
         >
           <DrawerCloseButton 
             color="#FF492C" 
@@ -361,14 +373,24 @@ export default function MyDrawer({
           
           <DrawerBody 
             ref={drawerBodyRef} 
-            overflowY="auto" 
+            overflowY="auto"
+            position="relative"
+            zIndex={1}
+            pointerEvents="auto"
             css={{ 
               '&::-webkit-scrollbar': { width: '8px' }, 
               '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' }, 
               '&::-webkit-scrollbar-thumb': { background: '#888', borderRadius: '4px', '&:hover': { background: '#555' } } 
             }}
           >
-            <VStack spacing={4} p={2} align="stretch">
+            <VStack 
+              spacing={4} 
+              p={2} 
+              align="stretch"
+              position="relative"
+              zIndex={1}
+              pointerEvents="auto"
+            >
               
               {/* ✅ Overall AI Justification - Updated to handle EdgeFunctionResponse */}
               <OverallJustificationDisplay
@@ -710,7 +732,8 @@ export default function MyDrawer({
             borderTop="1px solid rgba(255, 73, 44, 0.1)"
             position="sticky" 
             bottom="0" 
-            zIndex="sticky"
+            zIndex={2}
+            pointerEvents="auto"
           >
             <Flex justify="center">
               <Button

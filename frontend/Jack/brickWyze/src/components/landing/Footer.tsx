@@ -23,21 +23,12 @@ const Footer: React.FC = () => {
               Smart picks for tough streets - we show you where your business stands a chance.
             </p>
           </div>
-
-          <div className={styles.footerHelpSection}>
-            <div className={styles.footerHelp}>Help</div>
-            <div className={styles.footerHelpLinks}>
-              <Link href="/faqs">FAQs</Link>
-              <Link href="/contact">Contact Us</Link>
-            </div>
-          </div>
         </div>
 
         <div className={styles.footerBottom}>
           <div className={styles.footerNav}>
             <Link href="/">Home</Link>
-            <Link href="/about">About</Link>
-            <Link href="/contact">Contact Us</Link>
+            <Link href="/map">Map</Link>
           </div>
           <div className={styles.copyright}>© 2025. All Rights Reserved</div>
         </div>

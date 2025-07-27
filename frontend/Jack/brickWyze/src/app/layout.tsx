@@ -1,6 +1,6 @@
-// src/app/layout.tsx - CORRECT VERSION
+// src/app/layout.tsx - UPDATED VERSION
 import { Providers } from './providers'
-import Navbar from '@/components/landing/Navbar'
+import ConditionalNavbar from '@/components/landing/ConditionalNavbar'
 
 // You can keep any metadata exports here, as this is a Server Component
 export const metadata = {
@@ -17,7 +17,7 @@ export default function RootLayout({
     <html lang='en'>
       <body>
         <Providers>
-          <Navbar />
+          <ConditionalNavbar />
           {children}
         </Providers>
       </body>
