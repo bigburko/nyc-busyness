@@ -130,8 +130,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - **Afsana** - Coordination Lead
 - **Joy** - Customer Lead
-- **Swaraj** - Maintenance
-- **Luke** - Backend
+- **Swaraj** - Maintenance Lead
+- **Luke** - Backend Lead
 - **Jack** - Frontend Lead
 - **Jen** - Data Lead
 
