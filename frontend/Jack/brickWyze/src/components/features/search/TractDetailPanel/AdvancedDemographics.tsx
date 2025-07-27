@@ -255,12 +255,13 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
   // If no active components, show explanation
   if (activeComponents.length === 0) {
     return (
-      <CollapsibleSection
-        title="👥 Advanced Demographic Analysis"
-        defaultIsOpen={true}
-        priority="medium"
-        userType="business"
-      >
+      <div style={{ listStyle: 'none', listStyleType: 'none' }}>
+        <CollapsibleSection
+          title="👥 Advanced Demographic Analysis"
+          defaultIsOpen={true}
+          priority="medium"
+          userType="business"
+        >
         <VStack spacing={4} p={4}>
           <Box 
             p={4} 
@@ -278,10 +279,10 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
               To see advanced demographic analysis, apply specific filters:
             </Text>
             <VStack spacing={1} align="center">
-              <Text fontSize="xs" color="gray.400">• Select specific ethnicities (not all)</Text>
-              <Text fontSize="xs" color="gray.400">• Choose one gender (not both)</Text>
-              <Text fontSize="xs" color="gray.400">• Set custom age range (not 18-100)</Text>
-              <Text fontSize="xs" color="gray.400">• Set custom income range (not $0-$250K)</Text>
+              <Text fontSize="xs" color="gray.400">Select specific ethnicities (not all)</Text>
+              <Text fontSize="xs" color="gray.400">Choose one gender (not both)</Text>
+              <Text fontSize="xs" color="gray.400">Set custom age range (not 18-100)</Text>
+              <Text fontSize="xs" color="gray.400">Set custom income range (not $0-$250K)</Text>
             </VStack>
             
             {components.length > 0 && (
@@ -301,16 +302,18 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
           </Box>
         </VStack>
       </CollapsibleSection>
+      </div>
     );
   }
   
   return (
-    <CollapsibleSection
-      title="👥 Advanced Demographic Analysis"
-      defaultIsOpen={false}
-      priority={hasAdvancedScoring ? "high" : "medium"}
-      userType="business"
-    >
+    <div style={{ listStyle: 'none', listStyleType: 'none' }}>
+      <CollapsibleSection
+        title="👥 Advanced Demographic Analysis"
+        defaultIsOpen={false}
+        priority={hasAdvancedScoring ? "high" : "medium"}
+        userType="business"
+      >
       <VStack spacing={6} p={4}>
         {/* AI Strategy Display */}
         {hasAdvancedScoring && (
@@ -642,5 +645,6 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
         </Box>
       </VStack>
     </CollapsibleSection>
+    </div>
   );
 }

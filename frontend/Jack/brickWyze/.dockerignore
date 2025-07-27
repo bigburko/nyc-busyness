@@ -1,6 +1,74 @@
-# Create .dockerignore (this is what actually helps)
-echo node_modules > .dockerignore
-echo .next >> .dockerignore
+# Dependencies - This is the BIG one (saves ~500MB+)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Now Docker won't copy node_modules at all
-docker build -t brickwyze . --progress=plain
+# Next.js build outputs
+.next/
+out/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git (don't need in container)
+.git/
+.gitignore
+README.md
+CHANGELOG.md
+
+# Testing
+coverage/
+.nyc_output/
+.jest/
+
+# Logs
+logs/
+*.log
+
+# Package manager caches
+.npm/
+.yarn/
+.pnpm-store/
+.cache/
+
+# Build artifacts
+dist/
+build/
+
+# Temporary files
+.tmp/
+.temp/
+
+# Docker files (avoid recursion)
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# Documentation
+docs/
+*.md
+
+# Development only
+.eslintcache
+.prettierrc*
+.editorconfig
+
+# Large files that aren't needed in production
+*.sql
+*.sqlite
+*.dump
