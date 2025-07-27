@@ -12,8 +12,6 @@ const Navbar: React.FC = () => {
       {/* Left-side navigation links */}
       <div className={styles.navLeft}>
         <Link href="/">Home</Link>
-        <Link href="/about">About</Link>
-        <Link href="/help">Help</Link>
       </div>
 
       {/* center logo */}
@@ -31,7 +29,6 @@ const Navbar: React.FC = () => {
 
       {/* Right-side function buttons */}
       <div className={styles.navRight}>
-        <Link href="/shortlist">Shortlist</Link>
         <Link href="/map" className={styles.loginBtn}>Launch Map</Link>
       </div>
     </nav>
