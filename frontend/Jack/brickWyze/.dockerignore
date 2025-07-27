@@ -1,74 +1,24 @@
-# Dependencies - This is the BIG one (saves ~500MB+)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+# Use official Node.js LTS image
+FROM node:18-alpine
 
-# Next.js build outputs
-.next/
-out/
+# Set the working directory in container
+WORKDIR /app
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Copy the full project
+COPY . .
 
-# Git (don't need in container)
-.git/
-.gitignore
-README.md
-CHANGELOG.md
+# Build the Next.js project
+RUN NEXT_DISABLE_ESLINT=true npm run build
 
-# Testing
-coverage/
-.nyc_output/
-.jest/
+# Expose the port (default Next.js port)
+EXPOSE 3000
 
-# Logs
-logs/
-*.log
+# Set environment variable
+ENV NODE_ENV=production
 
-# Package manager caches
-.npm/
-.yarn/
-.pnpm-store/
-.cache/
-
-# Build artifacts
-dist/
-build/
-
-# Temporary files
-.tmp/
-.temp/
-
-# Docker files (avoid recursion)
-Dockerfile*
-.dockerignore
-docker-compose*.yml
-
-# Documentation
-docs/
-*.md
-
-# Development only
-.eslintcache
-.prettierrc*
-.editorconfig
-
-# Large files that aren't needed in production
-*.sql
-*.sqlite
-*.dump
+# Run the app
+CMD ["npm", "start"]
