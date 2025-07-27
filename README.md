@@ -1,0 +1,141 @@
+# Brickwyze 🏢
+
+**NYC Commercial Intelligence Platform**
+
+Visit the live application: [https://brickwyze.com/](https://brickwyze.com/)
+
+## Overview
+
+Brickwyze is an AI-powered business intelligence platform that helps entrepreneurs and businesses find optimal commercial locations in New York City. Using comprehensive data analysis and machine learning, it provides actionable insights for location-based business decisions.
+
+## Key Features
+
+- **Interactive NYC Map** - Explore Manhattan neighborhoods with detailed census tract analysis
+- **AI-Powered Insights** - Get personalized business recommendations powered by Gemini AI
+- **Multi-Factor Scoring** - Analyze locations based on:
+  - Crime rates and safety
+  - Foot traffic patterns
+  - Demographics alignment
+  - Rent costs
+  - Flood risk assessment
+  - Transit accessibility
+  - Points of interest density
+
+- **Smart Filtering** - Filter by demographics, income levels, time periods, and business preferences
+- **Trend Analysis** - Historical data and future projections for informed decision-making
+- **Export Reports** - Generate detailed PDF reports with AI analysis
+
+## Technology Stack
+
+### Frontend
+- **Next.js 14** with TypeScript
+- **Chakra UI** for component library
+- **Mapbox GL** for interactive mapping
+- **Zustand** for state management
+- **Recharts** for data visualization
+
+### Backend
+- **Node.js** with Express
+- **Docker** containerization
+- **RESTful API** architecture
+
+### Data Pipeline (ETL)
+- **Python** for data processing
+- **Jupyter Notebooks** for analysis
+- **CSV/JSON** data formats
+- **GeoJSON** for spatial data
+
+### AI Integration
+- **Google Gemini** for business intelligence
+- **OpenRouter API** for AI services
+
+## Project Structure
+
+```
+├── backend/           # Node.js backend API
+├── database/          # Database configuration
+├── docker/           # Docker setup files
+├── etl/              # Data processing pipeline
+│   ├── census tract geofiles/
+│   ├── crime score/
+│   ├── demographic_score/
+│   ├── flood_risk_scoring/
+│   ├── foot_traffic_score/
+│   ├── poi/
+│   └── rent_score/
+├── frontend/
+│   ├── Jack/brickwyze/    # Main Next.js application
+│   └── Joy/               # Alternative frontend implementation
+└── README.md
+```
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- Python 3.8+
+- Docker (optional)
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone https://github.com/yourusername/nyc-busyness.git
+cd nyc-busyness
+```
+
+2. **Frontend Setup**
+```bash
+cd frontend/Jack/brickwyze
+npm install
+npm run dev
+```
+
+3. **Backend Setup**
+```bash
+cd backend
+npm install
+npm start
+```
+
+4. **Environment Variables**
+Create `.env.local` in the frontend directory:
+```
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_token
+NEXT_PUBLIC_OPENROUTER_API_KEY=your_openrouter_key
+```
+
+## Data Sources
+
+The platform integrates multiple NYC datasets:
+- **NYC Open Data** - Crime, demographics, census
+- **MTA Data** - Subway and transit information
+- **PLUTO** - Property and zoning data
+- **BrickWyze Foot Traffic** - Proprietary movement data
+- **Real Estate Listings** - Rental market data
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Team
+
+- **Jack** - Frontend Development (Next.js)
+- **Joy** - UI/UX Design & Frontend
+- **Additional Contributors** - Data Engineering & Backend
+
+## Live Demo
+
+Experience Brickwyze at: **[https://brickwyze.com/](https://brickwyze.com/)**
+
+---
+
+*Built with ❤️ for NYC entrepreneurs and businesses*
