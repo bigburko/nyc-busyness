@@ -59,7 +59,7 @@
   "jest": {
     "testEnvironment": "jsdom",
     "setupFilesAfterEnv": [
-      "<rootDir>/src/__tests__/setup.ts"
+      "<rootDir>/src/tests/setup.ts"
     ],
     "moduleNameMapping": {
       "^@/(.*)$": "<rootDir>/src/$1",
