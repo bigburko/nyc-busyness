@@ -4,11 +4,14 @@ import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { TractResult } from '../types/TractTypes';
 import { Weight } from '../types/WeightTypes';
-import { AIBusinessAnalysis } from '../types/AIAnalysisTypes';
+import { AIBusinessAnalysis, BusinessInsight } from '../types/AIAnalysisTypes';
 
 declare module 'jspdf' {
   interface jsPDF {
     autoTable: typeof autoTable;
+    lastAutoTable: {
+      finalY: number;
+    };
   }
 }
 
@@ -25,6 +28,10 @@ interface ChartConfig {
   selector: string;
   title: string;
   maxHeight?: number;
+}
+
+interface AutoTableData {
+  [key: string]: string | number;
 }
 
 export class PDFExportService {
@@ -80,7 +87,8 @@ export class PDFExportService {
 
   constructor() {
     this.doc = new jsPDF('p', 'mm', 'a4');
-    (this.doc as any).autoTable = autoTable.bind(null, this.doc);
+    // Set up autoTable properly
+    this.doc.autoTable = autoTable.bind(null, this.doc);
   }
 
   async generateLocationReport(options: ExportOptions): Promise<void> {
@@ -105,7 +113,7 @@ export class PDFExportService {
 
       // Charts Section (NEW!)
       if (includeCharts) {
-        await this.addChartsSection(tract);
+        await this.addChartsSection();
         this.addSpace(10);
       }
 
@@ -146,7 +154,7 @@ export class PDFExportService {
   }
 
   // 🚀 NEW: Charts Section
-  private async addChartsSection(tract: TractResult): Promise<void> {
+  private async addChartsSection(): Promise<void> {
     this.checkPageBreak(40);
     
     this.doc.setFontSize(16);
@@ -357,7 +365,7 @@ export class PDFExportService {
     this.currentY += 3;
   }
 
-  // ✅ EXISTING METHODS (unchanged)
+  // ✅ EXISTING METHODS (updated for autoTable)
   private addHeader(tract: TractResult): void {
     // Title
     this.doc.setFontSize(24);
@@ -454,19 +462,19 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
     this.doc.text('📈 Key Performance Metrics', this.margin, this.currentY);
     this.currentY += 10;
 
-    const tableData = [
-      ['Overall Business Score', `${Math.round(tract.custom_score || 0)}/100`, this.getScoreDescription(tract.custom_score || 0)],
-      ['Foot Traffic Score', `${Math.round(tract.foot_traffic_score || 0)}/100`, this.getScoreDescription(tract.foot_traffic_score || 0)],
-      ['Safety Score', `${Math.round(tract.crime_score || 0)}/100`, this.getScoreDescription(tract.crime_score || 0)],
-      ['Demographics Match', `${Math.round(tract.demographic_match_pct || 0)}%`, this.getDemographicsDescription(tract.demographic_match_pct || 0)],
-      ['Average Rent', tract.avg_rent ? `$${tract.avg_rent}/sqft` : 'N/A', tract.avg_rent ? this.getRentDescription(tract.avg_rent) : 'Data unavailable'],
-      ['Resilience Score', `${Math.round(tract.resilience_score || 0)}/100`, 'Long-term stability indicator']
+    const tableData: AutoTableData[] = [
+      { metric: 'Overall Business Score', value: `${Math.round(tract.custom_score || 0)}/100`, assessment: this.getScoreDescription(tract.custom_score || 0) },
+      { metric: 'Foot Traffic Score', value: `${Math.round(tract.foot_traffic_score || 0)}/100`, assessment: this.getScoreDescription(tract.foot_traffic_score || 0) },
+      { metric: 'Safety Score', value: `${Math.round(tract.crime_score || 0)}/100`, assessment: this.getScoreDescription(tract.crime_score || 0) },
+      { metric: 'Demographics Match', value: `${Math.round(tract.demographic_match_pct || 0)}%`, assessment: this.getDemographicsDescription(tract.demographic_match_pct || 0) },
+      { metric: 'Average Rent', value: tract.avg_rent ? `$${tract.avg_rent}/sqft` : 'N/A', assessment: tract.avg_rent ? this.getRentDescription(tract.avg_rent) : 'Data unavailable' },
+      { metric: 'Resilience Score', value: `${Math.round(tract.resilience_score || 0)}/100`, assessment: 'Long-term stability indicator' }
     ];
 
-    (this.doc as any).autoTable({
+    autoTable(this.doc, {
       startY: this.currentY,
       head: [['Metric', 'Value', 'Assessment']],
-      body: tableData,
+      body: tableData.map(row => [row.metric, row.value, row.assessment]),
       theme: 'grid',
       headStyles: { fillColor: [41, 82, 156], textColor: 255, fontSize: 12, fontStyle: 'bold' },
       bodyStyles: { fontSize: 10, textColor: 60 },
@@ -479,7 +487,7 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       margin: { left: this.margin, right: this.margin }
     });
 
-    this.currentY = (this.doc as any).lastAutoTable.finalY + 5;
+    this.currentY = this.doc.lastAutoTable.finalY + 5;
   }
 
   private addWeightsSection(weights: Weight[]): void {
@@ -501,7 +509,7 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       this.getWeightDescription(weight.id)
     ]);
 
-    (this.doc as any).autoTable({
+    autoTable(this.doc, {
       startY: this.currentY,
       head: [['Factor', 'Weight', 'Impact']],
       body: weightsData,
@@ -517,7 +525,7 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       margin: { left: this.margin, right: this.margin }
     });
 
-    this.currentY = (this.doc as any).lastAutoTable.finalY + 5;
+    this.currentY = this.doc.lastAutoTable.finalY + 5;
   }
 
   private addAIAnalysisSection(aiAnalysis: AIBusinessAnalysis): void {
@@ -555,7 +563,7 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       this.doc.text('Key Insights:', this.margin, this.currentY);
       this.currentY += 8;
 
-      aiAnalysis.insights.forEach((insight, index) => {
+      aiAnalysis.insights.forEach((insight: BusinessInsight) => {
         this.checkPageBreak(15);
         
         this.doc.setFontSize(11);
@@ -639,7 +647,7 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       ['Tract Name', tract.tract_name || 'N/A']
     ];
 
-    (this.doc as any).autoTable({
+    autoTable(this.doc, {
       startY: this.currentY,
       body: locationData,
       theme: 'plain',
@@ -651,7 +659,7 @@ The analysis is weighted based on your priorities: ${weights.slice(0, 3).map(w =
       margin: { left: this.margin, right: this.margin }
     });
 
-    this.currentY = (this.doc as any).lastAutoTable.finalY + 5;
+    this.currentY = this.doc.lastAutoTable.finalY + 5;
   }
 
   private addTrendAnalysis(tract: TractResult): void {

@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { TractResult } from '../types/TractTypes';
 import { Weight } from '../types/WeightTypes';
-import { AIBusinessAnalysis } from '../types/AIAnalysisTypes';
+import { AIBusinessAnalysis, BusinessInsight } from '../types/AIAnalysisTypes';
 import { generateLoopNetUrl } from '../components/features/search/TractDetailPanel/LoopNetIntegration';
 import { generateStreetViewUrlSync } from '../components/features/search/TractDetailPanel/GoogleMapsImage';
 
@@ -568,14 +568,14 @@ export class EnhancedPDFService {
               AI Business Intelligence
             </h2>
             <div class="ai-section">
-              <div class="ai-headline">${(aiAnalysis as any).headline || 'AI Analysis Available'}</div>
+              <div class="ai-headline">${aiAnalysis.headline || 'AI Analysis Available'}</div>
               
-              ${(aiAnalysis as any).reasoning ? `<p style="margin-bottom: 20px; color: #374151;">${(aiAnalysis as any).reasoning}</p>` : ''}
+              ${aiAnalysis.reasoning ? `<p style="margin-bottom: 20px; color: #374151;">${aiAnalysis.reasoning}</p>` : ''}
               
-              ${(aiAnalysis as any).insights && Array.isArray((aiAnalysis as any).insights) && (aiAnalysis as any).insights.length > 0 ? `
+              ${aiAnalysis.insights && Array.isArray(aiAnalysis.insights) && aiAnalysis.insights.length > 0 ? `
                 <h3 style="color: #1e40af; margin: 24px 0 16px 0;">Key Insights:</h3>
                 <div class="insights-grid">
-                  ${(aiAnalysis as any).insights.map((insight: any) => `
+                  ${aiAnalysis.insights.map((insight: BusinessInsight) => `
                     <div class="insight-card ${insight.type || 'strength'}">
                       <div class="insight-title">
                         <span>${insight.icon || '📊'}</span>
@@ -587,21 +587,21 @@ export class EnhancedPDFService {
                 </div>
               ` : ''}
               
-              ${(aiAnalysis as any).businessTypes && Array.isArray((aiAnalysis as any).businessTypes) && (aiAnalysis as any).businessTypes.length > 0 ? `
+              ${aiAnalysis.businessTypes && Array.isArray(aiAnalysis.businessTypes) && aiAnalysis.businessTypes.length > 0 ? `
                 <h3 style="color: #1e40af; margin: 24px 0 12px 0;">Recommended Business Types:</h3>
                 <div class="business-types">
-                  ${(aiAnalysis as any).businessTypes.map((type: string) => `<span class="business-type">${type}</span>`).join('')}
+                  ${aiAnalysis.businessTypes.map((type: string) => `<span class="business-type">${type}</span>`).join('')}
                 </div>
               ` : ''}
               
-              ${(aiAnalysis as any).marketStrategy ? `
+              ${aiAnalysis.marketStrategy ? `
                 <h3 style="color: #1e40af; margin: 24px 0 12px 0;">Market Strategy:</h3>
-                <p style="color: #374151; margin-bottom: 16px;">${(aiAnalysis as any).marketStrategy}</p>
+                <p style="color: #374151; margin-bottom: 16px;">${aiAnalysis.marketStrategy}</p>
               ` : ''}
               
-              ${(aiAnalysis as any).bottomLine ? `
+              ${aiAnalysis.bottomLine ? `
                 <div class="bottom-line">
-                  <strong>Bottom Line:</strong> ${(aiAnalysis as any).bottomLine}
+                  <strong>Bottom Line:</strong> ${aiAnalysis.bottomLine}
                 </div>
               ` : ''}
             </div>
@@ -919,7 +919,7 @@ export class EnhancedPDFService {
       }
       
       // ADD CLICKABLE LINKS to the PDF
-      this.addClickableLinks(pdf, options.tract, streetViewUrl, loopNetUrl, totalPages);
+      this.addClickableLinks(pdf, options.tract, streetViewUrl, loopNetUrl);
       
       // Save the PDF
       pdf.save(filename);
@@ -932,7 +932,7 @@ export class EnhancedPDFService {
   }
 
   // ✅ ADD CLICKABLE LINKS at the top of the PDF
-  private addClickableLinks(pdf: jsPDF, tract: TractResult, streetViewUrl: string, loopNetUrl: string, totalPages: number): void {
+  private addClickableLinks(pdf: jsPDF, tract: TractResult, streetViewUrl: string, loopNetUrl: string): void {
     try {
       console.log('🔗 [PDF Links] Adding clickable links at top of PDF...');
       
