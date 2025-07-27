@@ -1,4 +1,4 @@
-// src/components/features/search/MyDrawer.tsx - FIXED: Updated to use EdgeFunctionResponse interface
+// src/components/features/search/MyDrawer.tsx - FIXED: Updated to use EdgeFunctionResponse interface + Added Tract Panel Closing
 
 'use client';
 
@@ -27,6 +27,13 @@ import MyToolTip from '../../ui/MyToolTip';
 // ✅ NEW: Import both justification components
 import OverallJustificationDisplay from '../../ui/OverallJustificationDisplay';
 import DemographicReasoningDisplay from '../../ui/DemographicReasoningDisplay';
+
+// 🆕 ADD THIS: Global window interface for tract panel closing
+declare global {
+  interface Window {
+    closeTractDetailPanel?: () => void;
+  }
+}
 
 // ✅ FIXED: Extended FilterState interface for submission data with topN
 interface SubmissionData extends FilterState {
@@ -182,6 +189,16 @@ export default function MyDrawer({
     updateWeight(id, value);
   }, [updateWeight]);
 
+  // ✅ NEW: Handle auto-balanced weight updates
+  const handleWeightsUpdated = useCallback((updatedWeights: Weighting[]) => {
+    console.log('🎯 [MyDrawer] Auto-balancing weights:', updatedWeights);
+    
+    // Update each weight individually through the store
+    updatedWeights.forEach(weight => {
+      updateWeight(weight.id, weight.value);
+    });
+  }, [updateWeight]);
+
   const handleAddWeight = useCallback((layer: Layer) => {
     addWeight(layer);
   }, [addWeight]);
@@ -195,9 +212,17 @@ export default function MyDrawer({
   const handleIncomeRangeChange = useCallback((newVal: [number, number]) => setFilters({ incomeRange: newVal }), [setFilters]);
   const handleGenderChange = useCallback((newVal: string[]) => setFilters({ selectedGenders: newVal }), [setFilters]);
   const handleEthnicityChange = useCallback((newVal: string[]) => setFilters({ selectedEthnicities: newVal }), [setFilters]);
+  
+  // 🆕 UPDATED: Add tract panel closing logic to handleTimePeriodChange
   const handleTimePeriodChange = useCallback((newVal: string[]) => {
     console.log('🕐 [MyDrawer] Time period change:', newVal);
     setFilters({ selectedTimePeriods: newVal });
+    
+    // 🆕 ADD THIS: Close tract detail panel when time period triggers auto-search
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [MyDrawer] Closed tract detail panel - time period auto-search triggered');
+    }
     
     // ✅ AUTO-SUBMIT: Trigger search when time periods change (like TopN does)
     const currentState = useFilterStore.getState();
@@ -220,9 +245,15 @@ export default function MyDrawer({
     });
   }, [setDemographicScoring]);
 
-  // ✅ FIXED: Handle TopN changes and trigger search
+  // 🆕 UPDATED: Add tract panel closing logic to handleTopNChange
   const handleTopNChange = useCallback((newValue: number) => {
     setTopN(newValue);
+    
+    // 🆕 ADD THIS: Close tract detail panel when TopN triggers auto-search
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [MyDrawer] Closed tract detail panel - TopN auto-search triggered');
+    }
     
     // Auto-submit search when topN changes (with current filters)
     const currentState = useFilterStore.getState();
@@ -233,10 +264,17 @@ export default function MyDrawer({
     onSearchSubmit(submissionData);
   }, [onSearchSubmit]);
 
+  // 🆕 UPDATED: Add tract panel closing logic to handleSubmit
   const handleSubmit = () => {
     if (!selectedGenders.length) {
       alert('Please select at least one gender.');
       return;
+    }
+    
+    // 🆕 ADD THIS: Close tract detail panel when search is submitted
+    if (window.closeTractDetailPanel) {
+      window.closeTractDetailPanel();
+      console.log('❌ [MyDrawer] Closed tract detail panel - user submitted search');
     }
     
     // ✅ DEBUG: Log current state before submission
@@ -317,8 +355,16 @@ export default function MyDrawer({
         finalFocusRef={btnRef as unknown as React.RefObject<FocusableElement>} 
         placement="left" 
         size="md"
+        blockScrollOnMount={false}
+        preserveScrollBarGap={false}
       >
-        <DrawerOverlay bg="blackAlpha.300" backdropFilter="blur(4px)" />
+        <DrawerOverlay 
+          bg="blackAlpha.300"
+          backdropFilter="blur(4px)"
+          style={{ 
+            zIndex: '9998 !important'
+          }}
+        />
         <DrawerContent 
           bg="linear-gradient(135deg, #FFF5F5 0%, #FFEEE8 100%)"
           maxW="440px"
@@ -326,6 +372,10 @@ export default function MyDrawer({
           display="flex" 
           flexDirection="column" 
           h="100%"
+          position="relative"
+          style={{ 
+            zIndex: '99999 !important'
+          }}
         >
           <DrawerCloseButton 
             color="#FF492C" 
@@ -351,14 +401,24 @@ export default function MyDrawer({
           
           <DrawerBody 
             ref={drawerBodyRef} 
-            overflowY="auto" 
+            overflowY="auto"
+            position="relative"
+            zIndex={1}
+            pointerEvents="auto"
             css={{ 
               '&::-webkit-scrollbar': { width: '8px' }, 
               '&::-webkit-scrollbar-track': { background: '#f1f1f1', borderRadius: '4px' }, 
               '&::-webkit-scrollbar-thumb': { background: '#888', borderRadius: '4px', '&:hover': { background: '#555' } } 
             }}
           >
-            <VStack spacing={4} p={2} align="stretch">
+            <VStack 
+              spacing={4} 
+              p={2} 
+              align="stretch"
+              position="relative"
+              zIndex={1}
+              pointerEvents="auto"
+            >
               
               {/* ✅ Overall AI Justification - Updated to handle EdgeFunctionResponse */}
               <OverallJustificationDisplay
@@ -611,9 +671,6 @@ export default function MyDrawer({
                     <Text fontSize="lg" fontWeight="bold" color="gray.800">
                       ⚖️ Score Weighting
                     </Text>
-                    <MyToolTip label="Score Weighting">
-                      Adjust the importance of different factors when ranking neighborhoods. Higher percentages mean that factor has more influence on the results.
-                    </MyToolTip>
                   </HStack>
                   
                   {/* ✅ UPDATED: Use same chevron style as other components */}
@@ -634,6 +691,13 @@ export default function MyDrawer({
                 {/* Content - Only show when expanded */}
                 {isWeightingOpen && (
                   <VStack spacing={3} p={3} pt={0}>
+                    {/* Explanation text */}
+                    <Box w="full" bg="blue.50" p={3} borderRadius="lg" border="1px solid" borderColor="blue.200">
+                      <Text fontSize="sm" color="blue.800" textAlign="center">
+                        💡 Adjust the importance of different factors when ranking neighborhoods. Higher percentages mean that factor has more influence on the results.
+                      </Text>
+                    </Box>
+                    
                     {/* Total weight indicator for debugging */}
                     <Box w="full" bg="gray.50" p={3} borderRadius="lg">
                       <Text fontSize="sm" color="gray.600" textAlign="center" fontWeight="medium">
@@ -664,6 +728,7 @@ export default function MyDrawer({
                         onSliderChangeEnd={handleWeightChangeEnd} 
                         onRemove={handleRemoveWeight} 
                         onAdd={handleAddWeight}
+                        onWeightsUpdated={handleWeightsUpdated}
                       />
                       <Flex justify="center" w="100%" mt={4}>
                         <Button 
@@ -695,7 +760,8 @@ export default function MyDrawer({
             borderTop="1px solid rgba(255, 73, 44, 0.1)"
             position="sticky" 
             bottom="0" 
-            zIndex="sticky"
+            zIndex={2}
+            pointerEvents="auto"
           >
             <Flex justify="center">
               <Button

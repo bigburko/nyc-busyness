@@ -1,7 +1,8 @@
-// Clean WeightingPanel.tsx with debug logs removed
+// WeightingPanel.tsx with auto-balancing functionality
 import { Box, Text, VStack, IconButton, HStack } from '@chakra-ui/react';
 import MySlider from './MySlider'; 
 import { AddIcon } from '@chakra-ui/icons';
+import { useCallback } from 'react';
 
 export interface Layer {
   id: string;
@@ -20,6 +21,7 @@ export interface Props {
   onSliderChangeEnd: (id: string, newValue: number) => void; 
   onRemove: (id: string) => void;
   onAdd: (layer: Layer) => void;
+  onWeightsUpdated: (weights: Weighting[]) => void; // New prop for auto-balancing
 }
 
 export default function WeightingPanel({
@@ -28,7 +30,91 @@ export default function WeightingPanel({
   onSliderChangeEnd,
   onRemove,
   onAdd,
+  onWeightsUpdated,
 }: Props) {
+
+  // Auto-balancing logic
+  const handleSliderChange = useCallback((changedId: string, newValue: number) => {
+    if (activeWeights.length <= 1) {
+      // If only one slider, just update it
+      onSliderChangeEnd(changedId, newValue);
+      return;
+    }
+
+    // Create a copy of active weights
+    const updatedWeights = [...activeWeights];
+    const changedIndex = updatedWeights.findIndex(w => w.id === changedId);
+    
+    if (changedIndex === -1) return;
+
+    // Update the changed slider
+    updatedWeights[changedIndex] = { ...updatedWeights[changedIndex], value: newValue };
+
+    // Calculate remaining percentage to distribute
+    const remainingPercentage = 100 - newValue;
+    const otherWeights = updatedWeights.filter((_, weightIndex) => weightIndex !== changedIndex);
+    
+    if (otherWeights.length === 0) return;
+
+    // Calculate current total of other weights
+    const currentOtherTotal = otherWeights.reduce((sum, weight) => sum + weight.value, 0);
+
+    // Redistribute the remaining percentage proportionally
+    if (currentOtherTotal > 0) {
+      // Proportional redistribution
+      otherWeights.forEach((weight) => {
+        const proportion = weight.value / currentOtherTotal;
+        const newWeightValue = Math.round(remainingPercentage * proportion);
+        
+        // Find the original index in updatedWeights
+        const originalIndex = updatedWeights.findIndex(w => w.id === weight.id);
+        if (originalIndex !== -1) {
+          updatedWeights[originalIndex] = { 
+            ...updatedWeights[originalIndex], 
+            value: Math.max(0, newWeightValue) 
+          };
+        }
+      });
+    } else {
+      // If all other weights are 0, distribute equally
+      const equalShare = Math.floor(remainingPercentage / otherWeights.length);
+      const remainder = remainingPercentage % otherWeights.length;
+      
+      otherWeights.forEach((weight, weightIndex) => {
+        const originalIndex = updatedWeights.findIndex(w => w.id === weight.id);
+        if (originalIndex !== -1) {
+          const value = equalShare + (weightIndex < remainder ? 1 : 0);
+          updatedWeights[originalIndex] = { 
+            ...updatedWeights[originalIndex], 
+            value: Math.max(0, value) 
+          };
+        }
+      });
+    }
+
+    // Ensure the total is exactly 100% by adjusting the last non-changed weight
+    const total = updatedWeights.reduce((sum, weight) => sum + weight.value, 0);
+    if (total !== 100) {
+      const difference = 100 - total;
+      const lastOtherIndex = updatedWeights.findIndex((weight, weightIndex) => 
+        weightIndex !== changedIndex && weight.value > 0
+      );
+      
+      if (lastOtherIndex !== -1) {
+        updatedWeights[lastOtherIndex] = {
+          ...updatedWeights[lastOtherIndex],
+          value: Math.max(0, updatedWeights[lastOtherIndex].value + difference)
+        };
+      }
+    }
+
+    // Update all weights through the callback
+    onWeightsUpdated(updatedWeights);
+    
+    // Also call the original callback for the changed slider
+    onSliderChangeEnd(changedId, newValue);
+  }, [activeWeights, onSliderChangeEnd, onWeightsUpdated]);
+
   return (
     <Box>
       <VStack spacing={4}>
@@ -40,7 +126,7 @@ export default function WeightingPanel({
             filledTrack={weight.color}
             value={weight.value}
             onChangeEnd={(val: number) => {
-              onSliderChangeEnd(weight.id, val);
+              handleSliderChange(weight.id, val);
             }}
             canBeRemoved={activeWeights.length > 1}
             onRemove={() => {
@@ -89,6 +175,22 @@ export default function WeightingPanel({
                 </HStack>
               ))}
             </VStack>
+          </Box>
+        )}
+        
+        {/* Total percentage display */}
+        {activeWeights.length > 1 && (
+          <Box 
+            w="100%" 
+            p={3} 
+            bg="gray.50" 
+            borderRadius="md" 
+            border="1px solid"
+            borderColor="gray.200"
+          >
+            <Text fontSize="sm" fontWeight="bold" textAlign="center">
+              Total: {activeWeights.reduce((sum, weight) => sum + weight.value, 0)}%
+            </Text>
           </Box>
         )}
       </VStack>

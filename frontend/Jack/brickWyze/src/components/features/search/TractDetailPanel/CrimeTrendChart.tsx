@@ -3,7 +3,7 @@
 
 import { Box, VStack, HStack, Text, Flex } from '@chakra-ui/react';
 import MyToolTip from '../../../ui/MyToolTip';
-import { TractResult } from '../types/TractTypes';
+import { TractResult } from '../../../../types/TractTypes';
 
 interface CrimeTrendChartProps {
   tract: TractResult;
@@ -51,7 +51,7 @@ export function CrimeTrendChart({ tract }: CrimeTrendChartProps) {
   };
 
   return (
-    <Box w="full">
+    <Box w="full" data-testid="crime-trend-chart" data-chart="crime-trend" data-chart-content="true">
       <HStack mb={4} align="center" spacing={3}>
         <Text fontSize="lg" fontWeight="bold" color="gray.800">
           Safety Score Trend
@@ -61,7 +61,7 @@ export function CrimeTrendChart({ tract }: CrimeTrendChartProps) {
         </MyToolTip>
       </HStack>
 
-      <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm">
+      <Box bg="white" p={4} borderRadius="lg" border="1px solid" borderColor="gray.200" boxShadow="sm" data-chart-content="true">
         {/* Chart - Clean version with reduced white space */}
         <Flex justify="space-around" align="end" h="160px" mb={2} px={2}>
           {chartData.map((item, chartIndex) => {

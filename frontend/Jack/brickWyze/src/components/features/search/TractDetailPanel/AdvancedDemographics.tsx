@@ -1,13 +1,14 @@
-// src/components/features/search/TractDetailPanel/AdvancedDemographics.tsx
+// Fixed AdvancedDemographics.tsx - Collapsible Section (No Tooltip/Glow)
+
 'use client';
 
 import { 
   Box, VStack, HStack, Text, Progress, SimpleGrid, Badge, Flex
 } from '@chakra-ui/react';
 import { useFilterStore } from '../../../../stores/filterStore';
-import MyToolTip from '../../../ui/MyToolTip';
+import CollapsibleSection from '../../../ui/CollapsibleSection';
 import { TractResult } from '../../../../types/TractTypes';
-import { DemographicScoring, DemographicWeights, ThresholdBonus, Penalty, FilterStore } from '../../../../types/WeightTypes';
+import { DemographicScoring, DemographicWeights, ThresholdBonus, Penalty } from '../../../../types/WeightTypes';
 
 interface AdvancedDemographicsProps {
   tract: TractResult;
@@ -27,9 +28,12 @@ interface DemographicComponent {
   };
 }
 
-// Helper function to get research-backed score from percentage
+// FIXED: Helper function to get research-backed score from percentage
+// This should match the backend logic exactly
 const getResearchScore = (percentage: number): number => {
+  // Input is already a percentage (0-100), not decimal (0-1)
   const pct = percentage;
+  
   if (pct >= 30) return Math.min(100, 80 + (pct - 30) / 20 * 20);
   if (pct >= 25) return 70 + (pct - 25) / 5 * 9;
   if (pct >= 20) return 60 + (pct - 20) / 5 * 9;
@@ -59,9 +63,18 @@ const getWeightColor = (value: number): string => {
 };
 
 export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
-  // Access demographic scoring from filter store
-  const filterStore = useFilterStore() as FilterStore;
+  // Access demographic scoring from filter store - ✅ FIXED: Remove type casting
+  const filterStore = useFilterStore();
   const demographicScoring: DemographicScoring | undefined = filterStore.demographicScoring;
+  
+  // FIXED: Add debugging to see what data we're receiving
+  console.log('🔍 [AdvancedDemographics] Received tract data:', {
+    geoid: tract.geoid,
+    demographic_match_pct: tract.demographic_match_pct,
+    gender_match_pct: tract.gender_match_pct,
+    age_match_pct: tract.age_match_pct,
+    income_match_pct: tract.income_match_pct
+  });
   
   // Collect demographic components
   const components: DemographicComponent[] = [];
@@ -76,17 +89,25 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
   
   // Use advanced weights if available, otherwise use defaults
   const weights = demographicScoring?.weights || defaultWeights;
-  const hasAdvancedScoring = demographicScoring && demographicScoring.weights;
+  const hasAdvancedScoring = !!(demographicScoring && demographicScoring.weights); // ✅ FIXED: Convert to boolean
   const thresholdBonuses = demographicScoring?.thresholdBonuses || [];
   const penalties = demographicScoring?.penalties || [];
   const reasoning = demographicScoring?.reasoning;
   
-  // Process each demographic component with weighting
-  if (tract.demographic_match_pct) {
-    const ethPercent = Math.round((tract.demographic_match_pct > 1 ? tract.demographic_match_pct : tract.demographic_match_pct * 100));
+  // FIXED: Process each demographic component with proper data handling
+  if (tract.demographic_match_pct !== null && tract.demographic_match_pct !== undefined) {
+    // Backend sends percentage as number (e.g., 45 for 45%)
+    const ethPercent = Math.round(tract.demographic_match_pct);
     const ethScore = Math.round(getResearchScore(ethPercent));
     const ethThreshold = getThresholdLabel(ethPercent);
     const ethWeight = weights.ethnicity;
+    
+    console.log('🔍 [AdvancedDemographics] Ethnicity processing:', {
+      raw_value: tract.demographic_match_pct,
+      processed_percentage: ethPercent,
+      calculated_score: ethScore
+    });
+    
     components.push({
       id: 'ethnicity',
       name: 'Ethnicity Match',
@@ -99,11 +120,18 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
     });
   }
   
-  if (tract.gender_match_pct) {
-    const genPercent = Math.round((tract.gender_match_pct > 1 ? tract.gender_match_pct : tract.gender_match_pct * 100));
+  if (tract.gender_match_pct !== null && tract.gender_match_pct !== undefined) {
+    const genPercent = Math.round(tract.gender_match_pct);
     const genScore = Math.round(getResearchScore(genPercent));
     const genThreshold = getThresholdLabel(genPercent);
     const genWeight = weights.gender;
+    
+    console.log('🔍 [AdvancedDemographics] Gender processing:', {
+      raw_value: tract.gender_match_pct,
+      processed_percentage: genPercent,
+      calculated_score: genScore
+    });
+    
     components.push({
       id: 'gender',
       name: 'Gender Match',
@@ -116,11 +144,18 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
     });
   }
   
-  if (tract.age_match_pct) {
-    const agePercent = Math.round((tract.age_match_pct > 1 ? tract.age_match_pct : tract.age_match_pct * 100));
+  if (tract.age_match_pct !== null && tract.age_match_pct !== undefined) {
+    const agePercent = Math.round(tract.age_match_pct);
     const ageScore = Math.round(getResearchScore(agePercent));
     const ageThreshold = getThresholdLabel(agePercent);
     const ageWeight = weights.age;
+    
+    console.log('🔍 [AdvancedDemographics] Age processing:', {
+      raw_value: tract.age_match_pct,
+      processed_percentage: agePercent,
+      calculated_score: ageScore
+    });
+    
     components.push({
       id: 'age',
       name: 'Age Match',
@@ -133,11 +168,18 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
     });
   }
   
-  if (tract.income_match_pct) {
-    const incPercent = Math.round((tract.income_match_pct > 1 ? tract.income_match_pct : tract.income_match_pct * 100));
+  if (tract.income_match_pct !== null && tract.income_match_pct !== undefined) {
+    const incPercent = Math.round(tract.income_match_pct);
     const incScore = Math.round(getResearchScore(incPercent));
     const incThreshold = getThresholdLabel(incPercent);
     const incWeight = weights.income;
+    
+    console.log('🔍 [AdvancedDemographics] Income processing:', {
+      raw_value: tract.income_match_pct,
+      processed_percentage: incPercent,
+      calculated_score: incScore
+    });
+    
     components.push({
       id: 'income',
       name: 'Income Match',
@@ -150,61 +192,129 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
     });
   }
   
+  console.log('🔍 [AdvancedDemographics] Final components:', components.length, components.map(c => `${c.name}: ${c.percentage}% → ${c.score} pts`));
+  
+  // If no components with data, don't render the section at all
   if (components.length === 0) {
-    return (
-      <Box p={6}>
-        <HStack mb={6} align="center" spacing={3}>
-          <Text fontSize="xl" fontWeight="bold" color="gray.800">
-            👥 Advanced Demographic Analysis
-          </Text>
-          <MyToolTip label="Advanced Demographic Analysis">
-            Shows sophisticated demographic scoring using AI-optimized weights, threshold bonuses, and penalties
-          </MyToolTip>
-        </HStack>
-        
-        <Box 
-          p={4} 
-          bg="gray.50" 
-          borderRadius="lg" 
-          border="1px solid" 
-          borderColor="gray.200"
-          textAlign="center"
-        >
-          <Text fontSize="md" color="gray.600">
-            No demographic filters applied in your search
-          </Text>
-          <Text fontSize="sm" color="gray.500" mt={2}>
-            Add ethnicity, gender, age, or income filters to see advanced demographic analysis
-          </Text>
-        </Box>
-      </Box>
-    );
+    return null;
   }
   
-  // Calculate weighted demographic score
-  const totalWeight = components.reduce((sum, comp) => sum + comp.weight, 0);
+  // ✅ CALCULATE activeComponents IMMEDIATELY after components are processed
+  const activeComponents = components.filter((component) => {
+    switch (component.id) {
+      case 'ethnicity':
+        return !!(filterStore.selectedEthnicities && filterStore.selectedEthnicities.length > 0);
+      
+      case 'gender':
+        // ✅ Only active if exactly 1 gender selected (not both or neither)
+        const selectedGenders = filterStore.selectedGenders || [];
+        return selectedGenders.length > 0 && selectedGenders.length < 2;
+      
+      case 'age':
+        // ✅ Active if age range differs from defaults (18-100)
+        const ageRange = filterStore.ageRange || [18, 100];
+        return !!(ageRange && (ageRange[0] > 18 || ageRange[1] < 100));
+      
+      case 'income':
+        // ✅ Active if income range differs from defaults (0-250000)
+        const incomeRange = filterStore.incomeRange || [0, 250000];
+        return !!(incomeRange && (incomeRange[0] > 0 || incomeRange[1] < 250000));
+      
+      default:
+        return false;
+    }
+  });
+  
+  console.log('🔍 [AdvancedDemographics] Active components after filter detection:', 
+    activeComponents.map(c => `${c.name}: ${c.percentage}%`)
+  );
+  
+  // Calculate weighted demographic score using ONLY active components
+  const totalWeight = activeComponents.reduce((sum, comp) => sum + comp.weight, 0);
   const weightedScore = totalWeight > 0 
-    ? Math.round(components.reduce((sum, comp) => sum + comp.weightedContribution, 0) / totalWeight)
-    : Math.round(components.reduce((sum, comp) => sum + comp.score, 0) / components.length);
+    ? Math.round(activeComponents.reduce((sum, comp) => sum + comp.weightedContribution, 0) / totalWeight)
+    : activeComponents.length > 0 
+      ? Math.round(activeComponents.reduce((sum, comp) => sum + comp.score, 0) / activeComponents.length)
+      : 0;
   
   const finalScore = weightedScore;
   
-  const overallThreshold = getThresholdLabel(
-    components.reduce((sum, comp) => sum + comp.percentage, 0) / components.length
-  );
+  const overallThreshold = activeComponents.length > 0 
+    ? getThresholdLabel(activeComponents.reduce((sum, comp) => sum + comp.percentage, 0) / activeComponents.length)
+    : getThresholdLabel(0);
+  
+  console.log('🔍 [AdvancedDemographics] Final calculation:', {
+    totalWeight,
+    weightedScore,
+    finalScore,
+    components_count: components.length,
+    active_components_count: activeComponents.length,
+    active_components: activeComponents.map(c => c.name)
+  });
+  
+  // If no active components, show explanation
+  if (activeComponents.length === 0) {
+    return (
+      <div style={{ listStyle: 'none', listStyleType: 'none' }}>
+        <CollapsibleSection
+          title="👥 Advanced Demographic Analysis"
+          defaultIsOpen={true}
+          priority="medium"
+          userType="business"
+        >
+        <VStack spacing={4} p={4}>
+          <Box 
+            p={4} 
+            bg="gray.50" 
+            borderRadius="lg" 
+            border="1px solid" 
+            borderColor="gray.200"
+            textAlign="center"
+            w="full"
+          >
+            <Text fontSize="md" color="gray.600" mb={2}>
+              No meaningful demographic filters applied
+            </Text>
+            <Text fontSize="sm" color="gray.500" mb={3}>
+              To see advanced demographic analysis, apply specific filters:
+            </Text>
+            <VStack spacing={1} align="center">
+              <Text fontSize="xs" color="gray.400">Select specific ethnicities (not all)</Text>
+              <Text fontSize="xs" color="gray.400">Choose one gender (not both)</Text>
+              <Text fontSize="xs" color="gray.400">Set custom age range (not 18-100)</Text>
+              <Text fontSize="xs" color="gray.400">Set custom income range (not $0-$250K)</Text>
+            </VStack>
+            
+            {components.length > 0 && (
+              <>
+                <Text fontSize="sm" color="gray.500" mt={4} mb={2}>
+                  Available data (not being analyzed):
+                </Text>
+                <HStack justify="center" spacing={4} wrap="wrap">
+                  {components.map((component, index) => (
+                    <Text key={index} fontSize="xs" color="gray.400">
+                      {component.icon} {component.name.replace(' Match', '')}: {component.percentage}%
+                    </Text>
+                  ))}
+                </HStack>
+              </>
+            )}
+          </Box>
+        </VStack>
+      </CollapsibleSection>
+      </div>
+    );
+  }
   
   return (
-    <Box p={6}>
-      <HStack mb={6} align="center" spacing={3}>
-        <Text fontSize="xl" fontWeight="bold" color="gray.800">
-          👥 Advanced Demographic Analysis
-        </Text>
-        <MyToolTip label="Advanced Demographic Analysis">
-          Shows sophisticated demographic scoring using AI-optimized weights, threshold bonuses, and penalties
-        </MyToolTip>
-      </HStack>
-      
-      <VStack spacing={6}>
+    <div style={{ listStyle: 'none', listStyleType: 'none' }}>
+      <CollapsibleSection
+        title="👥 Advanced Demographic Analysis"
+        defaultIsOpen={false}
+        priority={hasAdvancedScoring ? "high" : "medium"}
+        userType="business"
+      >
+      <VStack spacing={6} p={4}>
         {/* AI Strategy Display */}
         {hasAdvancedScoring && (
           <Box 
@@ -301,7 +411,10 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
                   {hasAdvancedScoring ? "AI-Weighted Demographic Score" : "Balanced Demographic Score"}
                 </Text>
                 <Text fontSize="sm" color={hasAdvancedScoring ? "green.600" : "blue.600"}>
-                  {hasAdvancedScoring ? "Using AI-optimized weights" : `Average of ${components.length} component${components.length !== 1 ? 's' : ''}`}
+                  {hasAdvancedScoring ? "Using AI-optimized weights" : `Average of ${activeComponents.length} active component${activeComponents.length !== 1 ? 's' : ''}`}
+                  {activeComponents.length < components.length && (
+                    <span> • {components.length - activeComponents.length} inactive factor{components.length - activeComponents.length !== 1 ? 's' : ''} excluded</span>
+                  )}
                 </Text>
               </VStack>
               <VStack align="end" spacing={0}>
@@ -316,23 +429,23 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
             
             {hasAdvancedScoring ? (
               <Text fontSize="xs" color="green.600" textAlign="center">
-                📊 Weighted Calculation: ({components.map(c => `${Math.round(c.score)} × ${Math.round(c.weight * 100)}%`).join(' + ')}) ÷ {Math.round(totalWeight * 100)}% = {finalScore}
+                📊 Weighted Calculation: ({activeComponents.map(c => `${Math.round(c.score)} × ${Math.round(c.weight * 100)}%`).join(' + ')}) ÷ {Math.round(totalWeight * 100)}% = {finalScore}
               </Text>
             ) : (
               <Text fontSize="xs" color="blue.600" textAlign="center">
-                📊 Balanced Calculation: ({components.map(c => c.score).join(' + ')}) ÷ {components.length} = {finalScore}
+                📊 Balanced Calculation: ({activeComponents.map(c => c.score).join(' + ')}) ÷ {activeComponents.length} = {finalScore}
               </Text>
             )}
           </VStack>
         </Box>
         
-        {/* Individual Component Analysis */}
+        {/* Individual Component Analysis - ✅ UPDATED: Only show ACTIVE components */}
         <VStack spacing={4} w="full">
           <Text fontSize="md" fontWeight="semibold" color="gray.700" textAlign="center">
-            📋 Detailed Component Breakdown
+            📋 Active Component Breakdown
           </Text>
           
-          {components.map((component: DemographicComponent, index: number) => (
+          {activeComponents.map((component: DemographicComponent, index: number) => (
             <Box 
               key={`demo-${component.id}-${index}`}
               p={4} 
@@ -404,6 +517,40 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
               </VStack>
             </Box>
           ))}
+          
+          {/* ✅ ADDED: Show summary of inactive components if any exist */}
+          {activeComponents.length < components.length && (
+            <Box 
+              p={3} 
+              bg="gray.50" 
+              borderRadius="lg" 
+              border="1px solid" 
+              borderColor="gray.200"
+              w="full"
+            >
+              <VStack spacing={2}>
+                <Text fontSize="sm" fontWeight="semibold" color="gray.600">
+                  📋 Inactive Components (Not Contributing to Score)
+                </Text>
+                <HStack justify="center" spacing={4} wrap="wrap">
+                  {components.filter(c => !activeComponents.some(ac => ac.id === c.id)).map((component, index) => (
+                    <HStack key={index} spacing={1}>
+                      <Text fontSize="sm">{component.icon}</Text>
+                      <Text fontSize="sm" color="gray.500">
+                        {component.name.replace(' Match', '')}
+                      </Text>
+                      <Text fontSize="xs" color="gray.400">
+                        ({component.percentage}% available)
+                      </Text>
+                    </HStack>
+                  ))}
+                </HStack>
+                <Text fontSize="xs" color="gray.400" textAlign="center">
+                  These factors have data but aren&apos;t included because no meaningful filters were applied
+                </Text>
+              </VStack>
+            </Box>
+          )}
         </VStack>
         
         {/* Threshold Bonuses and Penalties */}
@@ -497,6 +644,7 @@ export function AdvancedDemographics({ tract }: AdvancedDemographicsProps) {
           </VStack>
         </Box>
       </VStack>
-    </Box>
+    </CollapsibleSection>
+    </div>
   );
 }

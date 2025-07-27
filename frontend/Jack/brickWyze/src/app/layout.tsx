@@ -1,5 +1,6 @@
-// In src/app/layout.tsx
-import { Providers } from './providers' // 👈 Import the new client component
+// src/app/layout.tsx - UPDATED VERSION
+import { Providers } from './providers'
+import ConditionalNavbar from '@/components/landing/ConditionalNavbar'
 
 // You can keep any metadata exports here, as this is a Server Component
 export const metadata = {
@@ -15,12 +16,10 @@ export default function RootLayout({
   return (
     <html lang='en'>
       <body>
-        {/*
-          Wrap your children with the Providers component.
-          Now, ChakraProvider and extendTheme() will only
-          be rendered on the client, solving the error.
-        */}
-        <Providers>{children}</Providers>
+        <Providers>
+          <ConditionalNavbar />
+          {children}
+        </Providers>
       </body>
     </html>
   )

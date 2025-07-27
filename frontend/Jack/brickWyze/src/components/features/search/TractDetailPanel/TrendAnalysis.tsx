@@ -1,10 +1,11 @@
-// src/components/features/search/components/TrendAnalysis.tsx
+// src/components/features/search/TractDetailPanel/TrendAnalysis.tsx
 'use client';
 
 import { Box, VStack, Text } from '@chakra-ui/react';
-import { TractResult } from '../types/TractTypes';
+import { TractResult } from '../../../../types/TractTypes';
 import { FootTrafficChart } from './FootTrafficChart';
 import { CrimeTrendChart } from './CrimeTrendChart';
+import { TrendIndicators } from './TrendIndicators'; // Import the fixed component
 
 interface TrendAnalysisProps {
   tract: TractResult;
@@ -12,15 +13,20 @@ interface TrendAnalysisProps {
 
 export function TrendAnalysis({ tract }: TrendAnalysisProps) {
   return (
-    <Box p={6}>
-      <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.800">
-        📈 Trend Analysis
-      </Text>
-      
-      <VStack spacing={6}>
-        <FootTrafficChart tract={tract} />
-        <CrimeTrendChart tract={tract} />
-      </VStack>
-    </Box>
+    <VStack spacing={8} align="stretch" w="full">
+      {/* Quick Trend Summary */}
+      <TrendIndicators tract={tract} />
+
+      {/* Detailed Charts */}
+      <Box>
+        <Text fontSize="lg" fontWeight="bold" mb={4} color="gray.800">
+          Detailed Charts
+        </Text>
+        <VStack spacing={6}>
+          <FootTrafficChart tract={tract} />
+          <CrimeTrendChart tract={tract} />
+        </VStack>
+      </Box>
+    </VStack>
   );
 }
