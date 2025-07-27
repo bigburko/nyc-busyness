@@ -3,15 +3,16 @@
 
 import React from "react";
 import Image from 'next/image';
+import styles from './landing.module.css';
 
 const Welcome: React.FC = () => {
   return (
-    <section className="welcome-section">
-      <div className="welcome-card">
+    <section className={styles.welcomeSection}>
+      <div className={styles.welcomeCard}>
         <h1>
-          Welcome to <span className="highlight">BrickWyze</span>
+          Welcome to <span className={styles.highlight}>BrickWyze</span>
         </h1>
-        <p className="intro">
+        <p className={styles.intro}>
           <strong>BrickWyze</strong> helps NYC entrepreneurs answer one critical question: "If I run a great business, will this place still work against me?"
         </p>
         <p>
@@ -19,11 +20,11 @@ const Welcome: React.FC = () => {
         </p>
       </div>
 
-      <div className="welcome-image-container">
+      <div className={styles.welcomeImageContainer}>
         <Image 
-          src="/assets/images/welcome.png" 
+          src="/images/welcome.png" 
           alt="New Business in NYC" 
-          className="welcome-image"
+          className={styles.welcomeImage}
           width={500}
           height={400}
         />

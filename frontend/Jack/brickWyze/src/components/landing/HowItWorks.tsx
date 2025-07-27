@@ -3,29 +3,30 @@
 
 import React from "react";
 import Image from 'next/image';
+import styles from './landing.module.css';
 
 const HowItWorks: React.FC = () => {
   return (
-    <div className="how-it-works-wrapper">
-      <h2 className="section-title">How It Works</h2>
+    <div className={styles.howItWorksWrapper}>
+      <h2 className={styles.sectionTitle}>How It Works</h2>
 
-      <div className="how-it-works-container">
-        <div className="map-section">
+      <div className={styles.howItWorksContainer}>
+        <div className={styles.mapSection}>
           <Image 
-            src="/assets/images/map.png" 
+            src="/images/map.png" 
             alt="Manhattan Map" 
-            className="map-image"
+            className={styles.mapImage}
             width={400}
             height={600}
           />
         </div>
 
-        <div className="steps-section">
-          <div className="step-box dashed-border">
+        <div className={styles.stepsSection}>
+          <div className={`${styles.stepBox} ${styles.dashedBorder}`}>
             <Image 
-              src="/assets/icons/process1.png" 
+              src="/icons/process1.png" 
               alt="Input Criteria Icon" 
-              className="step-icon"
+              className={styles.stepIcon}
               width={64}
               height={64}
             />
@@ -34,18 +35,18 @@ const HowItWorks: React.FC = () => {
           </div>
 
           <Image 
-            src="/assets/icons/downArrow.png" 
+            src="/icons/downArrow.png" 
             alt="down Arrow" 
-            className="arrow-icon"
+            className={styles.arrowIcon}
             width={24}
             height={24}
           />
 
-          <div className="step-box dashed-border">
+          <div className={`${styles.stepBox} ${styles.dashedBorder}`}>
             <Image 
-              src="/assets/icons/process2.png" 
+              src="/icons/process2.png" 
               alt="Data Processing Icon" 
-              className="step-icon"
+              className={styles.stepIcon}
               width={64}
               height={64}
             />
@@ -54,18 +55,18 @@ const HowItWorks: React.FC = () => {
           </div>
 
           <Image 
-            src="/assets/icons/downArrow.png" 
+            src="/icons/downArrow.png" 
             alt="down Arrow" 
-            className="arrow-icon"
+            className={styles.arrowIcon}
             width={24}
             height={24}
           />
 
-          <div className="step-box result-box">
+          <div className={`${styles.stepBox} ${styles.resultBox}`}>
             <Image 
-              src="/assets/icons/process3.png" 
+              src="/icons/process3.png" 
               alt="Get Results Icon" 
-              className="step-icon"
+              className={styles.stepIcon}
               width={64}
               height={64}
             />

@@ -3,6 +3,7 @@
 
 import React from "react";
 import Image from 'next/image';
+import styles from './landing.module.css';
 
 interface IconItem {
   icon: string;
@@ -21,22 +22,22 @@ const items: IconItem[] = [
 
 const WhoWeAre: React.FC = () => {
   return (
-    <section className="who-we-are">
-      <h2 className="who-we-are-title">Who We're Here For</h2>
-      <p className="who-we-are-description">
+    <section className={styles.whoWeAre}>
+      <h2 className={styles.whoWeAreTitle}>Who We're Here For</h2>
+      <p className={styles.whoWeAreDescription}>
         We support founders who want to build smart from day one — not just with ideas, but with location intelligence. BrickWyze is built for entrepreneurs seeking to understand the factors they can't control, so they can launch in places that set them up to succeed.
       </p>
-      <div className="who-we-are-icons">
+      <div className={styles.whoWeAreIcons}>
         {items.map((item, idx) => (
-          <div key={idx} className="icon-item">
+          <div key={idx} className={styles.iconItem}>
             <Image
-              src={`/assets/icons/${item.icon}`}
+              src={`/icons/${item.icon}`}
               alt={item.label}
-              className="icon-img"
+              className={styles.iconImg}
               width={64}
               height={64}
             />
-            <p className="icon-label">{item.label}</p>
+            <p className={styles.iconLabel}>{item.label}</p>
           </div>
         ))}
       </div>
