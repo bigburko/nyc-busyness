@@ -112,7 +112,7 @@ NEXT_PUBLIC_OPENROUTER_API_KEY=your_openrouter_key
 ## Data Sources
 
 The platform integrates multiple NYC datasets:
-- **NYC Open Data** - Crime, demographics, census
+- **NYC Open Data** - Crime, demographics, census, Flood Risk Index
 - **MTA Data** - Subway and transit information
 - **PLUTO** - Property and zoning data
 - **BrickWyze Foot Traffic** - Proprietary movement data
