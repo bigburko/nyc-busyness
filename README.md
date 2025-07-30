@@ -77,7 +77,6 @@ Brickwyze is an AI-powered business intelligence platform that helps entrepreneu
 - Node.js 18+
 - Python 3.8+
 - Docker (optional)
-- Jest (for backend testing)
 
 ### Installation
 
