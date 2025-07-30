@@ -56,9 +56,7 @@ Brickwyze is an AI-powered business intelligence platform that helps entrepreneu
 ## Project Structure
 
 ```
-├── backend/           # Node.js backend API
-├── database/          # Database configuration
-├── docker/           # Docker setup files
+├── backend/           # Serverless API (Deno Edge Function, TypeScript)
 ├── etl/              # Data processing pipeline
 │   ├── census tract geofiles/
 │   ├── crime score/
@@ -68,8 +66,8 @@ Brickwyze is an AI-powered business intelligence platform that helps entrepreneu
 │   ├── poi/
 │   └── rent_score/
 ├── frontend/
-│   ├── Jack/brickwyze/    # Main Next.js application
-│   └── Joy/               # Alternative frontend implementation
+│   ├── Jack/brickwyze/    # Main application (React TypeScript)
+│   └── Joy/               # Home page implementation (React JavaScript, migrated to TypeScript)
 └── README.md
 ```
 
