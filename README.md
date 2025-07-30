@@ -82,7 +82,7 @@ Brickwyze is an AI-powered business intelligence platform that helps entrepreneu
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/nyc-busyness.git
+git clone https://github.com/bigburko/nyc-busyness.git
 cd nyc-busyness
 ```
 
