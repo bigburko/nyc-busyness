@@ -118,17 +118,33 @@ The platform integrates multiple NYC datasets:
 - **BrickWyze Foot Traffic** - Proprietary movement data
 - **Real Estate Listings** - Rental market data
 
-## Contributing
+## Security Checklist
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- ✅ HTTPS enabled
+- ✅ Environment variables secured
+- ✅ Database credentials protected
+- ✅ CORS properly configured
+- ✅ Security headers (preventing code injection)
+- ✅ Multi-tier rate limiting: General traffic (10 req/sec, 20 burst), Authentication (5 req/min), API endpoints (100 req/min)
+
+## DevOps
+
+- Docker containerisation (port 3001)
+- Custom bash script for CI/CD automation
+- Nginx as reverse proxy
+- Let's encrypt SSL certificate automation
+
+## Project Management
+
+- Tom's planner
+- Monday.com
+- Excel product backlog
+- Scrum/Agile
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project was developed solely for academic purposes as part of COMP47360 (Research Practicum). It is not
+licensed for public or commercial use.
 
 ## Team
 
